@@ -52,7 +52,7 @@ async def on_invoice_paid(payment: Payment) -> None:
         wallet_id=wallet_id,
         amount=int(tipAmount),
         internal=True,
-        memo=f"tpos tip",
+        memo="tpos tip",
     )
     logger.debug(f"tpos: tip invoice created: {payment_hash}")
 
