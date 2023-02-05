@@ -34,3 +34,13 @@ async def m003_addtip_options(db):
         ALTER TABLE tpos.tposs ADD tip_options TEXT NULL;
     """
     )
+
+async def m004_addfee(db):
+    """
+    Add fee to tposs table
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.tposs ADD fee TEXT NULL DEFAULT 0;
+    """
+    )

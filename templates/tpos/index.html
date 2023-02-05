@@ -4,9 +4,7 @@
   <div class="col-12 col-md-8 col-lg-7 q-gutter-y-md">
     <q-card>
       <q-card-section>
-        <q-btn unelevated color="primary" @click="formDialog.show = true"
-          >New TPoS</q-btn
-        >
+        <q-btn unelevated color="primary" @click="formDialog.show = true">New TPoS</q-btn>
       </q-card-section>
     </q-card>
 
@@ -20,14 +18,8 @@
             <q-btn flat color="grey" @click="exportCSV">Export to CSV</q-btn>
           </div>
         </div>
-        <q-table
-          dense
-          flat
-          :data="tposs"
-          row-key="id"
-          :columns="tpossTable.columns"
-          :pagination.sync="tpossTable.pagination"
-        >
+        <q-table dense flat :data="tposs" row-key="id" :columns="tpossTable.columns"
+          :pagination.sync="tpossTable.pagination">
           {% raw %}
           <template v-slot:header="props">
             <q-tr :props="props">
@@ -42,30 +34,15 @@
           <template v-slot:body="props">
             <q-tr :props="props">
               <q-td auto-width>
-                <q-btn
-                  unelevated
-                  dense
-                  size="xs"
-                  icon="launch"
-                  :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
-                  type="a"
-                  :href="props.row.tpos"
-                  target="_blank"
-                ></q-btn>
+                <q-btn unelevated dense size="xs" icon="launch" :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
+                  type="a" :href="props.row.tpos" target="_blank"></q-btn>
               </q-td>
               <q-td v-for="col in props.cols" :key="col.name" :props="props">
                 {{ (col.name == 'tip_options' && col.value ?
                 JSON.parse(col.value).join(", ") : col.value) }}
               </q-td>
               <q-td auto-width>
-                <q-btn
-                  flat
-                  dense
-                  size="xs"
-                  @click="deleteTPoS(props.row.id)"
-                  icon="cancel"
-                  color="pink"
-                ></q-btn>
+                <q-btn flat dense size="xs" @click="deleteTPoS(props.row.id)" icon="cancel" color="pink"></q-btn>
               </q-td>
             </q-tr>
           </template>
@@ -94,68 +71,27 @@
   <q-dialog v-model="formDialog.show" position="top" @hide="closeFormDialog">
     <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
       <q-form @submit="createTPoS" class="q-gutter-md">
-        <q-input
-          filled
-          dense
-          v-model.trim="formDialog.data.name"
-          label="Name"
-          placeholder="Tiago's PoS"
-        ></q-input>
-        <q-select
-          filled
-          dense
-          emit-value
-          v-model="formDialog.data.wallet"
-          :options="g.user.walletOptions"
-          label="Wallet *"
-        ></q-select>
-        <q-select
-          filled
-          dense
-          emit-value
-          v-model="formDialog.data.currency"
-          :options="currencyOptions"
-          label="Currency *"
-        ></q-select>
-        <q-select
-          filled
-          dense
-          emit-value
-          v-model="formDialog.data.tip_wallet"
-          :options="g.user.walletOptions"
-          label="Tip Wallet"
-        ></q-select>
-        <q-select
-          filled
-          multiple
-          dense
-          emit-value
-          v-model="formDialog.data.tip_options"
-          v-if="formDialog.data.tip_wallet"
-          use-input
-          use-chips
-          multiple
-          hide-dropdown-icon
-          input-debounce="0"
-          new-value-mode="add-unique"
-          label="Tip % Options (hit enter to add values)"
-          ><q-tooltip>Hit enter to add values</q-tooltip>
+        <q-input filled dense v-model.trim="formDialog.data.name" label="Name" placeholder="Tiago's PoS"></q-input>
+        <q-select filled dense emit-value v-model="formDialog.data.wallet" :options="g.user.walletOptions"
+          label="Wallet *"></q-select>
+        <q-select filled dense emit-value v-model="formDialog.data.currency" :options="currencyOptions"
+          label="Currency *"></q-select>
+        <q-select filled dense emit-value v-model="formDialog.data.tip_wallet" :options="g.user.walletOptions"
+          label="Tip Wallet"></q-select>
+        <q-input filled dense v-model.trim="formDialog.data.fee" label="Fee %" placeholder="Fee (%)"></q-input>
+        <q-select filled multiple dense emit-value v-model="formDialog.data.tip_options"
+          v-if="formDialog.data.tip_wallet" use-input use-chips multiple hide-dropdown-icon input-debounce="0"
+          new-value-mode="add-unique" label="Tip % Options (hit enter to add values)">
+          <q-tooltip>Hit enter to add values</q-tooltip>
           <template v-slot:hint>
             You can leave this blank. A default rounding option is available
             (round amount to a value)
           </template>
         </q-select>
         <div class="row q-mt-lg">
-          <q-btn
-            unelevated
-            color="primary"
-            :disable="formDialog.data.currency == null || formDialog.data.name == null"
-            type="submit"
-            >Create TPoS</q-btn
-          >
-          <q-btn v-close-popup flat color="grey" class="q-ml-auto"
-            >Cancel</q-btn
-          >
+          <q-btn unelevated color="primary" :disable="formDialog.data.currency == null || formDialog.data.name == null"
+            type="submit">Create TPoS</q-btn>
+          <q-btn v-close-popup flat color="grey" class="q-ml-auto">Cancel</q-btn>
         </div>
       </q-form>
     </q-card>
@@ -355,8 +291,8 @@
         ],
         tpossTable: {
           columns: [
-            {name: 'id', align: 'left', label: 'ID', field: 'id'},
-            {name: 'name', align: 'left', label: 'Name', field: 'name'},
+            { name: 'id', align: 'left', label: 'ID', field: 'id' },
+            { name: 'name', align: 'left', label: 'Name', field: 'name' },
             {
               name: 'currency',
               align: 'left',
@@ -374,6 +310,12 @@
               align: 'left',
               label: 'Tip Options %',
               field: 'tip_options'
+            },
+            {
+              name: 'fee',
+              align: 'left',
+              label: 'Fee %',
+              field: 'fee'
             }
           ],
           pagination: {
@@ -401,6 +343,7 @@
           )
           .then(function (response) {
             self.tposs = response.data.map(function (obj) {
+              console.log(obj)
               return mapTPoS(obj)
             })
           })
@@ -411,10 +354,11 @@
           currency: this.formDialog.data.currency,
           tip_options: this.formDialog.data.tip_options
             ? JSON.stringify(
-                this.formDialog.data.tip_options.map(str => parseInt(str))
-              )
+              this.formDialog.data.tip_options.map(str => parseInt(str))
+            )
             : JSON.stringify([]),
-          tip_wallet: this.formDialog.data.tip_wallet || ''
+          tip_wallet: this.formDialog.data.tip_wallet || '',
+          fee: this.formDialog.data.fee || ''
         }
         var self = this
 
@@ -422,7 +366,7 @@
           .request(
             'POST',
             '/tpos/api/v1/tposs',
-            _.findWhere(this.g.user.wallets, {id: this.formDialog.data.wallet})
+            _.findWhere(this.g.user.wallets, { id: this.formDialog.data.wallet })
               .inkey,
             data
           )
@@ -436,7 +380,7 @@
       },
       deleteTPoS: function (tposId) {
         var self = this
-        var tpos = _.findWhere(this.tposs, {id: tposId})
+        var tpos = _.findWhere(this.tposs, { id: tposId })
 
         LNbits.utils
           .confirmDialog('Are you sure you want to delete this TPoS?')
@@ -445,7 +389,7 @@
               .request(
                 'DELETE',
                 '/tpos/api/v1/tposs/' + tposId,
-                _.findWhere(self.g.user.wallets, {id: tpos.wallet}).adminkey
+                _.findWhere(self.g.user.wallets, { id: tpos.wallet }).adminkey
               )
               .then(function (response) {
                 self.tposs = _.reject(self.tposs, function (obj) {
