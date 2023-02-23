@@ -458,7 +458,7 @@
       },
       getRates: function () {
         var self = this
-        axios.get('https://api.opennode.co/v1/rates').then(function (response) {
+        axios.get('https://api.opennode.com/v1/rates').then(function (response) {
           self.exchangeRate =
             response.data.data['BTC' + self.currency][self.currency]
         })
