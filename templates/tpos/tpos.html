@@ -31,8 +31,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >1</q-btn
-            >
+              >1
+            </q-btn>
             <q-btn
               unelevated
               @click="stack.push(2)"
@@ -40,8 +40,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >2</q-btn
-            >
+              >2
+            </q-btn>
             <q-btn
               unelevated
               @click="stack.push(3)"
@@ -49,8 +49,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >3</q-btn
-            >
+              >3
+            </q-btn>
             <q-btn
               unelevated
               @click="stack.push(4)"
@@ -58,8 +58,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >4</q-btn
-            >
+              >4
+            </q-btn>
             <q-btn
               unelevated
               @click="stack.push(5)"
@@ -67,8 +67,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >5</q-btn
-            >
+              >5
+            </q-btn>
             <q-btn
               unelevated
               @click="stack.push(6)"
@@ -76,8 +76,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >6</q-btn
-            >
+              >6
+            </q-btn>
             <q-btn
               unelevated
               @click="stack.push(7)"
@@ -85,8 +85,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >7</q-btn
-            >
+              >7
+            </q-btn>
             <q-btn
               unelevated
               @click="stack.push(8)"
@@ -94,8 +94,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >8</q-btn
-            >
+              >8
+            </q-btn>
             <q-btn
               unelevated
               @click="stack.push(9)"
@@ -103,8 +103,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >9</q-btn
-            >
+              >9
+            </q-btn>
             <q-btn
               unelevated
               @click="stack.splice(-1, 1)"
@@ -121,8 +121,8 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              >0</q-btn
-            >
+              >0
+            </q-btn>
             <q-btn
               unelevated
               @click="stack = []"
@@ -280,8 +280,8 @@
             outline
             color="grey"
             @click="copyText('{{ request.url }}', 'TPoS URL copied to clipboard!')"
-            >Copy URL</q-btn
-          >
+            >Copy URL
+          </q-btn>
           <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
         </div>
       </q-card>
@@ -363,6 +363,7 @@
         currency: '{{ tpos.currency }}',
         tip_options: null,
         exchangeRate: null,
+        fee: Number('{{tpos.fee}}') / 100,
         stack: [],
         tipAmount: 0.0,
         tipRounding: null,
@@ -411,6 +412,13 @@
         if (!this.exchangeRate) return 0
         return Math.ceil((this.amount / this.exchangeRate) * 100000000)
       },
+      satWithFee: function () {
+        if (!this.exchangeRate) return 0
+        return Math.ceil(
+          ((this.amount + this.amount * this.fee) / this.exchangeRate) *
+            100000000
+        )
+      },
       tipAmountSat: function () {
         if (!this.exchangeRate) return 0
         return Math.ceil((this.tipAmount / this.exchangeRate) * 100000000)
@@ -419,7 +427,7 @@
         return LNbits.utils.formatSat(this.tipAmountSat)
       },
       fsat: function () {
-        return LNbits.utils.formatSat(this.sat)
+        return LNbits.utils.formatSat(this.satWithFee)
       },
       isRoundValid() {
         return this.tipRounding > this.amount
@@ -499,9 +507,10 @@
         axios
           .post('/tpos/api/v1/tposs/' + this.tposId + '/invoices', null, {
             params: {
-              amount: this.sat,
+              amount: this.satWithFee,
               memo: this.amountFormatted,
-              tipAmount: this.tipAmountSat
+              tipAmount: this.tipAmountSat,
+              fee: Math.round(this.sat * this.fee)
             }
           })
           .then(function (response) {
@@ -630,10 +639,12 @@
       },
       getRates: function () {
         var self = this
-        axios.get('https://api.opennode.com/v1/rates').then(function (response) {
-          self.exchangeRate =
-            response.data.data['BTC' + self.currency][self.currency]
-        })
+        axios
+          .get('https://api.opennode.com/v1/rates')
+          .then(function (response) {
+            self.exchangeRate =
+              response.data.data['BTC' + self.currency][self.currency]
+          })
       },
       getLastPayments() {
         return axios

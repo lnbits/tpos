@@ -125,6 +125,13 @@
           :options="g.user.walletOptions"
           label="Tip Wallet"
         ></q-select>
+        <q-input
+          filled
+          dense
+          v-model.trim="formDialog.data.fee"
+          label="Fee %"
+          placeholder="Fee (%)"
+        ></q-input>
         <q-select
           filled
           multiple
@@ -139,7 +146,8 @@
           input-debounce="0"
           new-value-mode="add-unique"
           label="Tip % Options (hit enter to add values)"
-          ><q-tooltip>Hit enter to add values</q-tooltip>
+        >
+          <q-tooltip>Hit enter to add values</q-tooltip>
           <template v-slot:hint>
             You can leave this blank. A default rounding option is available
             (round amount to a value)
@@ -374,6 +382,12 @@
               align: 'left',
               label: 'Tip Options %',
               field: 'tip_options'
+            },
+            {
+              name: 'fee',
+              align: 'left',
+              label: 'Fee %',
+              field: 'fee'
             }
           ],
           pagination: {
@@ -401,6 +415,7 @@
           )
           .then(function (response) {
             self.tposs = response.data.map(function (obj) {
+              console.log(obj)
               return mapTPoS(obj)
             })
           })
@@ -414,7 +429,8 @@
                 this.formDialog.data.tip_options.map(str => parseInt(str))
               )
             : JSON.stringify([]),
-          tip_wallet: this.formDialog.data.tip_wallet || ''
+          tip_wallet: this.formDialog.data.tip_wallet || '',
+          fee: this.formDialog.data.fee || ''
         }
         var self = this
 

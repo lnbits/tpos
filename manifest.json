@@ -1,9 +1,9 @@
 {
-    "repos": [
-        {
-            "id": "tpos",
-            "organisation": "lnbits",
-            "repository": "tpos"
-        }
-    ]
+  "repos": [
+    {
+      "id": "tpos",
+      "organisation": "lnbits",
+      "repository": "tpos"
+    }
+  ]
 }
