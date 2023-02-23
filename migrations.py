@@ -35,6 +35,7 @@ async def m003_addtip_options(db):
     """
     )
 
+
 async def m004_addfee(db):
     """
     Add fee to tposs table

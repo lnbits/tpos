@@ -20,7 +20,7 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
             data.currency,
             data.tip_options,
             data.tip_wallet,
-            data.fee
+            data.fee,
         ),
     )
 

@@ -58,7 +58,11 @@ async def api_tpos_delete(
 
 @tpos_ext.post("/api/v1/tposs/{tpos_id}/invoices", status_code=HTTPStatus.CREATED)
 async def api_tpos_create_invoice(
-    tpos_id: str, amount: int = Query(..., ge=1), memo: str = "", tipAmount: int = 0,fee:int=0
+    tpos_id: str,
+    amount: int = Query(..., ge=1),
+    memo: str = "",
+    tipAmount: int = 0,
+    fee: int = 0,
 ) -> dict:
 
     tpos = await get_tpos(tpos_id)
@@ -81,7 +85,7 @@ async def api_tpos_create_invoice(
                 "tposId": tpos_id,
                 "amount": amount - tipAmount if tipAmount else False,
             },
-            fee=fee
+            fee=fee,
         )
     except Exception as e:
         raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(e))
