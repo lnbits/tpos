@@ -1,4 +1,5 @@
-# TPoS
+# TPoS - <small>[LNbits](https://github.com/lnbits/lnbits) extension</small>
+<small>For more about LNBits extension check [this tutorial](https://github.com/lnbits/lnbits/wiki/LNbits-Extensions)</small>
 
 ## A Shareable PoS (Point of Sale) that doesn't need to be installed and can run in the browser!
 
