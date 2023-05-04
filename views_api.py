@@ -10,10 +10,10 @@ from lnbits.core.crud import get_latest_payments_by_extension, get_user
 from lnbits.core.models import Payment
 from lnbits.core.services import create_invoice
 from lnbits.core.views.api import api_payment
-from lnbits.decorators import WalletTypeInfo, get_key_type, require_admin_key
+from lnbits.decorators import WalletTypeInfo, get_key_type, require_admin_key, check_admin
 from lnbits.settings import settings
 
-from . import tpos_ext
+from . import tpos_ext, scheduled_tasks
 from .crud import create_tpos, delete_tpos, get_tpos, get_tposs
 from .models import CreateTposData, PayLnurlWData
 
@@ -191,3 +191,19 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
         logger.error(exc)
         return {"paid": False}
     return status
+
+
+@tpos_ext.delete(
+    "/api/v1",
+    status_code=HTTPStatus.OK,
+    dependencies=[Depends(check_admin)],
+    description="Stop the extension.",
+)
+async def api_stop():
+    for t in scheduled_tasks:
+        try:
+            t.cancel()
+        except Exception as ex:
+            logger.warning(ex)
+
+    return {"success": True}
