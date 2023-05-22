@@ -10,10 +10,16 @@ from lnbits.core.crud import get_latest_payments_by_extension, get_user
 from lnbits.core.models import Payment
 from lnbits.core.services import create_invoice
 from lnbits.core.views.api import api_payment
-from lnbits.decorators import WalletTypeInfo, get_key_type, require_admin_key, check_admin
+from lnbits.decorators import (
+    WalletTypeInfo,
+    check_admin,
+    get_key_type,
+    require_admin_key,
+)
 from lnbits.settings import settings
+from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 
-from . import tpos_ext, scheduled_tasks
+from . import scheduled_tasks, tpos_ext
 from .crud import create_tpos, delete_tpos, get_tpos, get_tposs
 from .models import CreateTposData, PayLnurlWData
 
@@ -207,3 +213,12 @@ async def api_stop():
             logger.warning(ex)
 
     return {"success": True}
+
+@tpos_ext.get("/api/v1/rate/{currency}", status_code=HTTPStatus.OK)
+async def api_check_fiat_rate(currency):
+    try:
+        rate = await get_fiat_rate_satoshis(currency)
+    except AssertionError:
+        rate = None
+
+    return {"rate": rate}
