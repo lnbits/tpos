@@ -1,12 +1,5 @@
 {% extends "public.html" %} {% block toolbar_title %} {{ tpos.name }}
-<q-btn
-  flat
-  dense
-  size="md"
-  @click.prevent="urlDialog.show = true"
-  icon="share"
-  color="white"
-></q-btn>
+<q-btn flat dense size="md" @click.prevent="urlDialog.show = true" icon="share" color="white"></q-btn>
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
   <q-page>
@@ -24,153 +17,44 @@
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4">
           <div class="keypad q-pa-sm">
-            <q-btn
-              unelevated
-              @click="stack.push(1)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >1</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(2)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >2</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(3)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >3</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(4)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >4</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(5)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >5</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(6)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >6</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(7)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >7</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(8)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >8</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(9)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >9</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.splice(-1, 1)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >DEL</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(0)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >0</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack = []"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              class="btn-cancel"
-              >C</q-btn
-            >
-            <q-btn
-              unelevated
-              :disabled="amount == 0"
-              @click="submitForm()"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              class="btn-confirm"
-              >OK</q-btn
-            >
+            <q-btn unelevated @click="stack.push(1)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">1</q-btn>
+            <q-btn unelevated @click="stack.push(2)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">2</q-btn>
+            <q-btn unelevated @click="stack.push(3)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">3</q-btn>
+            <q-btn unelevated @click="stack.push(4)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">4</q-btn>
+            <q-btn unelevated @click="stack.push(5)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">5</q-btn>
+            <q-btn unelevated @click="stack.push(6)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">6</q-btn>
+            <q-btn unelevated @click="stack.push(7)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">7</q-btn>
+            <q-btn unelevated @click="stack.push(8)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">8</q-btn>
+            <q-btn unelevated @click="stack.push(9)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">9</q-btn>
+            <q-btn unelevated @click="stack.splice(-1, 1)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">DEL</q-btn>
+            <q-btn unelevated @click="stack.push(0)" size="xl" :outline="!($q.dark.isActive)" rounded
+              color="primary">0</q-btn>
+            <q-btn unelevated @click="stack = []" size="xl" :outline="!($q.dark.isActive)" rounded color="primary"
+              class="btn-cancel">C</q-btn>
+            <q-btn unelevated :disabled="amount == 0" @click="submitForm()" size="xl" :outline="!($q.dark.isActive)"
+              rounded color="primary" class="btn-confirm">OK</q-btn>
           </div>
         </div>
       </div>
     </q-page-sticky>
     <q-page-sticky position="top-right" :offset="[18, 18]">
-      <q-btn
-        @click="showLastPayments"
-        fab
-        icon="receipt_long"
-        color="primary"
-      />
+      <q-btn @click="showLastPayments" fab icon="receipt_long" color="primary" />
     </q-page-sticky>
-    <q-dialog
-      v-model="invoiceDialog.show"
-      position="top"
-      @hide="closeInvoiceDialog"
-    >
-      <q-card
-        v-if="invoiceDialog.data"
-        class="q-pa-lg q-pt-xl lnbits__dialog-card"
-      >
+    <q-dialog v-model="invoiceDialog.show" position="top" @hide="closeInvoiceDialog">
+      <q-card v-if="invoiceDialog.data" class="q-pa-lg q-pt-xl lnbits__dialog-card">
         <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
-          <qrcode
-            :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
-            :options="{width: 800}"
-            class="rounded-borders"
-          ></qrcode>
+          <qrcode :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()" :options="{width: 800}"
+            class="rounded-borders"></qrcode>
         </q-responsive>
         <div class="text-center">
           <h3 class="q-my-md">
@@ -179,26 +63,13 @@
           <h5 class="q-mt-none">
             {% raw %}{{ fsat }}
             <small>sat</small>
-            <span v-show="tip_options" style="font-size: 0.75rem"
-              >( + {{ tipAmountFormatted }} tip)</span
-            >
+            <span v-show="tip_options" style="font-size: 0.75rem">( + {{ tipAmountFormatted }} tip)</span>
             {% endraw %}
           </h5>
-          <q-btn
-            outline
-            color="grey"
-            icon="nfc"
-            @click="readNfcTag()"
-            :disable="nfcTagReading"
-          ></q-btn>
+          <q-btn outline color="grey" icon="nfc" @click="readNfcTag()" :disable="nfcTagReading"></q-btn>
         </div>
         <div class="row q-mt-lg">
-          <q-btn
-            outline
-            color="grey"
-            @click="copyText(invoiceDialog.data.payment_request)"
-            >Copy invoice</q-btn
-          >
+          <q-btn outline color="grey" @click="copyText(invoiceDialog.data.payment_request)">Copy invoice</q-btn>
           <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
         </div>
       </q-card>
@@ -210,52 +81,20 @@
           <b style="font-size: 24px">Would you like to leave a tip?</b>
         </div>
         <div class="text-center q-mb-xl">
-          <q-btn
-            style="padding: 10px; margin: 3px"
-            unelevated
-            @click="processTipSelection(tip)"
-            size="lg"
-            :outline="!($q.dark.isActive)"
-            rounded
-            color="primary"
-            v-for="tip in tip_options.filter(f => f != 'Round')"
-            :key="tip"
-            >{% raw %}{{ tip }}{% endraw %}%</q-btn
-          >
-          <q-btn
-            style="padding: 10px; margin: 3px"
-            unelevated
-            @click="setRounding"
-            size="lg"
-            :outline="!($q.dark.isActive)"
-            rounded
-            color="primary"
-            label="Round to"
-          ></q-btn>
+          <q-btn style="padding: 10px; margin: 3px" unelevated @click="processTipSelection(tip)" size="lg"
+            :outline="!($q.dark.isActive)" rounded color="primary" v-for="tip in tip_options.filter(f => f != 'Round')"
+            :key="tip">{% raw %}{{ tip }}{% endraw %}%</q-btn>
+          <q-btn style="padding: 10px; margin: 3px" unelevated @click="setRounding" size="lg"
+            :outline="!($q.dark.isActive)" rounded color="primary" label="Round to"></q-btn>
           <div class="row q-my-lg" v-if="rounding">
-            <q-input
-              class="col"
-              ref="inputRounding"
-              v-model.number="tipRounding"
-              :placeholder="roundToSugestion"
-              type="number"
-              hint="Total amount including tip"
-              :prefix="currency"
-            >
+            <q-input class="col" ref="inputRounding" v-model.number="tipRounding" :placeholder="roundToSugestion"
+              type="number" hint="Total amount including tip" :prefix="currency">
             </q-input>
-            <q-btn
-              class="q-ml-sm"
-              style="margin-bottom: 20px"
-              color="primary"
-              @click="calculatePercent"
-              >Ok</q-btn
-            >
+            <q-btn class="q-ml-sm" style="margin-bottom: 20px" color="primary" @click="calculatePercent">Ok</q-btn>
           </div>
         </div>
         <div class="row q-mt-lg">
-          <q-btn flat color="primary" @click="processTipSelection(0)"
-            >No, thanks</q-btn
-          >
+          <q-btn flat color="primary" @click="processTipSelection(0)">No, thanks</q-btn>
           <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
         </div>
       </q-card>
@@ -264,11 +103,7 @@
     <q-dialog v-model="urlDialog.show" position="top">
       <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
         <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
-          <qrcode
-            value="{{ request.url }}"
-            :options="{width: 800}"
-            class="rounded-borders"
-          ></qrcode>
+          <qrcode value="{{ request.url }}" :options="{width: 800}" class="rounded-borders"></qrcode>
         </q-responsive>
         <div class="text-center q-mb-xl">
           <p style="word-break: break-all">
@@ -276,24 +111,15 @@
           </p>
         </div>
         <div class="row q-mt-lg">
-          <q-btn
-            outline
-            color="grey"
-            @click="copyText('{{ request.url }}', 'TPoS URL copied to clipboard!')"
-            >Copy URL</q-btn
-          >
+          <q-btn outline color="grey" @click="copyText('{{ request.url }}', 'TPoS URL copied to clipboard!')">Copy
+            URL</q-btn>
           <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
         </div>
       </q-card>
     </q-dialog>
 
     <q-dialog v-model="complete.show" position="top">
-      <q-icon
-        name="check"
-        transition-show="fade"
-        class="text-light-green"
-        style="font-size: min(90vw, 40em)"
-      ></q-icon>
+      <q-icon name="check" transition-show="fade" class="text-light-green" style="font-size: min(90vw, 40em)"></q-icon>
     </q-dialog>
 
     <q-dialog v-model="lastPaymentsDialog.show" position="bottom">
@@ -311,12 +137,8 @@
           <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
             {%raw%}
             <q-item-section>
-              <q-item-label class="text-bold"
-                >{{payment.amount / 1000}} sats</q-item-label
-              >
-              <q-item-label caption lines="2"
-                >Hash: {{payment.checking_id.slice(0, 30)}}...</q-item-label
-              >
+              <q-item-label class="text-bold">{{payment.amount / 1000}} sats</q-item-label>
+              <q-item-label caption lines="2">Hash: {{payment.checking_id.slice(0, 30)}}...</q-item-label>
             </q-item-section>
             <q-item-section side top>
               <q-item-label caption>{{payment.dateFrom}}</q-item-label>
@@ -409,11 +231,11 @@
       },
       sat: function () {
         if (!this.exchangeRate) return 0
-        return Math.ceil((this.amount / this.exchangeRate) * 100000000)
+        return Math.ceil(this.amount * this.exchangeRate)
       },
       tipAmountSat: function () {
         if (!this.exchangeRate) return 0
-        return Math.ceil((this.tipAmount / this.exchangeRate) * 100000000)
+        return Math.ceil(this.tipAmount * this.exchangeRate)
       },
       tipAmountFormatted: function () {
         return LNbits.utils.formatSat(this.tipAmountSat)
@@ -517,9 +339,9 @@
               axios
                 .get(
                   '/tpos/api/v1/tposs/' +
-                    self.tposId +
-                    '/invoices/' +
-                    response.data.payment_hash
+                  self.tposId +
+                  '/invoices/' +
+                  response.data.payment_hash
                 )
                 .then(function (res) {
                   if (res.data.paid) {
@@ -560,7 +382,7 @@
             message: 'Tap your NFC tag to pay this invoice with LNURLw.'
           })
 
-          return ndef.scan({signal: readerAbortController.signal}).then(() => {
+          return ndef.scan({ signal: readerAbortController.signal }).then(() => {
             ndef.onreadingerror = () => {
               self.nfcTagReading = false
 
@@ -572,7 +394,7 @@
               readerAbortController.abort()
             }
 
-            ndef.onreading = ({message}) => {
+            ndef.onreading = ({ message }) => {
               //Decode NDEF data from tag
               const textDecoder = new TextDecoder('utf-8')
 
@@ -609,10 +431,10 @@
         return axios
           .post(
             '/tpos/api/v1/tposs/' +
-              self.tposId +
-              '/invoices/' +
-              self.invoiceDialog.data.payment_request +
-              '/pay',
+            self.tposId +
+            '/invoices/' +
+            self.invoiceDialog.data.payment_request +
+            '/pay',
             {
               lnurl: lnurl
             }
@@ -628,12 +450,12 @@
             readerAbortController.abort()
           })
       },
-      getRates: function () {
-        var self = this
-        axios.get('https://api.opennode.com/v1/rates').then(function (response) {
-          self.exchangeRate =
-            response.data.data['BTC' + self.currency][self.currency]
-        })
+      getRates() {
+        LNbits.api.request('GET', `/tpos/api/v1/rate/${this.currency}`).then(
+          response => {
+            this.exchangeRate = response.data.rate
+          }
+        ).catch(e => console.error(e))
       },
       getLastPayments() {
         return axios
