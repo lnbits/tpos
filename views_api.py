@@ -64,7 +64,7 @@ async def api_tpos_delete(
 
 @tpos_ext.post("/api/v1/tposs/{tpos_id}/invoices", status_code=HTTPStatus.CREATED)
 async def api_tpos_create_invoice(
-    tpos_id: str, amount: int = Query(..., ge=1), memo: str = "", tipAmount: int = 0
+    tpos_id: str, amount: int = Query(..., ge=1), memo: str = "", tipAmount: int = 0, currency: str = "USD", fiatAmount: float = 0, rate: float = 0
 ) -> dict:
 
     tpos = await get_tpos(tpos_id)
@@ -87,6 +87,9 @@ async def api_tpos_create_invoice(
                 "tipAmount": tipAmount,
                 "tposId": tpos_id,
                 "amount": amount - tipAmount if tipAmount else False,
+                "currency": currency,
+                "fiatAmount": fiatAmount,
+                "rate": rate,
             },
         )
     except Exception as e:
