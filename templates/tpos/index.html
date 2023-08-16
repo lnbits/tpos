@@ -35,6 +35,10 @@
               <q-th v-for="col in props.cols" :key="col.name" :props="props">
                 {{ col.label }}
               </q-th>
+              <q-th auto-width>Tip Wallet</q-th>
+              <q-th auto-width>Tip Options %</q-th>
+              <q-th auto-width>Withdraw Pin</q-th>
+              <q-th auto-width>Withdraw Limit</q-th>
               <q-th auto-width></q-th>
             </q-tr>
           </template>
@@ -51,11 +55,61 @@
                   type="a"
                   :href="props.row.tpos"
                   target="_blank"
-                ></q-btn>
+                ><q-tooltip>Open PoS</q-tooltip></q-btn>
               </q-td>
-              <q-td v-for="col in props.cols" :key="col.name" :props="props">
+              <q-td auto-width>
+                <q-btn
+                  unelevated
+                  dense
+                  size="md"
+                  copy="copy"
+                  @click="copyText(props.row.id)"
+                ><q-tooltip>Click to copy</q-tooltip>{{props.row.id.substring(0,6)}}...</q-btn>
+              </q-td>
+
+              <q-td v-for="col in props.cols" v-if="col.name != 'id'" :key="col.name" :props="props">
                 {{ (col.name == 'tip_options' && col.value ?
                 JSON.parse(col.value).join(", ") : col.value) }}
+              </q-td>
+              <q-td v-if="props.row.tip_wallet != ''" auto-width>
+                <q-btn
+                unelevated
+                dense
+                size="md"
+                copy="copy"
+                @click="copyText(props.row.tip_wallet)"
+              ><q-tooltip>Click to copy</q-tooltip>{{props.row.tip_wallet.substring(0,6)}}...</q-btn>
+              </q-td>
+              <q-td v-else auto-width>
+                N/A
+              </q-td>
+              <q-td v-if="props.row.tip_wallet != ''" auto-width>
+                {{props.row.tip_options}}
+              </q-td>
+              <q-td v-else auto-width>this
+                N/A
+              </q-td>
+              <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
+                {{props.row.withdrawpin}}
+              </q-td>
+              <q-td v-else auto-width>
+                N/A
+              </q-td>
+              <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
+                {{props.row.withdrawlimit}}
+              </q-td>
+              <q-td v-else auto-width>
+                N/A
+              </q-td>
+              <q-td auto-width>
+                <q-btn
+                  flat
+                  dense
+                  size="xs"
+                  @click="editTPoS(props.row)"
+                  icon="edit"
+                  color="blue"
+                ></q-btn>
               </q-td>
               <q-td auto-width>
                 <q-btn
@@ -117,7 +171,16 @@
           :options="currencyOptions"
           label="Currency *"
         ></q-select>
+        <div class="row">
+          <div class="col">
+            <q-checkbox v-model="formDialog.advanced.tips" label="Enable tips"></q-checkbox>
+          </div>
+          <div class="col">
+            <q-checkbox v-model="formDialog.advanced.otc" label="Enable selling bitcoin"></q-checkbox>
+          </div>
+        </div>
         <q-select
+          v-if="formDialog.advanced.tips"
           filled
           dense
           emit-value
@@ -126,6 +189,7 @@
           label="Tip Wallet"
         ></q-select>
         <q-select
+          v-if="formDialog.advanced.tips"
           filled
           multiple
           dense
@@ -145,8 +209,33 @@
             (round amount to a value)
           </template>
         </q-select>
+        <q-input
+          v-if="formDialog.advanced.otc"
+          filled
+          dense
+          v-model.number="formDialog.data.withdrawlimit"
+          type="number"
+          label="Max amount to be sold daily (sats)"
+        ></q-input>
+        <q-input
+          v-if="formDialog.advanced.otc"
+          filled
+          dense
+          v-model.number="formDialog.data.withdrawpin"
+          type="number"
+          max="1000000"
+          label="Withdraw pin"
+        ></q-input>
         <div class="row q-mt-lg">
           <q-btn
+            v-if="formDialog.data.id"
+            unelevated
+            color="primary"
+            type="submit"
+            >Update TPoS</q-btn
+          >
+          <q-btn
+            v-else
             unelevated
             color="primary"
             :disable="formDialog.data.currency == null || formDialog.data.name == null"
@@ -362,18 +451,6 @@
               align: 'left',
               label: 'Currency',
               field: 'currency'
-            },
-            {
-              name: 'tip_wallet',
-              align: 'left',
-              label: 'Tip Wallet',
-              field: 'tip_wallet'
-            },
-            {
-              name: 'tip_options',
-              align: 'left',
-              label: 'Tip Options %',
-              field: 'tip_options'
             }
           ],
           pagination: {
@@ -382,7 +459,14 @@
         },
         formDialog: {
           show: false,
-          data: {}
+          data: {
+            withdrawpin: 878787,
+            tip_options: ["5","10"]
+          },
+          advanced: {
+          tips: false,
+          otc: false,
+        }
         }
       }
     },
@@ -406,33 +490,53 @@
           })
       },
       createTPoS: function () {
+        self = this
         var data = {
-          name: this.formDialog.data.name,
-          currency: this.formDialog.data.currency,
-          tip_options: this.formDialog.data.tip_options
+          name: self.formDialog.data.name,
+          currency: self.formDialog.data.currency,
+          tip_options: self.formDialog.data.tip_options
             ? JSON.stringify(
-                this.formDialog.data.tip_options.map(str => parseInt(str))
+              self.formDialog.data.tip_options.map(str => parseInt(str))
               )
             : JSON.stringify([]),
-          tip_wallet: this.formDialog.data.tip_wallet || ''
+          tip_wallet: self.formDialog.data.tip_wallet || '',
+          withdrawlimit: self.formDialog.data.withdrawlimit || '',
+          withdrawpin: self.formDialog.data.withdrawpin || ''
         }
-        var self = this
-
-        LNbits.api
-          .request(
-            'POST',
-            '/tpos/api/v1/tposs',
-            _.findWhere(this.g.user.wallets, {id: this.formDialog.data.wallet})
-              .inkey,
-            data
-          )
-          .then(function (response) {
-            self.tposs.push(mapTPoS(response.data))
-            self.formDialog.show = false
-          })
-          .catch(function (error) {
-            LNbits.utils.notifyApiError(error)
-          })
+        if(self.formDialog.data.id  != undefined){
+          LNbits.api
+            .request(
+              'POST',
+              '/tpos/api/v1/tposs/' + self.formDialog.data.id,
+              _.findWhere(self.g.user.wallets, {id: self.formDialog.data.wallet})
+                .inkey,
+              data
+            )
+            .then(function (response) {
+              self.tposs.push(mapTPoS(response.data))
+              self.formDialog.show = false
+            })
+            .catch(function (error) {
+              LNbits.utils.notifyApiError(error)
+            })
+        }
+        else{
+          LNbits.api
+            .request(
+              'POST',
+              '/tpos/api/v1/tposs',
+              _.findWhere(self.g.user.wallets, {id: self.formDialog.data.wallet})
+                .inkey,
+              data
+            )
+            .then(function (response) {
+              self.tposs.push(mapTPoS(response.data))
+              self.formDialog.show = false
+            })
+            .catch(function (error) {
+              LNbits.utils.notifyApiError(error)
+            })
+        }
       },
       deleteTPoS: function (tposId) {
         var self = this
@@ -456,6 +560,17 @@
                 LNbits.utils.notifyApiError(error)
               })
           })
+      },
+      editTPoS: function (data) {
+        data.tip_options = JSON.parse(data.tip_options)
+        this.formDialog.data = data
+        if(data.tip_wallet != ''){
+          this.formDialog.advanced.tips = true
+        }
+        if(data.withdrawlimit >= 1){
+          this.formDialog.advanced.otc = true
+        }
+        this.formDialog.show = true
       },
       exportCSV: function () {
         LNbits.utils.exportCSV(this.tpossTable.columns, this.tposs)

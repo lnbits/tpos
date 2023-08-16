@@ -9,8 +9,9 @@ from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
 from lnbits.settings import settings
 
+from loguru import logger
 from . import tpos_ext, tpos_renderer
-from .crud import get_tpos
+from .crud import get_tpos, get_clean_tpos
 
 templates = Jinja2Templates(directory="templates")
 
@@ -24,7 +25,7 @@ async def index(request: Request, user: User = Depends(check_user_exists)):
 
 @tpos_ext.get("/{tpos_id}")
 async def tpos(request: Request, tpos_id):
-    tpos = await get_tpos(tpos_id)
+    tpos = await get_clean_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
@@ -35,6 +36,7 @@ async def tpos(request: Request, tpos_id):
         {
             "request": request,
             "tpos": tpos,
+            "withdrawamtposs": tpos.withdrawamtposs,
             "web_manifest": f"/tpos/manifest/{tpos_id}.webmanifest",
         },
     )
@@ -42,7 +44,7 @@ async def tpos(request: Request, tpos_id):
 
 @tpos_ext.get("/manifest/{tpos_id}.webmanifest")
 async def manifest(tpos_id: str):
-    tpos = await get_tpos(tpos_id)
+    tpos = await get_clean_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
