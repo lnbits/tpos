@@ -14,6 +14,7 @@ class CreateTposData(BaseModel):
     withdrawlimit: Optional[int]
     withdrawpin: Optional[int]
     withdrawamt: Optional[int]
+    withdrawtime: Optional[int]
 
 class TPoS(BaseModel):
     id: str
@@ -25,6 +26,7 @@ class TPoS(BaseModel):
     withdrawlimit: Optional[int]
     withdrawpin: Optional[int]
     withdrawamt: Optional[int]
+    withdrawtime: Optional[int]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoS":
@@ -41,6 +43,7 @@ class TPoSClean(BaseModel):
     tip_options: Optional[str]
     withdrawlimit: Optional[int]
     withdrawamt: Optional[int]
+    withdrawtime: Optional[int]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoSClean":
