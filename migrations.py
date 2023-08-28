@@ -37,10 +37,9 @@ async def m003_addtip_options(db):
     
 async def m004_addwithdrawlimit(db):
     rows = [list(row) for row in await db.fetchall("SELECT * FROM tpos.tposs")]
-    await db.execute("DROP TABLE tpos.tposs")
     await db.execute(
         """
-        CREATE TABLE tpos.tposs (
+        CREATE TABLE tpos.tpos (
             id TEXT PRIMARY KEY,
             wallet TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -59,7 +58,7 @@ async def m004_addwithdrawlimit(db):
     for row in rows:
         await db.execute(
             """
-            INSERT INTO events.ticket (
+            INSERT INTO tpos.tpos (
                 id,
                 wallet,
                 name,
@@ -71,6 +70,7 @@ async def m004_addwithdrawlimit(db):
             """,
             (row[0], row[1], row[2], row[3], row[4], row[5]),
         )
+    await db.execute("DROP TABLE tpos.tposs")
 
 async def m005_initial(db):
     """

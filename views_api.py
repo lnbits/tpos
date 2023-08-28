@@ -14,7 +14,7 @@ from lnbits.decorators import WalletTypeInfo, get_key_type, require_admin_key
 from lnbits.settings import settings
 
 from . import tpos_ext
-from .crud import create_tpos, update_tpos,  delete_tpos, get_tpos, get_tposs, start_lnurlcharge
+from .crud import create_tpos, update_tpos,  delete_tpos, get_tpos, start_lnurlcharge
 from .models import CreateTposData, PayLnurlWData
 
 
