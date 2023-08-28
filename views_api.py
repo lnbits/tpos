@@ -27,7 +27,7 @@ async def api_tposs(
         user = await get_user(wallet.wallet.user)
         wallet_ids = user.wallet_ids if user else []
 
-    return [tpos.dict() for tpos in await get_tposs(wallet_ids)]
+    return [tpos.dict() for tpos in await get_tpos(wallet_ids)]
 
 
 @tpos_ext.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)

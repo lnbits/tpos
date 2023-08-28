@@ -7,6 +7,7 @@ from .crud import (
     get_tpos,
     get_lnurlcharge,
     update_lnurlcharge,
+    update_tpos
 )
 
 async def lnurl_params(
@@ -78,7 +79,7 @@ async def lnurl_callback(
         }   
     try:
         await update_lnurlcharge(claimed=True, lnurlcharge_id=k1)
-        await update_tpos(withdrawamt=True, tpos_id=lnurlcharge.tpos_id, time=True)
+        await update_tpos(withdrawamt=True, tpos_id=lnurlcharge.tpos_id, timebool=True)
         await pay_invoice(
             wallet_id=tpos.wallet,
             payment_request=pr,
