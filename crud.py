@@ -23,7 +23,7 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
             data.withdrawlimit,
             data.withdrawpin,
             0,
-            db.timestamp_now
+            datetime.timestamp(datetime.now())
         ),
     )
 
@@ -33,7 +33,7 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
 
 async def start_lnurlcharge(tpos_id: str):
     tpos = await get_tpos(tpos_id)
-    if db.timestamp_now - tpos.withdrawtime < 10000:
+    if datetime.timestamp(datetime.now()) - tpos.withdrawtime < 10000:
         assert tpos, "TPoS could not be retreived"
     token = urlsafe_short_hash()
     await db.execute(
@@ -84,7 +84,7 @@ async def update_tpos(
         timebetween = db.timestamp_now - tpos.time
         if timebetween < 600000:
             assert tpos, f"Last withdraw was made too recently,  please try again in {(600000 - timebetween) / 1000} secs"
-        await db.execute(f"UPDATE tpos.tpos WHERE time = {db.timestamp_now};")
+        await db.execute(f"UPDATE tpos.tpos WHERE withdrawtime = {datetime.timestamp(datetime.now())};")
     assert tpos, "Newly created tpos couldn't be retrieved"
     return tpos
 
