@@ -2,7 +2,7 @@
 <q-btn flat dense size="md" @click.prevent="urlDialog.show = true" icon="share" color="white"></q-btn>
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
-  <q-page>
+  <q-page id="tpos">
     <q-page-sticky v-if="exchangeRate" expand position="top">
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
@@ -49,6 +49,9 @@
     </q-page-sticky>
     <q-page-sticky position="top-right" :offset="[18, 18]">
       <q-btn @click="showLastPayments" fab icon="receipt_long" color="primary" />
+    </q-page-sticky>
+    <q-page-sticky position="top-right" :offset="[18, 90]">
+      <q-btn @click="toggleFullscreen" fab :icon="isFullscreen" color="primary" />
     </q-page-sticky>
     <q-dialog v-model="invoiceDialog.show" position="top" @hide="closeInvoiceDialog">
       <q-card v-if="invoiceDialog.data" class="q-pa-lg q-pt-xl lnbits__dialog-card">
@@ -209,7 +212,7 @@
         complete: {
           show: false
         },
-        rounding: false
+        rounding: false,
       }
     },
     computed: {
@@ -263,6 +266,9 @@
         }
 
         return Math.ceil(this.amount / toNext) * toNext
+      },
+      isFullscreen() {
+        return document.fullscreenElement ? 'fullscreen_exit' : 'fullscreen'
       }
     },
     methods: {
@@ -474,7 +480,15 @@
       showLastPayments() {
         this.getLastPayments()
         this.lastPaymentsDialog.show = true
-      }
+      },
+      toggleFullscreen() {
+        if (document.fullscreenElement) return document.exitFullscreen()
+
+        const elem = document.getElementById('tpos')
+        elem.requestFullscreen({ navigationUI: "show" })
+          .then(() => { })
+          .catch(err => console.log(err))
+      },
     },
     created: function () {
       var getRates = this.getRates
