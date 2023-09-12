@@ -51,7 +51,7 @@
       <q-btn @click="showLastPayments" fab icon="receipt_long" color="primary" />
     </q-page-sticky>
     <q-page-sticky position="top-right" :offset="[18, 90]">
-      <q-btn @click="toggleFullscreen" fab :icon="isFullscreen" color="primary" />
+      <q-btn @click="toggleFullscreen" fab :icon="fullScreenIcon" color="primary" />
     </q-page-sticky>
     <q-dialog v-model="invoiceDialog.show" position="top" @hide="closeInvoiceDialog">
       <q-card v-if="invoiceDialog.data" class="q-pa-lg q-pt-xl lnbits__dialog-card">
@@ -213,6 +213,7 @@
           show: false
         },
         rounding: false,
+        isFullScreen: false
       }
     },
     computed: {
@@ -267,8 +268,8 @@
 
         return Math.ceil(this.amount / toNext) * toNext
       },
-      isFullscreen() {
-        return document.fullscreenElement ? 'fullscreen_exit' : 'fullscreen'
+      fullScreenIcon() {
+        return this.isFullScreen ? 'fullscreen_exit' : 'fullscreen'
       }
     },
     methods: {
@@ -486,7 +487,11 @@
 
         const elem = document.documentElement
         elem.requestFullscreen({ navigationUI: "show" })
-          .then(() => { })
+          .then(() => {
+            document.addEventListener("fullscreenchange", () => {
+              this.isFullScreen = document.fullscreenElement
+            })
+          })
           .catch(err => console.log(err))
       },
     },
@@ -501,6 +506,7 @@
       if ('{{ tpos.tip_wallet }}') {
         this.tip_options.push('Round')
       }
+
       setInterval(function () {
         getRates()
       }, 120000)
