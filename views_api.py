@@ -66,7 +66,6 @@ async def api_tpos_delete(
 async def api_tpos_create_invoice(
     tpos_id: str, amount: int = Query(..., ge=1), memo: str = "", tipAmount: int = 0
 ) -> dict:
-
     tpos = await get_tpos(tpos_id)
 
     if not tpos:
@@ -213,6 +212,7 @@ async def api_stop():
             logger.warning(ex)
 
     return {"success": True}
+
 
 @tpos_ext.get("/api/v1/rate/{currency}", status_code=HTTPStatus.OK)
 async def api_check_fiat_rate(currency):
