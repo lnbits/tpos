@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 
 from lnbits.helpers import urlsafe_short_hash
-import datetime
+from datetime import datetime
 
 from . import db
 from .models import CreateTposData, TPoS, TPoSClean, LNURLCharge
