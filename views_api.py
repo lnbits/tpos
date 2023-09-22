@@ -217,7 +217,7 @@ async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
 
 @tpos_ext.get("/api/v1/atm/withdraw/{withdraw_token}/{amount}", status_code=HTTPStatus.CREATED)
 async def api_tpos_create_withdraw(
-    request: Request, withdraw_token: str, amount: int
+    request: Request, withdraw_token: str, amount: str
 ) -> dict:
     lnurlcharge = await get_lnurlcharge(withdraw_token)
     if not lnurlcharge:
@@ -231,5 +231,5 @@ async def api_tpos_create_withdraw(
             "status": "ERROR",
             "reason": f"TPoS {lnurlcharge.tpos_id} not found on this server",
         }
-    lnurlcharge = await update_lnurlcharge(LNURLCharge(id=withdraw_token, tpos_id=lnurlcharge.tpos_id, amount = amount))
+    lnurlcharge = await update_lnurlcharge(LNURLCharge(id=withdraw_token, tpos_id=lnurlcharge.tpos_id, amount = int(amount)))
     return {**lnurlcharge.dict(), **{"lnurl": lnurlcharge.lnurl(request)}}

@@ -59,7 +59,7 @@ class TPoSClean(BaseModel):
 class LNURLCharge(BaseModel):
     id: str
     tpos_id: str
-    amount: Optional[int] = Query(None)
+    amount: Optional[int]
     claimed: Optional[bool] = Query(False)
 
     @classmethod
@@ -70,12 +70,12 @@ class LNURLCharge(BaseModel):
         url = req.url_for(
             name="tpos.tposlnurlcharge", lnurlcharge_id=self.id, amount=self.amount
         )
-
+        logger.debug(url)
         return lnurl_encode(str(url))
 
     def lnurl_response(self, req: Request) -> LnurlWithdrawResponse:
         url = req.url_for(
-            name="tpos.tposlnurlcharge.callback", lnurlcharge_id=self.id
+            name="tpos.tposlnurlcharge.callback"
         )
         return LnurlWithdrawResponse(
             callback=ClearnetUrl(str(url), scheme="https"),

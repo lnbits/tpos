@@ -8,9 +8,17 @@
     icon="share"
     color="white"
   ></q-btn>
+
+
+
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
   <q-page>
+   <q-badge
+   class="text-subtitle1 q-ma-md"
+   v-show="atmMode"
+   color="negative"
+   >ATM MODE: Refresh to exit</q-badge>
     <q-page-sticky v-if="exchangeRate" expand position="top">
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
@@ -179,8 +187,9 @@
             :options="{width: 800}"
             class="rounded-borders"
           ></qrcode>
+
         </q-responsive>
-        <div class="text-center">
+        <div class="text-center" v-show="!atmMode">
           <h3 class="q-my-md">
             {% raw %}{{ amountWithTipFormatted }}{% endraw %}
           </h3>
@@ -205,7 +214,7 @@
             outline
             color="grey"
             @click="copyText(invoiceDialog.data.payment_request)"
-            >Copy invoice</q-btn
+            >Copy</q-btn
           >
           <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
         </div>
@@ -484,7 +493,6 @@
       atm() {
         if(this.withdrawamtposs > 0){
           this.atmBox = true
-          this.sat = 0
         }
       },
       atmSubmit() {
@@ -495,11 +503,10 @@
             `/tpos/api/v1/atm/` + this.tposId + `/` + this.atmPin)
           .then(function (res) {
             self.atmToken = res.data.id
+            console.log(self.atmToken)
             if (res.data.claimed == false) {
-
               self.atmBox = false
               self.atmMode = true
-              self.atmModeNotify()
             }
           })
             .catch(function (error) {
@@ -507,38 +514,18 @@
           })
         console.log(this.atmPin)
       },
-      atmModeNotify() {
-        self.atmPin = null
-        const dismiss = this.$q.notify({
-          message: 'ATM MODE (CLOSE TO LEAVE)',
-          color: 'negative',
-          icon: 'atm',
-          position: 'top',
-          progress: true,
-          timeout: 120000,
-          actions: [
-            { icon: 'close', color: 'white', round: true, handler: () => { /* ... */ } }
-          ]
-        })
-        setTimeout(() => {
-          self.atmPin = null
-          dismiss() // will hide the notification above
-        }, 120000)
-      },
-      atmGetWithdraw() {
+      atmGetWithdraw: function () {
         self = this
+        var dialog = this.invoiceDialog
           LNbits.api
           .request(
             'GET',
             `/tpos/api/v1/atm/withdraw/` + this.atmToken + `/` + this.sat)
           .then(function (res) {
-            console.log(res.data)
-            dialog.data = res.data
+            lnurl = res.data.lnurl
+            console.log(lnurl)
+            dialog.data = {"payment_request": lnurl}
             dialog.show = true
-            dialog.dismissMsg = self.$q.notify({
-              timeout: 0,
-              message: 'Please withdraw'
-            })
             if (location.protocol !== 'http:') {
               self.withdrawUrl =
               'wss://' +
@@ -546,7 +533,7 @@
               ':' +
               location.port +
               '/api/v1/ws/' +
-              self.chat_id
+              self.atmToken
             } else {
               self.withdrawUrl =
               'ws://' +
@@ -554,7 +541,7 @@
               ':' +
               location.port +
               '/api/v1/ws/' +
-              self.chat_id
+              self.atmToken
             }
             this.connectionWithdraw = new WebSocket(self.withdrawUrl)
             this.connectionWithdraw.onmessage = function (e) {
@@ -562,6 +549,8 @@
                 dialog.show = false
                 self.atmPin = null
                 self.atmToken = ""
+                self.complete.show = true
+                self.atmMode = false
               }
             }
           })
@@ -626,7 +615,6 @@
       showInvoice: function () {
         var self = this
         if(self.atmMode){
-          console.log("cunt")
           this.atmGetWithdraw()
         }
         else{
