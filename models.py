@@ -9,24 +9,24 @@ class CreateTposData(BaseModel):
     wallet: Optional[str]
     name: Optional[str]
     currency: Optional[str]
-    tip_options: Optional[str]
-    tip_wallet: Optional[str]
-    withdrawlimit: Optional[int]
-    withdrawpin: Optional[int]
-    withdrawamt: Optional[int]
-    withdrawtime: Optional[int]
+    tip_options: Optional[str] = Query(None)
+    tip_wallet: Optional[str] = Query(None)
+    withdrawlimit: Optional[int] = Query(None)
+    withdrawpin: Optional[int] = Query(None)
+    withdrawamt: Optional[int] = Query(None)
+    withdrawtime: Optional[int] = Query(None)
 
 class TPoS(BaseModel):
     id: str
     wallet: str
     name: str
     currency: str
-    tip_options: Optional[str]
-    tip_wallet: Optional[str]
-    withdrawlimit: Optional[int]
-    withdrawpin: Optional[int]
-    withdrawamt: Optional[int]
-    withdrawtime: Optional[int]
+    tip_options: Optional[str] = Query(None)
+    tip_wallet: Optional[str] = Query(None)
+    withdrawlimit: Optional[int] = Query(None)
+    withdrawpin: Optional[int] = Query(None)
+    withdrawamt: Optional[int] = Query(None)
+    withdrawtime: Optional[int] = Query(None)
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoS":
@@ -40,10 +40,10 @@ class TPoSClean(BaseModel):
     id: str
     name: str
     currency: str
-    tip_options: Optional[str]
-    withdrawlimit: Optional[int]
-    withdrawamt: Optional[int]
-    withdrawtime: Optional[int]
+    tip_options: Optional[str] = Query(None)
+    withdrawlimit: Optional[int] = Query(None)
+    withdrawamt: Optional[int] = Query(None)
+    withdrawtime: Optional[int] = Query(None)
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoSClean":
@@ -56,8 +56,8 @@ class TPoSClean(BaseModel):
 class LNURLCharge(BaseModel):
     id: str
     tpos_id: str
-    amount: Optional[int]
-    claimed: Optional[bool]
+    amount: Optional[int] = Query(None)
+    claimed: Optional[bool] = Query(False)
 
     @classmethod
     def from_row(cls, row: Row) -> "LNURLCharge":
@@ -65,3 +65,5 @@ class LNURLCharge(BaseModel):
     
 class PayLnurlWData(BaseModel):
     lnurl: str
+
+# comment

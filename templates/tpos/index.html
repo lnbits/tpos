@@ -500,8 +500,8 @@
               )
             : JSON.stringify([]),
           tip_wallet: self.formDialog.data.tip_wallet || '',
-          withdrawlimit: self.formDialog.data.withdrawlimit || '',
-          withdrawpin: self.formDialog.data.withdrawpin || ''
+          withdrawlimit: self.formDialog.data.withdrawlimit || 0,
+          withdrawpin: self.formDialog.data.withdrawpin || 0
         }
         if(self.formDialog.data.id  != undefined){
           LNbits.api

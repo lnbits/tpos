@@ -39,7 +39,7 @@ async def m004_addwithdrawlimit(db):
     rows = [list(row) for row in await db.fetchall("SELECT * FROM tpos.tposs")]
     await db.execute(
         """
-        CREATE TABLE tpos.tpos (
+        CREATE TABLE tpos.pos (
             id TEXT PRIMARY KEY,
             wallet TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -56,7 +56,7 @@ async def m004_addwithdrawlimit(db):
     for row in rows:
         await db.execute(
             """
-            INSERT INTO tpos.tpos (
+            INSERT INTO tpos.pos (
                 id,
                 wallet,
                 name,
@@ -72,15 +72,15 @@ async def m004_addwithdrawlimit(db):
 
 async def m005_initial(db):
     """
-    Initial withdaws table.
+    Initial withdraws table.
     """
     await db.execute(
         f"""
-        CREATE TABLE tpos.withdaws (
+        CREATE TABLE tpos.withdraws (
             id TEXT PRIMARY KEY,
             tpos_id TEXT NOT NULL,
-            amount int NOT NULL,
-            claimed BOOL NOT NULL
+            amount int,
+            claimed BOOLEAN DEFAULT 0
         );
     """
     )
