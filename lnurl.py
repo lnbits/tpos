@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 from lnbits.core.views.api import pay_invoice
-
+from fastapi import Query, Request, Security
 from . import tpos_ext
 from .crud import (
     get_tpos,
@@ -9,12 +9,20 @@ from .crud import (
     update_lnurlcharge,
     update_tpos
 )
+from .models import CreateTposData, TPoS, TPoSClean, LNURLCharge
+from loguru import logger
 
+@tpos_ext.get(
+    "/api/v1/lnurl/",
+    status_code=HTTPStatus.OK,
+    name="tpos.tposlnurlcharge",
+)
 async def lnurl_params(
-    request: Request,
+    req: Request,
     lnurlcharge_id: str,
-    amount: str
+    amount: int
 ):
+    logger.debug(lnurlcharge_id)
     lnurlcharge = await get_lnurlcharge(lnurlcharge_id)
     if not lnurlcharge:
         return {
@@ -32,23 +40,22 @@ async def lnurl_params(
             "status": "ERROR",
             "reason": f"Amount requested {amount} is too high, try again with a smaller amount.",
         }
-    await update_lnurlcharge(amount=int(amount), lnurlcharge_id=lnurlcharge_id)
     return {
         "tag": "withdrawRequest",
-        "callback": request.url_for(
-            "tposlnurlcharge.callback", paymentid=lnurlcharge_id
+        "callback": req.url_for(
+            "tposlnurlcharge.callback"
         ),
-        "k1": p,
+        "k1": lnurlcharge_id,
         "minWithdrawable": amount,
         "maxWithdrawable": amount,
         "defaultDescription": "TPoS withdraw",
     }
 
 
-@lnurldevice_ext.get(
-    "/api/v1/lnurl/cb/{paymentid}",
+@tpos_ext.get(
+    "/api/v1/lnurl/cb",
     status_code=HTTPStatus.OK,
-    name="tposlnurlcharge.callback",
+    name="tpos.tposlnurlcharge.callback",
 )
 async def lnurl_callback(
     request: Request,

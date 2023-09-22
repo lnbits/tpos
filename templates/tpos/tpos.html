@@ -402,6 +402,8 @@
         hasNFC: false,
         atmBox: false,
         atmPin: null,
+        atmMode: false,
+        atmToken: "",
         nfcTagReading: false,
         lastPaymentsDialog: {
           show: false,
@@ -482,25 +484,90 @@
       atm() {
         if(this.withdrawamtposs > 0){
           this.atmBox = true
+          this.sat = 0
         }
       },
       atmSubmit() {
+        self = this
           LNbits.api
           .request(
             'GET',
-            `/tpos/api/v1/tposs/atm/` + this.tposId + `/` + this.atmPin)
+            `/tpos/api/v1/atm/` + this.tposId + `/` + this.atmPin)
           .then(function (res) {
-            if (res.data.paid) {
-              clearInterval(dialog.paymentChecker)
-              dialog.dismissMsg()
-              dialog.show = false
-              self.complete.show = true
+            self.atmToken = res.data.id
+            if (res.data.claimed == false) {
+
+              self.atmBox = false
+              self.atmMode = true
+              self.atmModeNotify()
             }
           })
             .catch(function (error) {
             LNbits.utils.notifyApiError(error)
           })
         console.log(this.atmPin)
+      },
+      atmModeNotify() {
+        self.atmPin = null
+        const dismiss = this.$q.notify({
+          message: 'ATM MODE (CLOSE TO LEAVE)',
+          color: 'negative',
+          icon: 'atm',
+          position: 'top',
+          progress: true,
+          timeout: 120000,
+          actions: [
+            { icon: 'close', color: 'white', round: true, handler: () => { /* ... */ } }
+          ]
+        })
+        setTimeout(() => {
+          self.atmPin = null
+          dismiss() // will hide the notification above
+        }, 120000)
+      },
+      atmGetWithdraw() {
+        self = this
+          LNbits.api
+          .request(
+            'GET',
+            `/tpos/api/v1/atm/withdraw/` + this.atmToken + `/` + this.sat)
+          .then(function (res) {
+            console.log(res.data)
+            dialog.data = res.data
+            dialog.show = true
+            dialog.dismissMsg = self.$q.notify({
+              timeout: 0,
+              message: 'Please withdraw'
+            })
+            if (location.protocol !== 'http:') {
+              self.withdrawUrl =
+              'wss://' +
+              document.domain +
+              ':' +
+              location.port +
+              '/api/v1/ws/' +
+              self.chat_id
+            } else {
+              self.withdrawUrl =
+              'ws://' +
+              document.domain +
+              ':' +
+              location.port +
+              '/api/v1/ws/' +
+              self.chat_id
+            }
+            this.connectionWithdraw = new WebSocket(self.withdrawUrl)
+            this.connectionWithdraw.onmessage = function (e) {
+              if (e.data == "paid"){
+                dialog.show = false
+                self.atmPin = null
+                self.atmToken = ""
+              }
+            }
+          })
+          .catch(function (error) {
+            LNbits.utils.notifyApiError(error)
+          })
       },
       setRounding() {
         this.rounding = true
@@ -549,50 +616,61 @@
         }
       },
       showTipModal: function () {
-        this.tipDialog.show = true
+        if(!this.atmMode){
+          this.tipDialog.show = true
+        }
+        else{
+          this.showInvoice()
+        }
       },
       showInvoice: function () {
         var self = this
-        var dialog = this.invoiceDialog
-        axios
-          .post('/tpos/api/v1/tposs/' + this.tposId + '/invoices', null, {
-            params: {
-              amount: this.sat,
-              memo: this.amountFormatted,
-              tipAmount: this.tipAmountSat
-            }
-          })
-          .then(function (response) {
-            dialog.data = response.data
-            dialog.show = true
-
-            dialog.dismissMsg = self.$q.notify({
-              timeout: 0,
-              message: 'Waiting for payment...'
+        if(self.atmMode){
+          console.log("cunt")
+          this.atmGetWithdraw()
+        }
+        else{
+          var dialog = this.invoiceDialog
+          axios
+            .post('/tpos/api/v1/tposs/' + this.tposId + '/invoices', null, {
+              params: {
+                amount: this.sat,
+                memo: this.amountFormatted,
+                tipAmount: this.tipAmountSat
+              }
             })
+            .then(function (response) {
+              dialog.data = response.data
+              dialog.show = true
 
-            dialog.paymentChecker = setInterval(function () {
-              axios
-                .get(
-                  '/tpos/api/v1/tposs/' +
-                    self.tposId +
-                    '/invoices/' +
-                    response.data.payment_hash
-                )
-                .then(function (res) {
-                  if (res.data.paid) {
-                    clearInterval(dialog.paymentChecker)
-                    dialog.dismissMsg()
-                    dialog.show = false
+              dialog.dismissMsg = self.$q.notify({
+                timeout: 0,
+                message: 'Waiting for payment...'
+              })
 
-                    self.complete.show = true
-                  }
-                })
-            }, 3000)
-          })
-          .catch(function (error) {
-            LNbits.utils.notifyApiError(error)
-          })
+              dialog.paymentChecker = setInterval(function () {
+                axios
+                  .get(
+                    '/tpos/api/v1/tposs/' +
+                      self.tposId +
+                      '/invoices/' +
+                      response.data.payment_hash
+                  )
+                  .then(function (res) {
+                    if (res.data.paid) {
+                      clearInterval(dialog.paymentChecker)
+                      dialog.dismissMsg()
+                      dialog.show = false
+
+                      self.complete.show = true
+                    }
+                  })
+              }, 3000)
+            })
+            .catch(function (error) {
+              LNbits.utils.notifyApiError(error)
+            })
+          }
       },
       readNfcTag: function () {
         try {

@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 import httpx
-from fastapi import Depends, Query
+from fastapi import Depends, Query, Request
 from lnurl import decode as decode_lnurl
 from loguru import logger
 from starlette.exceptions import HTTPException
@@ -14,9 +14,9 @@ from lnbits.decorators import WalletTypeInfo, get_key_type, require_admin_key
 from lnbits.settings import settings
 
 from . import tpos_ext
-from .crud import create_tpos, update_tpos,  delete_tpos, get_tpos, get_tposs, start_lnurlcharge
-from .models import CreateTposData, PayLnurlWData
-
+from .crud import create_tpos, update_tpos,  delete_tpos, get_tpos, get_tposs, start_lnurlcharge, get_lnurlcharge, update_lnurlcharge
+from .models import CreateTposData, PayLnurlWData, LNURLCharge
+from .lnurl import lnurl_params
 
 @tpos_ext.get("/api/v1/tposs", status_code=HTTPStatus.OK)
 async def api_tposs(
@@ -199,7 +199,7 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
     return status
 
 
-@tpos_ext.get("/api/v1/tposs/atm/{tpos_id}/{atmpin}", status_code=HTTPStatus.CREATED)
+@tpos_ext.get("/api/v1/atm/{tpos_id}/{atmpin}", status_code=HTTPStatus.CREATED)
 async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
     tpos = await get_tpos(tpos_id)
     logger.debug(tpos)
@@ -213,3 +213,23 @@ async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
         )
     token = await start_lnurlcharge(tpos_id)
     return token
+
+
+@tpos_ext.get("/api/v1/atm/withdraw/{withdraw_token}/{amount}", status_code=HTTPStatus.CREATED)
+async def api_tpos_create_withdraw(
+    request: Request, withdraw_token: str, amount: int
+) -> dict:
+    lnurlcharge = await get_lnurlcharge(withdraw_token)
+    if not lnurlcharge:
+        return {
+            "status": "ERROR",
+            "reason": f"lnurlcharge {withdraw_token} not found on this server",
+        }
+    tpos = await get_tpos(lnurlcharge.tpos_id)
+    if not tpos:
+        return {
+            "status": "ERROR",
+            "reason": f"TPoS {lnurlcharge.tpos_id} not found on this server",
+        }
+    lnurlcharge = await update_lnurlcharge(LNURLCharge(id=withdraw_token, tpos_id=lnurlcharge.tpos_id, amount = amount))
+    return {**lnurlcharge.dict(), **{"lnurl": lnurlcharge.lnurl(request)}}

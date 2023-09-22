@@ -58,13 +58,15 @@ async def get_lnurlcharge(lnurlcharge_id: str) -> Optional[LNURLCharge]:
     return LNURLCharge(**row) if row else None
 
 async def update_lnurlcharge(
-    data: LNURLCharge, lnurlcharge_id: str
+    data: LNURLCharge
 ) -> LNURLCharge:
     q = ", ".join([f"{field[0]} = ?" for field in data])
+    logger.debug(q)
     items = [f"{field[1]}" for field in data]
-    items.append(lnurlcharge_id)
-    await db.execute(f"UPDATE tpos.pos SET {q} WHERE id = ?", (items,))
-    lnurlcharge = await get_lnurlcharge(lnurlcharge_id)
+    logger.debug(items)
+    items.append(data.id)
+    await db.execute(f"UPDATE tpos.withdraws SET {q} WHERE id = ?", (items,))
+    lnurlcharge = await get_lnurlcharge(data.id)
     assert lnurlcharge, "Withdraw couldnt be retreived"
     return lnurlcharge
 
