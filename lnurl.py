@@ -1,5 +1,5 @@
 from http import HTTPStatus
-
+from lnbits.core.services import websocketUpdater
 from lnbits.core.views.api import pay_invoice
 
 from . import tpos_ext
@@ -9,11 +9,17 @@ from .crud import (
     update_lnurlcharge,
 )
 
+@tpos_ext.get(
+    "/api/v1/lnurl/{lnurlcharge_id}/{amount}",
+    status_code=HTTPStatus.OK,
+    name="tpos.tposlnurlcharge",
+)
 async def lnurl_params(
     request: Request,
-    lnurlcharge_id: str,
-    amount: str
+    lnurlcharge_id: str = Query(None),
+    amount: str = Query(None),
 ):
+    logger.debug(amount)
     lnurlcharge = await get_lnurlcharge(lnurlcharge_id)
     if not lnurlcharge:
         return {
@@ -26,20 +32,20 @@ async def lnurl_params(
             "status": "ERROR",
             "reason": f"TPoS {lnurlcharge.tpos_id} not found on this server",
         }
-    if amount > tpos.withdrawamtposs:
+    if int(amount) > tpos.withdrawamtposs:
         return {
             "status": "ERROR",
-            "reason": f"Amount requested {amount} is too high, try again with a smaller amount.",
+            "reason": f"Amount requested {int(amount)} is too high, try again with a smaller amount.",
         }
     await update_lnurlcharge(amount=int(amount), lnurlcharge_id=lnurlcharge_id)
     return {
         "tag": "withdrawRequest",
         "callback": request.url_for(
-            "tposlnurlcharge.callback", paymentid=lnurlcharge_id
+            "tpos.tposlnurlcharge.callback"
         ),
-        "k1": p,
-        "minWithdrawable": amount,
-        "maxWithdrawable": amount,
+        "k1": lnurlcharge_id,
+        "minWithdrawable": int(amount),
+        "maxWithdrawable": int(amount),
         "defaultDescription": "TPoS withdraw",
     }
 
@@ -76,15 +82,13 @@ async def lnurl_callback(
             "status": "ERROR",
             "reason": f"Amount requested {lnurlcharge.amount} is too high, try again with a smaller amount.",
         }   
-    try:
-        await update_lnurlcharge(claimed=True, lnurlcharge_id=k1)
-        await update_tpos(withdrawamt=True, tpos_id=lnurlcharge.tpos_id, time=True)
-        await pay_invoice(
-            wallet_id=tpos.wallet,
-            payment_request=pr,
-            max_sat=lnurlcharge.amount,
-            extra={"tag": "TPoS"},
-        )
-    except:
-        await update_lnurlcharge(claimed=False, lnurlcharge_id=k1)
-        return {"status": "ERROR", "reason": "Payment failed, use a different wallet."}
+
+    await update_lnurlcharge(LNURLCharge(id=k1, tpos_id=lnurlcharge.tpos_id, amount=int(lnurlcharge.amount), claimed=True))
+    await update_tpos(CreateTposData(withdrawamt = int(withdrawamt) + int(lnurlcharge.amount)), tpos_id=lnurlcharge.tpos_id, timebool=True)
+    await pay_invoice(
+        wallet_id=tpos.wallet,
+        payment_request=pr,
+        max_sat=int(lnurlcharge.amount),
+        extra={"tag": "TPoS"},
+    )
+    await websocketUpdater(k1, "paid")

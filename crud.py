@@ -74,13 +74,14 @@ async def get_clean_tpos(tpos_id: str) -> Optional[TPoSClean]:
 async def update_tpos(
     data: CreateTposData, tpos_id: str, timebool: Optional[bool]
 ) -> TPoS:
+    tpos = await get_tpos(tpos_id)
     q = ", ".join([f"{field[0]} = ?" for field in data])
     items = [f"{field[1]}" for field in data]
     items.append(tpos_id)
     await db.execute(f"UPDATE tpos.tposs SET {q} WHERE id = ?", (items,))
     tpos = await get_tpos(tpos_id)
     if timebool:
-        timebetween = db.timestamp_now - tpos.time
+        timebetween = db.timestamp_now - tpos.withdrawtime
         if timebetween < 600000:
             assert tpos, f"Last withdraw was made too recently,  please try again in {(600000 - timebetween) / 1000} secs"
         await db.execute(f"UPDATE tpos.tposs WHERE time = {db.timestamp_now};")

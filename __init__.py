@@ -6,6 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from lnbits.db import Database
 from lnbits.helpers import template_renderer
 from lnbits.tasks import catch_everything_and_restart
+from typing import Callable
+from fastapi.responses import JSONResponse
 
 db = Database("ext_tpos")
 
