@@ -7,7 +7,7 @@ from lnbits.core.services import create_invoice, pay_invoice, websocketUpdater
 from lnbits.helpers import get_current_extension_name
 from lnbits.tasks import register_invoice_listener
 
-from .crud import get_tpos
+from .crud import get_tpos, update_lnurlcharge
 
 
 async def wait_for_paid_invoices():

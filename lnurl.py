@@ -86,11 +86,13 @@ async def lnurl_callback(
         }   
 
     await update_lnurlcharge(LNURLCharge(id=k1, tpos_id=lnurlcharge.tpos_id, amount=int(lnurlcharge.amount), claimed=True))
-    await update_tpos(CreateTposData(withdrawamt = int(withdrawamt) + int(lnurlcharge.amount)), tpos_id=lnurlcharge.tpos_id, timebool=True)
+    tpos.withdrawamt = int(tpos.withdrawamt) + int(lnurlcharge.amount)
+    logger.debug(tpos)
+    await update_tpos(data=tpos, tpos_id=lnurlcharge.tpos_id, timebool=True)
     await pay_invoice(
         wallet_id=tpos.wallet,
         payment_request=pr,
         max_sat=int(lnurlcharge.amount),
-        extra={"tag": "TPoS"},
+        extra={"tag": "TPoSWithdraw", "tpos_id": lnurlcharge.tpos_id},
     )
     await websocketUpdater(k1, "paid")

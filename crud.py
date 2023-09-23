@@ -84,10 +84,10 @@ async def update_tpos(
     await db.execute(f"UPDATE tpos.pos SET {q} WHERE id = ?", (items,))
     tpos = await get_tpos(tpos_id)
     if timebool:
-        timebetween = db.timestamp_now - tpos.withdrawtime
+        timebetween = int(datetime.timestamp(datetime.now()) - tpos.withdrawtime)
         if timebetween < 600000:
-            assert tpos, f"Last withdraw was made too recently,  please try again in {(600000 - timebetween) / 1000} secs"
-        await db.execute(f"UPDATE tpos.pos WHERE withdrawtime = {datetime.timestamp(datetime.now())};")
+            assert tpos, f"Last withdraw was made too recently,  please try again in {int((600000 - timebetween) / 1000)} secs"
+        await db.execute(f"UPDATE tpos.pos SET withdrawtime = ? WHERE id = ?", (int(datetime.timestamp(datetime.now())), tpos_id,))
     assert tpos, "Newly created tpos couldn't be retrieved"
     return tpos
 
