@@ -4,9 +4,7 @@
   <div class="col-12 col-md-8 col-lg-7 q-gutter-y-md">
     <q-card>
       <q-card-section>
-        <q-btn unelevated color="primary" @click="formDialog.show = true"
-          >New TPoS</q-btn
-        >
+        <q-btn unelevated color="primary" @click="formDialog.show = true">New TPoS</q-btn>
       </q-card-section>
     </q-card>
 
@@ -20,14 +18,8 @@
             <q-btn flat color="grey" @click="exportCSV">Export to CSV</q-btn>
           </div>
         </div>
-        <q-table
-          dense
-          flat
-          :data="tposs"
-          row-key="id"
-          :columns="tpossTable.columns"
-          :pagination.sync="tpossTable.pagination"
-        >
+        <q-table dense flat :data="tposs" row-key="id" :columns="tpossTable.columns"
+          :pagination.sync="tpossTable.pagination">
           {% raw %}
           <template v-slot:header="props">
             <q-tr :props="props">
@@ -36,36 +28,26 @@
                 {{ col.label }}
               </q-th>
               <q-th auto-width></q-th>
+              <q-th auto-width></q-th>
             </q-tr>
           </template>
 
           <template v-slot:body="props">
             <q-tr :props="props">
               <q-td auto-width>
-                <q-btn
-                  unelevated
-                  dense
-                  size="xs"
-                  icon="launch"
-                  :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
-                  type="a"
-                  :href="props.row.tpos"
-                  target="_blank"
-                ></q-btn>
+                <q-btn unelevated dense size="xs" icon="launch" :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
+                  type="a" :href="props.row.tpos" target="_blank"></q-btn>
               </q-td>
               <q-td v-for="col in props.cols" :key="col.name" :props="props">
                 {{ (col.name == 'tip_options' && col.value ?
                 JSON.parse(col.value).join(", ") : col.value) }}
               </q-td>
               <q-td auto-width>
-                <q-btn
-                  flat
-                  dense
-                  size="xs"
-                  @click="deleteTPoS(props.row.id)"
-                  icon="cancel"
-                  color="pink"
-                ></q-btn>
+                <q-btn flat dense size="xs" @click="updateTPosForm(props.row.id)" icon="edit"
+                  color="light-blue"></q-btn>
+              </q-td>
+              <q-td auto-width>
+                <q-btn flat dense size="xs" @click="deleteTPoS(props.row.id)" icon="cancel" color="pink"></q-btn>
               </q-td>
             </q-tr>
           </template>
@@ -93,69 +75,27 @@
 
   <q-dialog v-model="formDialog.show" position="top" @hide="closeFormDialog">
     <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
-      <q-form @submit="createTPoS" class="q-gutter-md">
-        <q-input
-          filled
-          dense
-          v-model.trim="formDialog.data.name"
-          label="Name"
-          placeholder="Tiago's PoS"
-        ></q-input>
-        <q-select
-          filled
-          dense
-          emit-value
-          v-model="formDialog.data.wallet"
-          :options="g.user.walletOptions"
-          label="Wallet *"
-        ></q-select>
-        <q-select
-          filled
-          dense
-          emit-value
-          v-model="formDialog.data.currency"
-          :options="currencyOptions"
-          label="Currency *"
-        ></q-select>
-        <q-select
-          filled
-          dense
-          emit-value
-          v-model="formDialog.data.tip_wallet"
-          :options="g.user.walletOptions"
-          label="Tip Wallet"
-        ></q-select>
-        <q-select
-          filled
-          multiple
-          dense
-          emit-value
-          v-model="formDialog.data.tip_options"
-          v-if="formDialog.data.tip_wallet"
-          use-input
-          use-chips
-          multiple
-          hide-dropdown-icon
-          input-debounce="0"
-          new-value-mode="add-unique"
-          label="Tip % Options (hit enter to add values)"
-          ><q-tooltip>Hit enter to add values</q-tooltip>
+      <q-form @submit="sendTPosData" class="q-gutter-md">
+        <q-input filled dense v-model.trim="formDialog.data.name" label="Name" placeholder="Tiago's PoS"></q-input>
+        <q-select filled dense emit-value v-model="formDialog.data.wallet" :options="g.user.walletOptions"
+          label="Wallet *" :disabled="formDialog.data.id"></q-select>
+        <q-select filled dense emit-value v-model="formDialog.data.currency" :options="currencyOptions"
+          label="Currency *"></q-select>
+        <q-select filled dense emit-value v-model="formDialog.data.tip_wallet" :options="g.user.walletOptions"
+          label="Tip Wallet"></q-select>
+        <q-select filled multiple dense emit-value v-model="formDialog.data.tip_options"
+          v-if="formDialog.data.tip_wallet" use-input use-chips multiple hide-dropdown-icon input-debounce="0"
+          new-value-mode="add-unique" label="Tip % Options (hit enter to add values)"><q-tooltip>Hit enter to add
+            values</q-tooltip>
           <template v-slot:hint>
             You can leave this blank. A default rounding option is available
             (round amount to a value)
           </template>
         </q-select>
         <div class="row q-mt-lg">
-          <q-btn
-            unelevated
-            color="primary"
-            :disable="formDialog.data.currency == null || formDialog.data.name == null"
-            type="submit"
-            >Create TPoS</q-btn
-          >
-          <q-btn v-close-popup flat color="grey" class="q-ml-auto"
-            >Cancel</q-btn
-          >
+          <q-btn unelevated color="primary" :disable="formDialog.data.currency == null || formDialog.data.name == null"
+            type="submit">Create TPoS</q-btn>
+          <q-btn v-close-popup flat color="grey" class="q-ml-auto">Cancel</q-btn>
         </div>
       </q-form>
     </q-card>
@@ -355,8 +295,8 @@
         ],
         tpossTable: {
           columns: [
-            {name: 'id', align: 'left', label: 'ID', field: 'id'},
-            {name: 'name', align: 'left', label: 'Name', field: 'name'},
+            { name: 'id', align: 'left', label: 'ID', field: 'id' },
+            { name: 'name', align: 'left', label: 'Name', field: 'name' },
             {
               name: 'currency',
               align: 'left',
@@ -387,7 +327,8 @@
       }
     },
     methods: {
-      closeFormDialog: function () {
+      closeFormDialog() {
+        this.formDialog.show = false
         this.formDialog.data = {}
       },
       getTPoSs: function () {
@@ -405,38 +346,68 @@
             })
           })
       },
-      createTPoS: function () {
-        var data = {
-          name: this.formDialog.data.name,
-          currency: this.formDialog.data.currency,
+      sendTPosData() {
+        const data = {
+          ...this.formDialog.data,
           tip_options: this.formDialog.data.tip_options
             ? JSON.stringify(
-                this.formDialog.data.tip_options.map(str => parseInt(str))
-              )
+              this.formDialog.data.tip_options.map(str => parseInt(str))
+            )
             : JSON.stringify([]),
           tip_wallet: this.formDialog.data.tip_wallet || ''
         }
-        var self = this
-
+        const wallet = _.findWhere(this.g.user.wallets, {
+          id: this.formDialog.data.wallet
+        })
+        if (data.id) {
+          this.updateTPos(wallet, data)
+        } else {
+          this.createTPoS(wallet, data)
+        }
+      },
+      updateTPosForm(tposId) {
+        const tpos = _.findWhere(this.tposs, { id: tposId })
+        this.formDialog.data = { ...tpos, tip_options: JSON.parse(tpos.tip_options) }
+        this.formDialog.show = true
+      },
+      createTPoS(wallet, data) {
         LNbits.api
           .request(
             'POST',
             '/tpos/api/v1/tposs',
-            _.findWhere(this.g.user.wallets, {id: this.formDialog.data.wallet})
-              .inkey,
+            wallet.inkey,
             data
           )
-          .then(function (response) {
-            self.tposs.push(mapTPoS(response.data))
-            self.formDialog.show = false
+          .then((response) => {
+            this.tposs.push(mapTPoS(response.data))
+            this.closeFormDialog()
           })
-          .catch(function (error) {
+          .catch((error) => {
+            LNbits.utils.notifyApiError(error)
+          })
+      },
+      updateTPos(wallet, data) {
+        LNbits.api
+          .request(
+            'PUT',
+            `/tpos/api/v1/tposs/${data.id}`,
+            wallet.adminkey,
+            data
+          )
+          .then((response) => {
+            this.tposs = _.reject(this.tposs, (obj) => {
+              return obj.id == data.id
+            })
+            this.tposs.push(mapTPoS(response.data))
+            this.closeFormDialog()
+          })
+          .catch((error) => {
             LNbits.utils.notifyApiError(error)
           })
       },
       deleteTPoS: function (tposId) {
         var self = this
-        var tpos = _.findWhere(this.tposs, {id: tposId})
+        var tpos = _.findWhere(this.tposs, { id: tposId })
 
         LNbits.utils
           .confirmDialog('Are you sure you want to delete this TPoS?')
@@ -445,7 +416,7 @@
               .request(
                 'DELETE',
                 '/tpos/api/v1/tposs/' + tposId,
-                _.findWhere(self.g.user.wallets, {id: tpos.wallet}).adminkey
+                _.findWhere(self.g.user.wallets, { id: tpos.wallet }).adminkey
               )
               .then(function (response) {
                 self.tposs = _.reject(self.tposs, function (obj) {
