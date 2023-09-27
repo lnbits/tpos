@@ -1,6 +1,7 @@
 {
   "name": "TPoS",
   "short_description": "A shareable PoS terminal!",
-	"tile": "/tpos/static/image/tpos.png",
-  "contributors": ["talvasconcelos", "arcbtc", "leesalminen"]
+  "tile": "/tpos/static/image/tpos.png",
+  "contributors": ["talvasconcelos", "arcbtc", "leesalminen"],
+  "min_lnbits_version": "0.11.0"
 }

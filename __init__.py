@@ -40,14 +40,13 @@ tpos_ext.route_class = LNURLErrorResponseHandler
 tpos_static_files = [
     {
         "path": "/tpos/static",
-        "app": StaticFiles(directory="lnbits/extensions/tpos/static"),
         "name": "tpos_static",
     }
 ]
 
 
 def tpos_renderer():
-    return template_renderer(["lnbits/extensions/tpos/templates"])
+    return template_renderer(["tpos/templates"])
 
 
 from .lnurl import *  # noqa: F401,F403

@@ -4,9 +4,7 @@
   <div class="col-12 col-md-8 col-lg-7 q-gutter-y-md">
     <q-card>
       <q-card-section>
-        <q-btn unelevated color="primary" @click="formDialog.show = true"
-          >New TPoS</q-btn
-        >
+        <q-btn unelevated color="primary" @click="formDialog.show = true">New TPoS</q-btn>
       </q-card-section>
     </q-card>
 
@@ -20,14 +18,8 @@
             <q-btn flat color="grey" @click="exportCSV">Export to CSV</q-btn>
           </div>
         </div>
-        <q-table
-          dense
-          flat
-          :data="tposs"
-          row-key="id"
-          :columns="tpossTable.columns"
-          :pagination.sync="tpossTable.pagination"
-        >
+        <q-table dense flat :data="tposs" row-key="id" :columns="tpossTable.columns"
+          :pagination.sync="tpossTable.pagination">
           {% raw %}
           <template v-slot:header="props">
             <q-tr :props="props">
@@ -39,6 +31,7 @@
               <q-th auto-width>Tip Options %</q-th>
               <q-th auto-width>Withdraw Pin</q-th>
               <q-th auto-width>Withdraw Limit</q-th>
+              <q-th auto-width></q-th>
               <q-th auto-width></q-th>
             </q-tr>
           </template>
@@ -120,6 +113,9 @@
                   icon="cancel"
                   color="pink"
                 ></q-btn>
+              </q-td>
+              <q-td auto-width>
+                <q-btn flat dense size="xs" @click="deleteTPoS(props.row.id)" icon="cancel" color="pink"></q-btn>
               </q-td>
             </q-tr>
           </template>
@@ -444,8 +440,8 @@
         ],
         tpossTable: {
           columns: [
-            {name: 'id', align: 'left', label: 'ID', field: 'id'},
-            {name: 'name', align: 'left', label: 'Name', field: 'name'},
+            { name: 'id', align: 'left', label: 'ID', field: 'id' },
+            { name: 'name', align: 'left', label: 'Name', field: 'name' },
             {
               name: 'currency',
               align: 'left',
@@ -471,7 +467,8 @@
       }
     },
     methods: {
-      closeFormDialog: function () {
+      closeFormDialog() {
+        this.formDialog.show = false
         this.formDialog.data = {}
       },
       getTPoSs: function () {
@@ -538,9 +535,28 @@
             })
         }
       },
+      updateTPos(wallet, data) {
+        LNbits.api
+          .request(
+            'PUT',
+            `/tpos/api/v1/tposs/${data.id}`,
+            wallet.adminkey,
+            data
+          )
+          .then((response) => {
+            this.tposs = _.reject(this.tposs, (obj) => {
+              return obj.id == data.id
+            })
+            this.tposs.push(mapTPoS(response.data))
+            this.closeFormDialog()
+          })
+          .catch((error) => {
+            LNbits.utils.notifyApiError(error)
+          })
+      },
       deleteTPoS: function (tposId) {
         var self = this
-        var tpos = _.findWhere(this.tposs, {id: tposId})
+        var tpos = _.findWhere(this.tposs, { id: tposId })
 
         LNbits.utils
           .confirmDialog('Are you sure you want to delete this TPoS?')
@@ -549,7 +565,7 @@
               .request(
                 'DELETE',
                 '/tpos/api/v1/tposs/' + tposId,
-                _.findWhere(self.g.user.wallets, {id: tpos.wallet}).adminkey
+                _.findWhere(self.g.user.wallets, { id: tpos.wallet }).adminkey
               )
               .then(function (response) {
                 self.tposs = _.reject(self.tposs, function (obj) {
