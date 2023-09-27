@@ -14,11 +14,7 @@
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
   <q-page>
-   <q-badge
-   class="text-subtitle1 q-ma-md"
-   v-show="atmMode"
-   color="negative"
-   >ATM MODE: Refresh to exit</q-badge>
+ <q-btn  v-show="atmMode" color="negative" @click="window.location.reload()">EXIT ATM MODE</q-btn>
     <q-page-sticky v-if="exchangeRate" expand position="top">
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
@@ -163,17 +159,19 @@
         fab
         icon="receipt_long"
         color="primary"
-        ></q-btn>
-        <q-btn
+        ></q-btn></q-page-sticky>
+        <q-page-sticky position="top-right" :offset="[18, 90]">
+      <q-btn @click="toggleFullscreen" fab :icon="fullScreenIcon" color="primary" ></q-btn>
+    </q-page-sticky>
+    <q-page-sticky position="top-right" :offset="[18, 162]">
+              <q-btn
         @click="atm"
         v-if="withdrawamtposs > 0"
         fab
         icon="atm"
         color="primary"
         ></q-btn>
-    </q-page-sticky>
-    <q-page-sticky position="top-right" :offset="[18, 90]">
-      <q-btn @click="toggleFullscreen" fab :icon="fullScreenIcon" color="primary" />
+
     </q-page-sticky>
     <q-dialog v-model="invoiceDialog.show" position="top" @hide="closeInvoiceDialog">
       <q-card v-if="invoiceDialog.data" class="q-pa-lg q-pt-xl lnbits__dialog-card">
