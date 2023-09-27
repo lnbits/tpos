@@ -63,6 +63,16 @@ async def update_lnurlcharge(
     assert lnurlcharge, "Withdraw couldnt be retreived"
     return lnurlcharge
 
+async def update_tpos(tpos_id: str, **kwargs) -> TPoS:
+    q = ", ".join([f"{field[0]} = ?" for field in kwargs.items()])
+    await db.execute(
+        f"UPDATE tpos.tposs SET {q} WHERE id = ?", (*kwargs.values(), tpos_id)
+    )
+    tpos = await get_tpos(tpos_id)
+    assert tpos, "Newly updated tpos couldn't be retrieved"
+    return tpos
+
+
 async def get_tpos(tpos_id: str) -> Optional[TPoS]:
     row = await db.fetchone("SELECT * FROM tpos.tposs WHERE id = ?", (tpos_id,))
     return TPoS(**row) if row else None

@@ -1,7 +1,6 @@
 import asyncio
 
 from fastapi import APIRouter
-from fastapi.staticfiles import StaticFiles
 
 from lnbits.db import Database
 from lnbits.helpers import template_renderer
@@ -16,14 +15,13 @@ tpos_ext: APIRouter = APIRouter(prefix="/tpos", tags=["TPoS"])
 tpos_static_files = [
     {
         "path": "/tpos/static",
-        "app": StaticFiles(directory="lnbits/extensions/tpos/static"),
         "name": "tpos_static",
     }
 ]
 
 
 def tpos_renderer():
-    return template_renderer(["lnbits/extensions/tpos/templates"])
+    return template_renderer(["tpos/templates"])
 
 
 from .tasks import wait_for_paid_invoices
