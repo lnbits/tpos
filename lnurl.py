@@ -2,6 +2,7 @@ from http import HTTPStatus
 from lnbits.core.services import websocketUpdater
 from lnbits.core.views.api import pay_invoice
 from fastapi import Query, Request, Security
+from typing import Optional
 from . import tpos_ext
 from .crud import (
     get_tpos,
@@ -19,8 +20,8 @@ from loguru import logger
 )
 async def lnurl_params(
     request: Request,
-    lnurlcharge_id: str = Query(None),
-    amount: str = Query(None),
+    lnurlcharge_id: Optional[str] = None,
+    amount: Optional[str] = None,
 ):
     logger.debug(amount)
     lnurlcharge = await get_lnurlcharge(lnurlcharge_id)
@@ -59,8 +60,8 @@ async def lnurl_params(
 )
 async def lnurl_callback(
     request: Request,
-    pr: str = Query(None),
-    k1: str = Query(None),
+    pr: Optional[str] = None,
+    k1: Optional[str] = None,
 ):
     lnurlcharge = await get_lnurlcharge(k1)
     if not lnurlcharge:

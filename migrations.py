@@ -37,6 +37,7 @@ async def m003_addtip_options(db):
     
 async def m004_addwithdrawlimit(db):
     rows = [list(row) for row in await db.fetchall("SELECT * FROM tpos.tposs")]
+    await db.execute("DROP TABLE IF EXISTS tpos.tposs")
     await db.execute(
         """
         CREATE TABLE tpos.pos (

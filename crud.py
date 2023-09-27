@@ -33,7 +33,7 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
 
 
 async def get_tpos(tpos_id: str) -> Optional[TPoS]:
-    row = await db.fetchone("SELECT * FROM tpos.tposs WHERE id = ?", (tpos_id,))
+    row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = ?", (tpos_id,))
     return TPoS(**row) if row else None
 
 async def start_lnurlcharge(tpos_id: str):
