@@ -73,7 +73,9 @@ class LNURLCharge(BaseModel):
     def lnurl(self, req: Request) -> Lnurl:
         url = str(
             req.url_for(
-                "tpos.tposlnurlcharge", lnurlcharge_id=self.id, amount=self.amount
+                "tpos.tposlnurlcharge",
+                lnurlcharge_id=self.id,
+                amount=self.amount,
             )
         )
         logger.debug(url)
