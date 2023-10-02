@@ -34,10 +34,10 @@ async def m003_addtip_options(db):
         ALTER TABLE tpos.tposs ADD tip_options TEXT NULL;
     """
     )
-    
+
+
 async def m004_addwithdrawlimit(db):
     rows = [list(row) for row in await db.fetchall("SELECT * FROM tpos.tposs")]
-    await db.execute("DROP TABLE IF EXISTS tpos.tposs")
     await db.execute(
         """
         CREATE TABLE tpos.pos (
@@ -70,6 +70,7 @@ async def m004_addwithdrawlimit(db):
             (row[0], row[1], row[2], row[3], row[4], row[5]),
         )
     await db.execute("DROP TABLE tpos.tposs")
+
 
 async def m005_initial(db):
     """

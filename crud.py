@@ -7,6 +7,7 @@ from . import db
 from .models import CreateTposData, TPoS, TPoSClean, LNURLCharge
 from loguru import logger
 
+
 async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
     tpos_id = urlsafe_short_hash()
     await db.execute(
@@ -24,7 +25,7 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
             data.withdrawlimit,
             data.withdrawpin,
             0,
-            datetime.timestamp(datetime.now())
+            datetime.timestamp(datetime.now()),
         ),
     )
     tpos = await get_tpos(tpos_id)
@@ -36,6 +37,7 @@ async def get_tpos(tpos_id: str) -> Optional[TPoS]:
     row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = ?", (tpos_id,))
     return TPoS(**row) if row else None
 
+
 async def start_lnurlcharge(tpos_id: str):
     tpos = await get_tpos(tpos_id)
     if datetime.timestamp(datetime.now()) - tpos.withdrawtime < 10000:
@@ -46,21 +48,20 @@ async def start_lnurlcharge(tpos_id: str):
         INSERT INTO tpos.withdraws (id, tpos_id)
         VALUES (?, ?)
         """,
-        (
-            token,
-            tpos_id
-        ),
+        (token, tpos_id),
     )
     lnurlcharge = await get_lnurlcharge(token)
     return lnurlcharge
 
+
 async def get_lnurlcharge(lnurlcharge_id: str) -> Optional[LNURLCharge]:
-    row = await db.fetchone("SELECT * FROM tpos.withdraws WHERE id = ?", (lnurlcharge_id,))
+    row = await db.fetchone(
+        "SELECT * FROM tpos.withdraws WHERE id = ?", (lnurlcharge_id,)
+    )
     return LNURLCharge(**row) if row else None
 
-async def update_lnurlcharge(
-    data: LNURLCharge
-) -> LNURLCharge:
+
+async def update_lnurlcharge(data: LNURLCharge) -> LNURLCharge:
     q = ", ".join([f"{field[0]} = ?" for field in data])
     logger.debug(q)
     items = [f"{field[1]}" for field in data]
@@ -71,9 +72,11 @@ async def update_lnurlcharge(
     assert lnurlcharge, "Withdraw couldnt be retreived"
     return lnurlcharge
 
+
 async def get_clean_tpos(tpos_id: str) -> Optional[TPoSClean]:
     row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = ?", (tpos_id,))
     return TPoSClean(**row) if row else None
+
 
 async def update_tpos(
     data: CreateTposData, tpos_id: str, timebool: Optional[bool]
@@ -87,10 +90,19 @@ async def update_tpos(
     if timebool:
         timebetween = int(datetime.timestamp(datetime.now()) - tpos.withdrawtime)
         if timebetween < 600000:
-            assert tpos, f"Last withdraw was made too recently,  please try again in {int((600000 - timebetween) / 1000)} secs"
-        await db.execute(f"UPDATE tpos.pos SET withdrawtime = ? WHERE id = ?", (int(datetime.timestamp(datetime.now())), tpos_id,))
+            assert (
+                tpos
+            ), f"Last withdraw was made too recently,  please try again in {int((600000 - timebetween) / 1000)} secs"
+        await db.execute(
+            f"UPDATE tpos.pos SET withdrawtime = ? WHERE id = ?",
+            (
+                int(datetime.timestamp(datetime.now())),
+                tpos_id,
+            ),
+        )
     assert tpos, "Newly created tpos couldn't be retrieved"
     return tpos
+
 
 async def get_tposs(wallet_ids: Union[str, List[str]]) -> List[TPoS]:
     if isinstance(wallet_ids, str):
