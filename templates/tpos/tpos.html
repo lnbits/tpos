@@ -524,6 +524,10 @@
             console.log(lnurl)
             dialog.data = {"payment_request": lnurl}
             dialog.show = true
+            dialog.dismissMsg = self.$q.notify({
+                timeout: 0,
+                message: 'Withdraw...'
+              })
             if (location.protocol !== 'http:') {
               self.withdrawUrl =
               'wss://' +
