@@ -13,12 +13,12 @@ class CreateTposData(BaseModel):
     wallet: Optional[str]
     name: Optional[str]
     currency: Optional[str]
-    tip_options: Optional[str] = Query(None)
-    tip_wallet: Optional[str] = Query(None)
-    withdrawlimit: Optional[int] = Query(None)
-    withdrawpin: Optional[int] = Query(None)
-    withdrawamt: Optional[int] = Query(None)
-    withdrawtime: Optional[int] = Query(None)
+    tip_options: str = Query(None)
+    tip_wallet: str = Query(None)
+    withdrawlimit: int = Query(None)
+    withdrawpin: int = Query(None)
+    withdrawamt: int = Query(None)
+    withdrawtime: int = Query(None)
 
 
 class TPoS(BaseModel):
@@ -26,12 +26,12 @@ class TPoS(BaseModel):
     wallet: str
     name: str
     currency: str
-    tip_options: Optional[str] = Query(None)
-    tip_wallet: Optional[str] = Query(None)
-    withdrawlimit: Optional[int] = Query(None)
-    withdrawpin: Optional[int] = Query(None)
-    withdrawamt: Optional[int] = Query(None)
-    withdrawtime: Optional[int] = Query(None)
+    tip_options: Optional[str]
+    tip_wallet: Optional[str]
+    withdrawlimit: Optional[int]
+    withdrawpin: Optional[int]
+    withdrawamt: Optional[int]
+    withdrawtime: Optional[int]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoS":
@@ -46,10 +46,10 @@ class TPoSClean(BaseModel):
     id: str
     name: str
     currency: str
-    tip_options: Optional[str] = Query(None)
-    withdrawlimit: Optional[int] = Query(None)
-    withdrawamt: Optional[int] = Query(None)
-    withdrawtime: Optional[int] = Query(None)
+    tip_options: Optional[str]
+    withdrawlimit: Optional[int]
+    withdrawamt: Optional[int]
+    withdrawtime: Optional[int]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoSClean":
@@ -63,8 +63,8 @@ class TPoSClean(BaseModel):
 class LNURLCharge(BaseModel):
     id: str
     tpos_id: str
-    amount: Optional[int]
-    claimed: Optional[bool] = Query(False)
+    amount: int = Query(None)
+    claimed: bool = Query(False)
 
     @classmethod
     def from_row(cls, row: Row) -> "LNURLCharge":
@@ -78,16 +78,17 @@ class LNURLCharge(BaseModel):
                 amount=self.amount,
             )
         )
-        logger.debug(url)
         return lnurl_encode(url)
 
     def lnurl_response(self, req: Request) -> LnurlWithdrawResponse:
         url = str(req.url_for("tpos.tposlnurlcharge.callback"))
+        assert self.amount
+        amount = int(self.amount)
         return LnurlWithdrawResponse(
             callback=ClearnetUrl(url, scheme="https"),
             k1=self.k1,
-            minWithdrawable=MilliSatoshi(self.min_withdrawable * 1000),
-            maxWithdrawable=MilliSatoshi(self.max_withdrawable * 1000),
+            minWithdrawable=MilliSatoshi(amount * 1000),
+            maxWithdrawable=MilliSatoshi(amount * 1000),
             defaultDescription=self.title,
         )
 

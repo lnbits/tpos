@@ -4,7 +4,9 @@
   <div class="col-12 col-md-8 col-lg-7 q-gutter-y-md">
     <q-card>
       <q-card-section>
-        <q-btn unelevated color="primary" @click="formDialog.show = true">New TPoS</q-btn>
+        <q-btn unelevated color="primary" @click="formDialog.show = true"
+          >New TPoS</q-btn
+        >
       </q-card-section>
     </q-card>
 
@@ -18,8 +20,14 @@
             <q-btn flat color="grey" @click="exportCSV">Export to CSV</q-btn>
           </div>
         </div>
-        <q-table dense flat :data="tposs" row-key="id" :columns="tpossTable.columns"
-          :pagination.sync="tpossTable.pagination">
+        <q-table
+          dense
+          flat
+          :data="tposs"
+          row-key="id"
+          :columns="tpossTable.columns"
+          :pagination.sync="tpossTable.pagination"
+        >
           {% raw %}
           <template v-slot:header="props">
             <q-tr :props="props">
@@ -48,7 +56,8 @@
                   type="a"
                   :href="props.row.tpos"
                   target="_blank"
-                ><q-tooltip>Open PoS</q-tooltip></q-btn>
+                  ><q-tooltip>Open PoS</q-tooltip></q-btn
+                >
               </q-td>
               <q-td auto-width>
                 <q-btn
@@ -57,43 +66,44 @@
                   size="md"
                   copy="copy"
                   @click="copyText(props.row.id)"
-                ><q-tooltip>Click to copy</q-tooltip>{{props.row.id.substring(0,6)}}...</q-btn>
+                  ><q-tooltip>Click to copy</q-tooltip
+                  >{{props.row.id.substring(0,6)}}...</q-btn
+                >
               </q-td>
 
-              <q-td v-for="col in props.cols" v-if="col.name != 'id'" :key="col.name" :props="props">
+              <q-td
+                v-for="col in props.cols"
+                v-if="col.name != 'id'"
+                :key="col.name"
+                :props="props"
+              >
                 {{ (col.name == 'tip_options' && col.value ?
                 JSON.parse(col.value).join(", ") : col.value) }}
               </q-td>
               <q-td v-if="props.row.tip_wallet != ''" auto-width>
                 <q-btn
-                unelevated
-                dense
-                size="md"
-                copy="copy"
-                @click="copyText(props.row.tip_wallet)"
-              ><q-tooltip>Click to copy</q-tooltip>{{props.row.tip_wallet.substring(0,6)}}...</q-btn>
+                  unelevated
+                  dense
+                  size="md"
+                  copy="copy"
+                  @click="copyText(props.row.tip_wallet)"
+                  ><q-tooltip>Click to copy</q-tooltip
+                  >{{props.row.tip_wallet.substring(0,6)}}...</q-btn
+                >
               </q-td>
-              <q-td v-else auto-width>
-                N/A
-              </q-td>
+              <q-td v-else auto-width> N/A </q-td>
               <q-td v-if="props.row.tip_wallet != ''" auto-width>
                 {{props.row.tip_options}}
               </q-td>
-              <q-td v-else auto-width>this
-                N/A
-              </q-td>
+              <q-td v-else auto-width>this N/A </q-td>
               <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
                 {{props.row.withdrawpin}}
               </q-td>
-              <q-td v-else auto-width>
-                N/A
-              </q-td>
+              <q-td v-else auto-width> N/A </q-td>
               <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
                 {{props.row.withdrawlimit}}
               </q-td>
-              <q-td v-else auto-width>
-                N/A
-              </q-td>
+              <q-td v-else auto-width> N/A </q-td>
               <q-td auto-width>
                 <q-btn
                   flat
@@ -113,9 +123,6 @@
                   icon="cancel"
                   color="pink"
                 ></q-btn>
-              </q-td>
-              <q-td auto-width>
-                <q-btn flat dense size="xs" @click="deleteTPoS(props.row.id)" icon="cancel" color="pink"></q-btn>
               </q-td>
             </q-tr>
           </template>
@@ -169,10 +176,16 @@
         ></q-select>
         <div class="row">
           <div class="col">
-            <q-checkbox v-model="formDialog.advanced.tips" label="Enable tips"></q-checkbox>
+            <q-checkbox
+              v-model="formDialog.advanced.tips"
+              label="Enable tips"
+            ></q-checkbox>
           </div>
           <div class="col">
-            <q-checkbox v-model="formDialog.advanced.otc" label="Enable selling bitcoin"></q-checkbox>
+            <q-checkbox
+              v-model="formDialog.advanced.otc"
+              label="Enable selling bitcoin"
+            ></q-checkbox>
           </div>
         </div>
         <q-select
@@ -440,8 +453,8 @@
         ],
         tpossTable: {
           columns: [
-            { name: 'id', align: 'left', label: 'ID', field: 'id' },
-            { name: 'name', align: 'left', label: 'Name', field: 'name' },
+            {name: 'id', align: 'left', label: 'ID', field: 'id'},
+            {name: 'name', align: 'left', label: 'Name', field: 'name'},
             {
               name: 'currency',
               align: 'left',
@@ -457,12 +470,12 @@
           show: false,
           data: {
             withdrawpin: 878787,
-            tip_options: ["5","10"]
+            tip_options: ['5', '10']
           },
           advanced: {
-          tips: false,
-          otc: false,
-        }
+            tips: false,
+            otc: false
+          }
         }
       }
     },
@@ -493,20 +506,21 @@
           currency: self.formDialog.data.currency,
           tip_options: self.formDialog.data.tip_options
             ? JSON.stringify(
-              self.formDialog.data.tip_options.map(str => parseInt(str))
+                self.formDialog.data.tip_options.map(str => parseInt(str))
               )
             : JSON.stringify([]),
           tip_wallet: self.formDialog.data.tip_wallet || '',
           withdrawlimit: self.formDialog.data.withdrawlimit || 0,
           withdrawpin: self.formDialog.data.withdrawpin || 0
         }
-        if(self.formDialog.data.id  != undefined){
+        if (self.formDialog.data.id != undefined) {
           LNbits.api
             .request(
               'POST',
               '/tpos/api/v1/tposs/' + self.formDialog.data.id,
-              _.findWhere(self.g.user.wallets, {id: self.formDialog.data.wallet})
-                .inkey,
+              _.findWhere(self.g.user.wallets, {
+                id: self.formDialog.data.wallet
+              }).inkey,
               data
             )
             .then(function (response) {
@@ -516,14 +530,14 @@
             .catch(function (error) {
               LNbits.utils.notifyApiError(error)
             })
-        }
-        else{
+        } else {
           LNbits.api
             .request(
               'POST',
               '/tpos/api/v1/tposs',
-              _.findWhere(self.g.user.wallets, {id: self.formDialog.data.wallet})
-                .inkey,
+              _.findWhere(self.g.user.wallets, {
+                id: self.formDialog.data.wallet
+              }).inkey,
               data
             )
             .then(function (response) {
@@ -543,20 +557,20 @@
             wallet.adminkey,
             data
           )
-          .then((response) => {
-            this.tposs = _.reject(this.tposs, (obj) => {
+          .then(response => {
+            this.tposs = _.reject(this.tposs, obj => {
               return obj.id == data.id
             })
             this.tposs.push(mapTPoS(response.data))
             this.closeFormDialog()
           })
-          .catch((error) => {
+          .catch(error => {
             LNbits.utils.notifyApiError(error)
           })
       },
       deleteTPoS: function (tposId) {
         var self = this
-        var tpos = _.findWhere(this.tposs, { id: tposId })
+        var tpos = _.findWhere(this.tposs, {id: tposId})
 
         LNbits.utils
           .confirmDialog('Are you sure you want to delete this TPoS?')
@@ -565,7 +579,7 @@
               .request(
                 'DELETE',
                 '/tpos/api/v1/tposs/' + tposId,
-                _.findWhere(self.g.user.wallets, { id: tpos.wallet }).adminkey
+                _.findWhere(self.g.user.wallets, {id: tpos.wallet}).adminkey
               )
               .then(function (response) {
                 self.tposs = _.reject(self.tposs, function (obj) {
@@ -580,10 +594,10 @@
       editTPoS: function (data) {
         data.tip_options = JSON.parse(data.tip_options)
         this.formDialog.data = data
-        if(data.tip_wallet != ''){
+        if (data.tip_wallet != '') {
           this.formDialog.advanced.tips = true
         }
-        if(data.withdrawlimit >= 1){
+        if (data.withdrawlimit >= 1) {
           this.formDialog.advanced.otc = true
         }
         this.formDialog.show = true

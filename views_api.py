@@ -14,9 +14,18 @@ from lnbits.decorators import WalletTypeInfo, get_key_type, require_admin_key
 from lnbits.settings import settings
 
 from . import tpos_ext
-from .crud import create_tpos, update_tpos,  delete_tpos, get_tpos, get_tposs, start_lnurlcharge, get_lnurlcharge, update_lnurlcharge
+from .crud import (
+    create_tpos,
+    update_tpos,
+    delete_tpos,
+    get_tpos,
+    get_tposs,
+    start_lnurlcharge,
+    get_lnurlcharge,
+    update_lnurlcharge,
+)
 from .models import CreateTposData, PayLnurlWData, LNURLCharge
-from .lnurl import lnurl_params
+
 
 @tpos_ext.get("/api/v1/tposs", status_code=HTTPStatus.OK)
 async def api_tposs(
@@ -37,12 +46,14 @@ async def api_tpos_create(
     tpos = await create_tpos(wallet_id=wallet.wallet.id, data=data)
     return tpos.dict()
 
+
 @tpos_ext.post("/api/v1/tposs/{tpos_id}", status_code=HTTPStatus.CREATED)
-async def api_tpos_create(
+async def api_tpos_post_update(
     tpos_id: str, data: CreateTposData, wallet: WalletTypeInfo = Depends(get_key_type)
 ):
     tpos = await update_tpos(tpos_id=tpos_id, data=data)
     return tpos.dict()
+
 
 @tpos_ext.put("/api/v1/tposs/{tpos_id}")
 async def api_tpos_update(
@@ -59,7 +70,7 @@ async def api_tpos_update(
 
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
-    tpos = await update_tpos(tpos_id, **data.dict())
+    tpos = await update_tpos(tpos_id=tpos_id, data=data)
     return tpos.dict()
 
 
@@ -226,14 +237,14 @@ async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
     if int(tpos.withdrawpin) != int(atmpin):
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="Wrong pin."
-        )
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wrong pin.")
     token = await start_lnurlcharge(tpos_id)
     return token
 
 
-@tpos_ext.get("/api/v1/atm/withdraw/{withdraw_token}/{amount}", status_code=HTTPStatus.CREATED)
+@tpos_ext.get(
+    "/api/v1/atm/withdraw/{withdraw_token}/{amount}", status_code=HTTPStatus.CREATED
+)
 async def api_tpos_create_withdraw(
     request: Request, withdraw_token: str, amount: str
 ) -> dict:
@@ -249,8 +260,11 @@ async def api_tpos_create_withdraw(
             "status": "ERROR",
             "reason": f"TPoS {lnurlcharge.tpos_id} not found on this server",
         }
-    lnurlcharge = await update_lnurlcharge(LNURLCharge(id=withdraw_token, tpos_id=lnurlcharge.tpos_id, amount = int(amount)))
+    lnurlcharge = await update_lnurlcharge(
+        LNURLCharge(id=withdraw_token, tpos_id=lnurlcharge.tpos_id, amount=int(amount))
+    )
     return {**lnurlcharge.dict(), **{"lnurl": lnurlcharge.lnurl(request)}}
+
 
 @tpos_ext.get("/api/v1/rate/{currency}", status_code=HTTPStatus.OK)
 async def api_check_fiat_rate(currency):

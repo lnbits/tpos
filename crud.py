@@ -65,7 +65,7 @@ async def update_lnurlcharge(data: LNURLCharge) -> LNURLCharge:
     q = ", ".join([f"{field[0]} = ?" for field in data])
     logger.debug(q)
     items = [f"{field[1]}" for field in data]
-    logger.debug(items)
+    logger.debug(f"items {items}")
     items.append(data.id)
     await db.execute(f"UPDATE tpos.withdraws SET {q} WHERE id = ?", (items,))
     lnurlcharge = await get_lnurlcharge(data.id)
@@ -79,7 +79,7 @@ async def get_clean_tpos(tpos_id: str) -> Optional[TPoSClean]:
 
 
 async def update_tpos(
-    data: CreateTposData, tpos_id: str, timebool: Optional[bool]
+    data: CreateTposData, tpos_id: str, timebool: Optional[bool] = False
 ) -> TPoS:
     tpos = await get_tpos(tpos_id)
     q = ", ".join([f"{field[0]} = ?" for field in data])
