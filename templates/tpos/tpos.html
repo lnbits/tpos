@@ -506,7 +506,6 @@
           .request('GET', `/tpos/api/v1/atm/` + this.tposId + `/` + this.atmPin)
           .then(function (res) {
             self.atmToken = res.data.id
-            console.log(self.atmToken)
             if (res.data.claimed == false) {
               self.atmBox = false
               self.atmMode = true
@@ -515,7 +514,6 @@
           .catch(function (error) {
             LNbits.utils.notifyApiError(error)
           })
-        console.log(this.atmPin)
       },
       atmGetWithdraw: function () {
         self = this
@@ -527,7 +525,6 @@
           )
           .then(function (res) {
             lnurl = res.data.lnurl
-            console.log(lnurl)
             dialog.data = {payment_request: lnurl}
             dialog.show = true
             dialog.dismissMsg = self.$q.notify({
@@ -682,7 +679,7 @@
 
           const readerAbortController = new AbortController()
           readerAbortController.signal.onabort = event => {
-            console.log('All NFC Read operations have been aborted.')
+            console.debug('All NFC Read operations have been aborted.')
           }
 
           this.nfcTagReading = true
@@ -796,13 +793,12 @@
               this.isFullScreen = document.fullscreenElement
             })
           })
-          .catch(err => console.log(err))
+          .catch(err => console.debug(err))
       }
     },
     created: function () {
       var getRates = this.getRates
       getRates()
-      console.log(this.withdrawamtposs)
       this.tip_options =
         '{{ tpos.tip_options | tojson }}' == 'null'
           ? null

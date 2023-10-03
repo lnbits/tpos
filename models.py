@@ -6,7 +6,6 @@ from lnurl import Lnurl, LnurlWithdrawResponse
 from lnurl import encode as lnurl_encode
 from lnurl.models import ClearnetUrl, MilliSatoshi
 from pydantic import BaseModel
-from loguru import logger
 
 
 class CreateTposData(BaseModel):

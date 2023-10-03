@@ -578,80 +578,6 @@
             LNbits.utils.notifyApiError(error)
           })
       },
-      // createTPoS: function () {
-      //   self = this
-      //   var data = {
-      //     name: self.formDialog.data.name,
-      //     currency: self.formDialog.data.currency,
-      //     tip_options: self.formDialog.data.tip_options
-      //       ? JSON.stringify(
-      //           self.formDialog.data.tip_options.map(str => parseInt(str))
-      //         )
-      //       : JSON.stringify([]),
-      //     tip_wallet: self.formDialog.data.tip_wallet || '',
-      //     withdrawlimit: self.formDialog.data.withdrawlimit || 0,
-      //     withdrawpin: self.formDialog.data.withdrawpin || 0
-      //   }
-      //   if (self.formDialog.data.id != undefined) {
-      //     LNbits.api
-      //       .request(
-      //         'POST',
-      //         '/tpos/api/v1/tposs/' + self.formDialog.data.id,
-      //         _.findWhere(self.g.user.wallets, {
-      //           id: self.formDialog.data.wallet
-      //         }).inkey,
-      //         data
-      //       )
-      //       .then(function (response) {
-      //         self.tposs.push(mapTPoS(response.data))
-      //         self.formDialog.show = false
-      //       })
-      //       .catch(function (error) {
-      //         LNbits.utils.notifyApiError(error)
-      //       })
-      //   } else {
-      //     LNbits.api
-      //       .request(
-      //         'POST',
-      //         '/tpos/api/v1/tposs',
-      //         _.findWhere(self.g.user.wallets, {
-      //           id: self.formDialog.data.wallet
-      //         }).inkey,
-      //         data
-      //       )
-      //       .then(function (response) {
-      //         self.tposs.push(mapTPoS(response.data))
-      //         self.formDialog.show = false
-      //       })
-      //       .catch(function (error) {
-      //         LNbits.utils.notifyApiError(error)
-      //       })
-      //     this.updateTPos(
-      //       _.findWhere(self.g.user.wallets, {
-      //         id: self.formDialog.data.wallet
-      //       }),
-      //       data)
-      //   }
-      // },
-      // updateTPos(wallet, data) {
-      //   LNbits.api
-      //     .request(
-      //       'PUT',
-      //       `/tpos/api/v1/tposs/${data.id}`,
-      //       wallet.adminkey,
-      //       data
-      //     )
-      //     .then(response => {
-      //       this.tposs = _.reject(this.tposs, obj => {
-      //         return obj.id == data.id
-      //       })
-      //       this.tposs.push(mapTPoS(response.data))
-      //       this.closeFormDialog()
-      //     })
-      //     .catch(error => {
-      //       LNbits.utils.notifyApiError(error)
-      //     })
-      // },
       deleteTPoS: function (tposId) {
         var self = this
         var tpos = _.findWhere(this.tposs, {id: tposId})
@@ -675,17 +601,6 @@
               })
           })
       },
-      // editTPoS: function (data) {
-      //   data.tip_options = JSON.parse(data.tip_options)
-      //   this.formDialog.data = data
-      //   if (data.tip_wallet != '') {
-      //     this.formDialog.advanced.tips = true
-      //   }
-      //   if (data.withdrawlimit >= 1) {
-      //     this.formDialog.advanced.otc = true
-      //   }
-      //   this.formDialog.show = true
-      // },
       exportCSV: function () {
         LNbits.utils.exportCSV(this.tpossTable.columns, this.tposs)
       }

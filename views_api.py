@@ -12,6 +12,7 @@ from lnbits.core.services import create_invoice
 from lnbits.core.views.api import api_payment
 from lnbits.decorators import WalletTypeInfo, get_key_type, require_admin_key
 from lnbits.settings import settings
+from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 
 from . import tpos_ext
 from .crud import (
@@ -45,14 +46,6 @@ async def api_tpos_create(
 ):
     tpos = await create_tpos(wallet_id=wallet.wallet.id, data=data)
     return tpos.dict()
-
-
-# @tpos_ext.post("/api/v1/tposs/{tpos_id}", status_code=HTTPStatus.CREATED)
-# async def api_tpos_post_update(
-#     tpos_id: str, data: CreateTposData, wallet: WalletTypeInfo = Depends(get_key_type)
-# ):
-#     tpos = await update_tpos(tpos_id=tpos_id, data=data)
-#     return tpos.dict()
 
 
 @tpos_ext.put("/api/v1/tposs/{tpos_id}")
