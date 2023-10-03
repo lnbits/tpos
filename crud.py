@@ -7,20 +7,6 @@ from .models import CreateTposData, TPoS, TPoSClean, LNURLCharge
 from loguru import logger
 
 
-class TPoSNotFoundException(Exception):
-    def __init__(self, tpos_id):
-        self.tpos_id = tpos_id
-        super().__init__(f"TPoS with ID {tpos_id} not found")
-
-
-class WithdrawTimeTooSoonException(Exception):
-    def __init__(self, remaining_seconds):
-        self.remaining_seconds = remaining_seconds
-        super().__init__(
-            f"Last withdraw was made too recently, please try again in {remaining_seconds} secs"
-        )
-
-
 async def get_current_timestamp():
     # Get current DB timestamp
     now = int((await db.fetchone(f"SELECT {db.timestamp_now}"))[0])
@@ -49,8 +35,7 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
         ),
     )
     tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise TPoSNotFoundException(tpos_id)
+    assert tpos, "Newly created tpos couldn't be retrieved"
     return tpos
 
 
@@ -61,13 +46,12 @@ async def get_tpos(tpos_id: str) -> Optional[TPoS]:
 
 async def start_lnurlcharge(tpos_id: str):
     tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise TPoSNotFoundException(tpos_id)
+    assert tpos, f"TPoS with {tpos_id} not found!"
 
     now = await get_current_timestamp()
-    if now - tpos.withdrawtime < 10000:
-        remaining_seconds = int(10000 - (now - tpos.withdrawtime)) / 1000
-        raise WithdrawTimeTooSoonException(remaining_seconds)
+    assert (
+        now - tpos.withdrawtime > 600
+    ), f"Last withdraw was made too recently, please try again in {int(600 - (now - tpos.withdrawtime))} secs"
 
     token = urlsafe_short_hash()
     await db.execute(
@@ -102,10 +86,8 @@ async def update_lnurlcharge(data: LNURLCharge) -> LNURLCharge:
     )
 
     lnurlcharge = await get_lnurlcharge(data.id)
-    if not lnurlcharge:
-        raise Exception(
-            "Withdraw couldn't be retrieved"
-        )  # Replace with a specific exception if possible
+    assert lnurlcharge, "Withdraw couldn't be retrieved"
+
     return lnurlcharge
 
 
@@ -117,13 +99,14 @@ async def get_clean_tpos(tpos_id: str) -> Optional[TPoSClean]:
 async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
     # Calculate the time between withdrawals in seconds
     now = await get_current_timestamp()
-    time_between = (now - data.withdrawtime) / 1000  # Convert to seconds
+    time_between = now - data.withdrawtime
 
     logger.debug(f"Time between: {time_between} seconds")
 
     # Check if the time between withdrawals is less than 600 seconds (10 minutes)
-    if time_between < 600:
-        raise WithdrawTimeTooSoonException(int(600 - time_between))
+    assert (
+        time_between > 600
+    ), f"Last withdraw was made too recently, please try again in {int(600 - (time_between))} secs"
 
     # Update the withdraw time in the database
     await db.execute(
@@ -131,8 +114,7 @@ async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
     )
 
     tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise TPoSNotFoundException(tpos_id)
+    assert tpos, "Newly updated tpos couldn't be retrieved"
     return tpos
 
 
@@ -142,8 +124,7 @@ async def update_tpos(tpos_id: str, **kwargs) -> TPoS:
         f"UPDATE tpos.pos SET {q} WHERE id = ?", (*kwargs.values(), tpos_id)
     )
     tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise TPoSNotFoundException(tpos_id)
+    assert tpos, "Newly updated tpos couldn't be retrieved"
     return tpos
 
 

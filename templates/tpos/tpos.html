@@ -1,21 +1,25 @@
 {% extends "public.html" %} {% block toolbar_title %} {{ tpos.name }}
 
-    <q-btn
-    flat
-    dense
-    size="md"
-    @click.prevent="urlDialog.show = true"
-    icon="share"
-    color="white"
-  ></q-btn>
-
-
+<q-btn
+  flat
+  dense
+  size="md"
+  @click.prevent="urlDialog.show = true"
+  icon="share"
+  color="white"
+></q-btn>
 
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
   <q-page>
- <q-btn  v-show="atmMode" color="negative" @click="window.location.reload()">EXIT ATM MODE</q-btn>
     <q-page-sticky v-if="exchangeRate" expand position="top">
+      <q-btn
+        v-show="atmMode"
+        color="negative"
+        @click="atmMode = false"
+        class="absolute-top-left"
+        >EXIT ATM MODE</q-btn
+      >
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
           <h3 class="q-mb-md">{% raw %}{{ amountFormatted }}{% endraw %}</h3>
@@ -159,29 +163,40 @@
         fab
         icon="receipt_long"
         color="primary"
-        ></q-btn></q-page-sticky>
-        <q-page-sticky position="top-right" :offset="[18, 90]">
-      <q-btn @click="toggleFullscreen" fab :icon="fullScreenIcon" color="primary" ></q-btn>
+      ></q-btn
+    ></q-page-sticky>
+    <q-page-sticky position="top-right" :offset="[18, 90]">
+      <q-btn
+        @click="toggleFullscreen"
+        fab
+        :icon="fullScreenIcon"
+        color="primary"
+      ></q-btn>
     </q-page-sticky>
     <q-page-sticky position="top-right" :offset="[18, 162]">
-              <q-btn
+      <q-btn
         @click="atm"
         v-if="withdrawamtposs > 0"
         fab
         icon="atm"
         color="primary"
-        ></q-btn>
-
+      ></q-btn>
     </q-page-sticky>
-    <q-dialog v-model="invoiceDialog.show" position="top" @hide="closeInvoiceDialog">
-      <q-card v-if="invoiceDialog.data" class="q-pa-lg q-pt-xl lnbits__dialog-card">
+    <q-dialog
+      v-model="invoiceDialog.show"
+      position="top"
+      @hide="closeInvoiceDialog"
+    >
+      <q-card
+        v-if="invoiceDialog.data"
+        class="q-pa-lg q-pt-xl lnbits__dialog-card"
+      >
         <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
           <qrcode
             :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
             :options="{width: 800}"
             class="rounded-borders"
           ></qrcode>
-
         </q-responsive>
         <div class="text-center" v-show="!atmMode">
           <h3 class="q-my-md">
@@ -339,29 +354,21 @@
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="atmBox">
+    <q-dialog v-model="atmBox" @hide="atmPin = null">
       <q-card>
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">Withdraw pin</div>
         </q-card-section>
         <q-card-section>
-          <q-form
-          @submit="atmSubmit"
-          class="q-gutter-md"
-        >
-          <q-input
-            filled
-            type="number"
-            v-model="atmPin"
-          ></q-input>
-          <div>
-            <q-btn label="Submit" type="submit" color="primary"></q-btn>
-          </div>
-        </q-form>
+          <q-form @submit="atmSubmit" class="q-gutter-md">
+            <q-input filled type="number" v-model="atmPin"></q-input>
+            <div>
+              <q-btn label="Submit" type="submit" color="primary"></q-btn>
+            </div>
+          </q-form>
         </q-card-section>
       </q-card>
     </q-dialog>
-
   </q-page>
 </q-page-container>
 {% endblock %} {% block styles %}
@@ -406,7 +413,7 @@
         atmBox: false,
         atmPin: null,
         atmMode: false,
-        atmToken: "",
+        atmToken: '',
         nfcTagReading: false,
         lastPaymentsDialog: {
           show: false,
@@ -489,16 +496,14 @@
     },
     methods: {
       atm() {
-        if(this.withdrawamtposs > 0){
+        if (this.withdrawamtposs > 0) {
           this.atmBox = true
         }
       },
       atmSubmit() {
         self = this
-          LNbits.api
-          .request(
-            'GET',
-            `/tpos/api/v1/atm/` + this.tposId + `/` + this.atmPin)
+        LNbits.api
+          .request('GET', `/tpos/api/v1/atm/` + this.tposId + `/` + this.atmPin)
           .then(function (res) {
             self.atmToken = res.data.id
             console.log(self.atmToken)
@@ -507,7 +512,7 @@
               self.atmMode = true
             }
           })
-            .catch(function (error) {
+          .catch(function (error) {
             LNbits.utils.notifyApiError(error)
           })
         console.log(this.atmPin)
@@ -515,42 +520,43 @@
       atmGetWithdraw: function () {
         self = this
         var dialog = this.invoiceDialog
-          LNbits.api
+        LNbits.api
           .request(
             'GET',
-            `/tpos/api/v1/atm/withdraw/` + this.atmToken + `/` + this.sat)
+            `/tpos/api/v1/atm/withdraw/` + this.atmToken + `/` + this.sat
+          )
           .then(function (res) {
             lnurl = res.data.lnurl
             console.log(lnurl)
-            dialog.data = {"payment_request": lnurl}
+            dialog.data = {payment_request: lnurl}
             dialog.show = true
             dialog.dismissMsg = self.$q.notify({
-                timeout: 0,
-                message: 'Withdraw...'
-              })
+              timeout: 0,
+              message: 'Withdraw...'
+            })
             if (location.protocol !== 'http:') {
               self.withdrawUrl =
-              'wss://' +
-              document.domain +
-              ':' +
-              location.port +
-              '/api/v1/ws/' +
-              self.atmToken
+                'wss://' +
+                document.domain +
+                ':' +
+                location.port +
+                '/api/v1/ws/' +
+                self.atmToken
             } else {
               self.withdrawUrl =
-              'ws://' +
-              document.domain +
-              ':' +
-              location.port +
-              '/api/v1/ws/' +
-              self.atmToken
+                'ws://' +
+                document.domain +
+                ':' +
+                location.port +
+                '/api/v1/ws/' +
+                self.atmToken
             }
             this.connectionWithdraw = new WebSocket(self.withdrawUrl)
             this.connectionWithdraw.onmessage = function (e) {
-              if (e.data == "paid"){
+              if (e.data == 'paid') {
                 dialog.show = false
                 self.atmPin = null
-                self.atmToken = ""
+                self.atmToken = ''
                 self.complete.show = true
                 self.atmMode = false
               }
@@ -607,19 +613,17 @@
         }
       },
       showTipModal: function () {
-        if(!this.atmMode){
+        if (!this.atmMode) {
           this.tipDialog.show = true
-        }
-        else{
+        } else {
           this.showInvoice()
         }
       },
       showInvoice: function () {
         var self = this
-        if(self.atmMode){
+        if (self.atmMode) {
           this.atmGetWithdraw()
-        }
-        else{
+        } else {
           var dialog = this.invoiceDialog
           axios
             .post('/tpos/api/v1/tposs/' + this.tposId + '/invoices', null, {
@@ -660,7 +664,7 @@
             .catch(function (error) {
               LNbits.utils.notifyApiError(error)
             })
-          }
+        }
       },
       readNfcTag: function () {
         try {
@@ -756,10 +760,12 @@
       },
       getRates: function () {
         var self = this
-        axios.get('https://api.opennode.com/v1/rates').then(function (response) {
-          self.exchangeRate =
-            response.data.data['BTC' + self.currency][self.currency]
-        })
+        axios
+          .get('https://api.opennode.com/v1/rates')
+          .then(function (response) {
+            self.exchangeRate =
+              response.data.data['BTC' + self.currency][self.currency]
+          })
       },
       getLastPayments() {
         return axios
@@ -783,14 +789,15 @@
         if (document.fullscreenElement) return document.exitFullscreen()
 
         const elem = document.documentElement
-        elem.requestFullscreen({ navigationUI: "show" })
+        elem
+          .requestFullscreen({navigationUI: 'show'})
           .then(() => {
-            document.addEventListener("fullscreenchange", () => {
+            document.addEventListener('fullscreenchange', () => {
               this.isFullScreen = document.fullscreenElement
             })
           })
           .catch(err => console.log(err))
-      },
+      }
     },
     created: function () {
       var getRates = this.getRates

@@ -2,7 +2,6 @@ from http import HTTPStatus
 from fastapi import Request
 from typing import Optional
 from starlette.exceptions import HTTPException
-from lnbits.helpers import urlsafe_short_hash
 from lnbits.core.services import websocketUpdater
 from lnbits.core.views.api import pay_invoice
 
@@ -10,27 +9,6 @@ from . import tpos_ext
 from .crud import get_tpos, get_lnurlcharge, update_lnurlcharge, update_tpos_withdraw
 from .models import LNURLCharge
 from loguru import logger
-
-
-class LNURLChargeNotFoundException(Exception):
-    def __init__(self, lnurlcharge_id):
-        self.lnurlcharge_id = lnurlcharge_id
-        super().__init__(f"LNURLCharge with ID {lnurlcharge_id} not found")
-
-
-class TPoSNotFoundException(Exception):
-    def __init__(self, tpos_id):
-        self.tpos_id = tpos_id
-        super().__init__(f"TPoS with ID {tpos_id} not found")
-
-
-class WithdrawAmountTooHighException(Exception):
-    def __init__(self, requested_amount, max_withdrawable):
-        self.requested_amount = requested_amount
-        self.max_withdrawable = max_withdrawable
-        super().__init__(
-            f"Amount requested {requested_amount} is too high, maximum withdrawable is {max_withdrawable}"
-        )
 
 
 @tpos_ext.get(
@@ -51,10 +29,6 @@ async def lnurl_params(
     tpos = await get_tpos(lnurlcharge.tpos_id)
     if not tpos:
         raise TPoSNotFoundException(lnurlcharge.tpos_id)
-
-    # assert amount, "amount is required"
-    # # convert amount to int
-    # _amount = int(amount)
 
     if amount > tpos.withdrawamtposs:
         raise WithdrawAmountTooHighException(amount, tpos.withdrawamtposs)
@@ -85,19 +59,25 @@ async def lnurl_callback(
 
     lnurlcharge = await get_lnurlcharge(k1)
     if not lnurlcharge:
-        raise LNURLChargeNotFoundException(k1)
+        return {
+            "status": "ERROR",
+            "reason": f"lnurlcharge {k1} not found on this server",
+        }
 
     assert lnurlcharge.amount, f"LNURLCharge {k1} has no amount"
 
     if lnurlcharge.claimed:
-        raise Exception(f"LNURLCharge {k1} has already been claimed")
+        return {
+            "status": "ERROR",
+            "reason": f"LNURLCharge {k1} has already been claimed",
+        }
 
     tpos = await get_tpos(lnurlcharge.tpos_id)
-    if not tpos:
-        raise TPoSNotFoundException(lnurlcharge.tpos_id)
+    assert tpos, f"TPoS with ID {lnurlcharge.tpos_id} not found"
 
-    if lnurlcharge.amount > tpos.withdrawamtposs:
-        raise WithdrawAmountTooHighException(lnurlcharge.amount, tpos.withdrawamtposs)
+    assert (
+        lnurlcharge.amount < tpos.withdrawamtposs
+    ), f"Amount requested {lnurlcharge.amount} is too high, maximum withdrawable is {tpos.withdrawamtposs}"
 
     await update_lnurlcharge(
         LNURLCharge(
