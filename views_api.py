@@ -35,7 +35,7 @@ async def api_tposs(
     if all_wallets:
         user = await get_user(wallet.wallet.user)
         wallet_ids = user.wallet_ids if user else []
-
+    print([tpos.dict() for tpos in await get_tposs(wallet_ids)])
     return [tpos.dict() for tpos in await get_tposs(wallet_ids)]
 
 
@@ -47,12 +47,12 @@ async def api_tpos_create(
     return tpos.dict()
 
 
-@tpos_ext.post("/api/v1/tposs/{tpos_id}", status_code=HTTPStatus.CREATED)
-async def api_tpos_post_update(
-    tpos_id: str, data: CreateTposData, wallet: WalletTypeInfo = Depends(get_key_type)
-):
-    tpos = await update_tpos(tpos_id=tpos_id, data=data)
-    return tpos.dict()
+# @tpos_ext.post("/api/v1/tposs/{tpos_id}", status_code=HTTPStatus.CREATED)
+# async def api_tpos_post_update(
+#     tpos_id: str, data: CreateTposData, wallet: WalletTypeInfo = Depends(get_key_type)
+# ):
+#     tpos = await update_tpos(tpos_id=tpos_id, data=data)
+#     return tpos.dict()
 
 
 @tpos_ext.put("/api/v1/tposs/{tpos_id}")
@@ -70,7 +70,7 @@ async def api_tpos_update(
 
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
-    tpos = await update_tpos(tpos_id=tpos_id, data=data)
+    tpos = await update_tpos(tpos_id=tpos_id, **data.dict())
     return tpos.dict()
 
 

@@ -109,7 +109,7 @@
                   flat
                   dense
                   size="xs"
-                  @click="editTPoS(props.row)"
+                  @click="updateTPosForm(props.row.id)"
                   icon="edit"
                   color="blue"
                 ></q-btn>
@@ -150,7 +150,7 @@
 
   <q-dialog v-model="formDialog.show" position="top" @hide="closeFormDialog">
     <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
-      <q-form @submit="createTPoS" class="q-gutter-md">
+      <q-form @submit="sendTPosData" class="q-gutter-md">
         <q-input
           filled
           dense
@@ -188,53 +188,63 @@
             ></q-checkbox>
           </div>
         </div>
-        <q-select
-          v-if="formDialog.advanced.tips"
-          filled
-          dense
-          emit-value
-          v-model="formDialog.data.tip_wallet"
-          :options="g.user.walletOptions"
-          label="Tip Wallet"
-        ></q-select>
-        <q-select
-          v-if="formDialog.advanced.tips"
-          filled
-          multiple
-          dense
-          emit-value
-          v-model="formDialog.data.tip_options"
-          v-if="formDialog.data.tip_wallet"
-          use-input
-          use-chips
-          multiple
-          hide-dropdown-icon
-          input-debounce="0"
-          new-value-mode="add-unique"
-          label="Tip % Options (hit enter to add values)"
-          ><q-tooltip>Hit enter to add values</q-tooltip>
-          <template v-slot:hint>
-            You can leave this blank. A default rounding option is available
-            (round amount to a value)
-          </template>
-        </q-select>
-        <q-input
-          v-if="formDialog.advanced.otc"
-          filled
-          dense
-          v-model.number="formDialog.data.withdrawlimit"
-          type="number"
-          label="Max amount to be sold daily (sats)"
-        ></q-input>
-        <q-input
-          v-if="formDialog.advanced.otc"
-          filled
-          dense
-          v-model.number="formDialog.data.withdrawpin"
-          type="number"
-          max="1000000"
-          label="Withdraw pin"
-        ></q-input>
+        <div v-if="formDialog.advanced.tips">
+          <q-select
+            filled
+            dense
+            emit-value
+            v-model="formDialog.data.tip_wallet"
+            :options="g.user.walletOptions"
+            label="Tip Wallet"
+          ></q-select>
+          <q-select
+            filled
+            multiple
+            dense
+            emit-value
+            v-model="formDialog.data.tip_options"
+            v-if="formDialog.data.tip_wallet"
+            use-input
+            use-chips
+            multiple
+            hide-dropdown-icon
+            input-debounce="0"
+            new-value-mode="add-unique"
+            label="Tip % Options (hit enter to add values)"
+            ><q-tooltip>Hit enter to add values</q-tooltip>
+            <template v-slot:hint>
+              You can leave this blank. A default rounding option is available
+              (round amount to a value)
+            </template>
+          </q-select>
+        </div>
+        <div v-if="formDialog.advanced.otc">
+          <q-input
+            filled
+            dense
+            v-model.number="formDialog.data.withdrawlimit"
+            type="number"
+            label="Max amount to be sold daily (sats)"
+          ></q-input>
+          <q-input
+            filled
+            dense
+            v-model.number="formDialog.data.withdrawpin"
+            type="number"
+            max="1000000"
+            label="Withdraw pin"
+          ></q-input>
+          <!-- TODO custom time between withdraws -->
+          <!-- <q-input
+            filled
+            dense
+            v-model.number="formDialog.data.withdrawbtwn"
+            type="number"
+            min="0"
+            label="Time between withdraws (minutes)"
+          ></q-input> -->
+        </div>
+
         <div class="row q-mt-lg">
           <q-btn
             v-if="formDialog.data.id"
@@ -470,7 +480,8 @@
           show: false,
           data: {
             withdrawpin: 878787,
-            tip_options: ['5', '10']
+            tip_options: [],
+            withdrawbtwn: 0
           },
           advanced: {
             tips: false,
@@ -482,7 +493,11 @@
     methods: {
       closeFormDialog() {
         this.formDialog.show = false
-        this.formDialog.data = {}
+        this.formDialog.data = {
+          withdrawpin: 878787,
+          tip_options: [],
+          withdrawbtwn: 0
+        }
       },
       getTPoSs: function () {
         var self = this
@@ -497,57 +512,52 @@
             self.tposs = response.data.map(function (obj) {
               return mapTPoS(obj)
             })
+            console.log(self.tposs)
           })
       },
-      createTPoS: function () {
-        self = this
-        var data = {
-          name: self.formDialog.data.name,
-          currency: self.formDialog.data.currency,
-          tip_options: self.formDialog.data.tip_options
+      sendTPosData() {
+        const data = {
+          ...this.formDialog.data,
+          tip_options: this.formDialog.data.tip_options
             ? JSON.stringify(
-                self.formDialog.data.tip_options.map(str => parseInt(str))
+                this.formDialog.data.tip_options.map(str => parseInt(str))
               )
             : JSON.stringify([]),
-          tip_wallet: self.formDialog.data.tip_wallet || '',
-          withdrawlimit: self.formDialog.data.withdrawlimit || 0,
-          withdrawpin: self.formDialog.data.withdrawpin || 0
+          tip_wallet: this.formDialog.data.tip_wallet || ''
         }
-        if (self.formDialog.data.id != undefined) {
-          LNbits.api
-            .request(
-              'POST',
-              '/tpos/api/v1/tposs/' + self.formDialog.data.id,
-              _.findWhere(self.g.user.wallets, {
-                id: self.formDialog.data.wallet
-              }).inkey,
-              data
-            )
-            .then(function (response) {
-              self.tposs.push(mapTPoS(response.data))
-              self.formDialog.show = false
-            })
-            .catch(function (error) {
-              LNbits.utils.notifyApiError(error)
-            })
+        const wallet = _.findWhere(this.g.user.wallets, {
+          id: this.formDialog.data.wallet
+        })
+        if (data.id) {
+          this.updateTPos(wallet, data)
         } else {
-          LNbits.api
-            .request(
-              'POST',
-              '/tpos/api/v1/tposs',
-              _.findWhere(self.g.user.wallets, {
-                id: self.formDialog.data.wallet
-              }).inkey,
-              data
-            )
-            .then(function (response) {
-              self.tposs.push(mapTPoS(response.data))
-              self.formDialog.show = false
-            })
-            .catch(function (error) {
-              LNbits.utils.notifyApiError(error)
-            })
+          this.createTPoS(wallet, data)
         }
+      },
+      updateTPosForm(tposId) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        this.formDialog.data = {
+          ...tpos,
+          tip_options: JSON.parse(tpos.tip_options)
+        }
+        if (this.formDialog.data.tip_wallet != '') {
+          this.formDialog.advanced.tips = true
+        }
+        if (this.formDialog.data.withdrawlimit >= 1) {
+          this.formDialog.advanced.otc = true
+        }
+        this.formDialog.show = true
+      },
+      createTPoS(wallet, data) {
+        LNbits.api
+          .request('POST', '/tpos/api/v1/tposs', wallet.inkey, data)
+          .then(response => {
+            this.tposs.push(mapTPoS(response.data))
+            this.closeFormDialog()
+          })
+          .catch(error => {
+            LNbits.utils.notifyApiError(error)
+          })
       },
       updateTPos(wallet, data) {
         LNbits.api
@@ -568,6 +578,80 @@
             LNbits.utils.notifyApiError(error)
           })
       },
+      // createTPoS: function () {
+      //   self = this
+      //   var data = {
+      //     name: self.formDialog.data.name,
+      //     currency: self.formDialog.data.currency,
+      //     tip_options: self.formDialog.data.tip_options
+      //       ? JSON.stringify(
+      //           self.formDialog.data.tip_options.map(str => parseInt(str))
+      //         )
+      //       : JSON.stringify([]),
+      //     tip_wallet: self.formDialog.data.tip_wallet || '',
+      //     withdrawlimit: self.formDialog.data.withdrawlimit || 0,
+      //     withdrawpin: self.formDialog.data.withdrawpin || 0
+      //   }
+      //   if (self.formDialog.data.id != undefined) {
+      //     LNbits.api
+      //       .request(
+      //         'POST',
+      //         '/tpos/api/v1/tposs/' + self.formDialog.data.id,
+      //         _.findWhere(self.g.user.wallets, {
+      //           id: self.formDialog.data.wallet
+      //         }).inkey,
+      //         data
+      //       )
+      //       .then(function (response) {
+      //         self.tposs.push(mapTPoS(response.data))
+      //         self.formDialog.show = false
+      //       })
+      //       .catch(function (error) {
+      //         LNbits.utils.notifyApiError(error)
+      //       })
+      //   } else {
+      //     LNbits.api
+      //       .request(
+      //         'POST',
+      //         '/tpos/api/v1/tposs',
+      //         _.findWhere(self.g.user.wallets, {
+      //           id: self.formDialog.data.wallet
+      //         }).inkey,
+      //         data
+      //       )
+      //       .then(function (response) {
+      //         self.tposs.push(mapTPoS(response.data))
+      //         self.formDialog.show = false
+      //       })
+      //       .catch(function (error) {
+      //         LNbits.utils.notifyApiError(error)
+      //       })
+      //     this.updateTPos(
+      //       _.findWhere(self.g.user.wallets, {
+      //         id: self.formDialog.data.wallet
+      //       }),
+      //       data)
+      //   }
+      // },
+      // updateTPos(wallet, data) {
+      //   LNbits.api
+      //     .request(
+      //       'PUT',
+      //       `/tpos/api/v1/tposs/${data.id}`,
+      //       wallet.adminkey,
+      //       data
+      //     )
+      //     .then(response => {
+      //       this.tposs = _.reject(this.tposs, obj => {
+      //         return obj.id == data.id
+      //       })
+      //       this.tposs.push(mapTPoS(response.data))
+      //       this.closeFormDialog()
+      //     })
+      //     .catch(error => {
+      //       LNbits.utils.notifyApiError(error)
+      //     })
+      // },
       deleteTPoS: function (tposId) {
         var self = this
         var tpos = _.findWhere(this.tposs, {id: tposId})
@@ -591,17 +675,17 @@
               })
           })
       },
-      editTPoS: function (data) {
-        data.tip_options = JSON.parse(data.tip_options)
-        this.formDialog.data = data
-        if (data.tip_wallet != '') {
-          this.formDialog.advanced.tips = true
-        }
-        if (data.withdrawlimit >= 1) {
-          this.formDialog.advanced.otc = true
-        }
-        this.formDialog.show = true
-      },
+      // editTPoS: function (data) {
+      //   data.tip_options = JSON.parse(data.tip_options)
+      //   this.formDialog.data = data
+      //   if (data.tip_wallet != '') {
+      //     this.formDialog.advanced.tips = true
+      //   }
+      //   if (data.withdrawlimit >= 1) {
+      //     this.formDialog.advanced.otc = true
+      //   }
+      //   this.formDialog.show = true
+      // },
       exportCSV: function () {
         LNbits.utils.exportCSV(this.tpossTable.columns, this.tposs)
       }

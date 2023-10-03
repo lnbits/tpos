@@ -28,10 +28,10 @@ class TPoS(BaseModel):
     currency: str
     tip_options: Optional[str]
     tip_wallet: Optional[str]
-    withdrawlimit: Optional[int]
-    withdrawpin: Optional[int]
-    withdrawamt: Optional[int]
-    withdrawtime: Optional[int]
+    withdrawlimit: int
+    withdrawpin: int
+    withdrawamt: int
+    withdrawtime: int
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoS":
@@ -49,7 +49,7 @@ class TPoSClean(BaseModel):
     tip_options: Optional[str]
     withdrawlimit: Optional[int]
     withdrawamt: Optional[int]
-    withdrawtime: Optional[int]
+    withdrawtime: int
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoSClean":
