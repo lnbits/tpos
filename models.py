@@ -1,23 +1,30 @@
 from sqlite3 import Row
 from typing import Optional
 
-from fastapi import Query, Request
+from fastapi import Request
 from lnurl import Lnurl, LnurlWithdrawResponse
 from lnurl import encode as lnurl_encode
 from lnurl.models import ClearnetUrl, MilliSatoshi
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class CreateTposData(BaseModel):
     wallet: Optional[str]
     name: Optional[str]
     currency: Optional[str]
-    tip_options: str = Query(None)
-    tip_wallet: str = Query(None)
-    withdrawlimit: int = Query(None)
-    withdrawpin: int = Query(None)
-    withdrawamt: int = Query(None)
-    withdrawtime: int = Query(None)
+    tip_options: str = Field(None)
+    tip_wallet: str = Field(None)
+    withdrawlimit: int = Field(
+        ..., ge=1
+    )  # Required and must be greater than or equal to 1
+    withdrawpin: int = Field(
+        ..., ge=1
+    )  # Required and must be greater than or equal to 1
+    withdrawamt: int = Field(
+        None, ge=1
+    )  # Optional, but if provided, must be greater than or equal to 1
+    withdrawtime: int = Field(0)
+    withdrawbtwn: int = Field(10, ge=1)
 
 
 class TPoS(BaseModel):
@@ -31,6 +38,7 @@ class TPoS(BaseModel):
     withdrawpin: int
     withdrawamt: int
     withdrawtime: int
+    withdrawbtwn: int
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoS":
@@ -46,9 +54,10 @@ class TPoSClean(BaseModel):
     name: str
     currency: str
     tip_options: Optional[str]
-    withdrawlimit: Optional[int]
-    withdrawamt: Optional[int]
+    withdrawlimit: int
+    withdrawamt: int
     withdrawtime: int
+    withdrawbtwn: int
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoSClean":
@@ -62,8 +71,8 @@ class TPoSClean(BaseModel):
 class LNURLCharge(BaseModel):
     id: str
     tpos_id: str
-    amount: int = Query(None)
-    claimed: bool = Query(False)
+    amount: int = Field(None)
+    claimed: bool = Field(False)
 
     @classmethod
     def from_row(cls, row: Row) -> "LNURLCharge":

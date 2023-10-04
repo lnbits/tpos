@@ -24,14 +24,23 @@ async def lnurl_params(
     logger.debug(amount)
     lnurlcharge = await get_lnurlcharge(lnurlcharge_id)
     if not lnurlcharge:
-        raise LNURLChargeNotFoundException(lnurlcharge_id)
+        return {
+            "status": "ERROR",
+            "reason": f"lnurlcharge {lnurlcharge_id} not found on this server",
+        }
 
     tpos = await get_tpos(lnurlcharge.tpos_id)
     if not tpos:
-        raise TPoSNotFoundException(lnurlcharge.tpos_id)
+        return {
+            "status": "ERROR",
+            "reason": f"TPoS {lnurlcharge.tpos_id} not found on this server",
+        }
 
     if amount > tpos.withdrawamtposs:
-        raise WithdrawAmountTooHighException(amount, tpos.withdrawamtposs)
+        return {
+            "status": "ERROR",
+            "reason": f"Amount requested {amount} is too high, maximum withdrawable is {tpos.withdrawamtposs}",
+        }
 
     logger.debug(f"Amount to withdraw: {amount}")
     return {

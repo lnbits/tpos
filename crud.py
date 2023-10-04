@@ -15,11 +15,10 @@ async def get_current_timestamp():
 
 async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
     tpos_id = urlsafe_short_hash()
-    now = await get_current_timestamp()
     await db.execute(
         """
-        INSERT INTO tpos.pos (id, wallet, name, currency, tip_options, tip_wallet, withdrawlimit, withdrawpin, withdrawamt, withdrawtime)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tpos.pos (id, wallet, name, currency, tip_options, tip_wallet, withdrawlimit, withdrawpin, withdrawamt, withdrawtime, withdrawbtwn)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             tpos_id,
@@ -31,7 +30,8 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
             data.withdrawlimit,
             data.withdrawpin,
             0,
-            now,
+            0,
+            data.withdrawbtwn,
         ),
     )
     tpos = await get_tpos(tpos_id)
@@ -49,9 +49,10 @@ async def start_lnurlcharge(tpos_id: str):
     assert tpos, f"TPoS with {tpos_id} not found!"
 
     now = await get_current_timestamp()
+    withdraw_time_seconds = tpos.withdrawbtwn * 60
     assert (
-        now - tpos.withdrawtime > 600
-    ), f"Last withdraw was made too recently, please try again in {int(600 - (now - tpos.withdrawtime))} secs"
+        now - tpos.withdrawtime > withdraw_time_seconds
+    ), f"Last withdraw was made too recently, please try again in {int(withdraw_time_seconds - (now - tpos.withdrawtime))} secs"
 
     token = urlsafe_short_hash()
     await db.execute(
@@ -99,14 +100,15 @@ async def get_clean_tpos(tpos_id: str) -> Optional[TPoSClean]:
 async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
     # Calculate the time between withdrawals in seconds
     now = await get_current_timestamp()
-    time_between = now - data.withdrawtime
+    time_elapsed = now - data.withdrawtime
+    withdraw_time_seconds = data.withdrawbtwn * 60
 
-    logger.debug(f"Time between: {time_between} seconds")
+    logger.debug(f"Time between: {time_elapsed} seconds")
 
-    # Check if the time between withdrawals is less than 600 seconds (10 minutes)
+    # Check if the time between withdrawals is less than withdrawbtwn
     assert (
-        time_between > 600
-    ), f"Last withdraw was made too recently, please try again in {int(600 - (time_between))} secs"
+        time_elapsed > withdraw_time_seconds
+    ), f"Last withdraw was made too recently, please try again in {int(withdraw_time_seconds - (time_elapsed))} secs"
 
     # Update the withdraw time in the database
     await db.execute(

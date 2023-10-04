@@ -50,7 +50,8 @@ async def m004_addwithdrawlimit(db):
             withdrawlimit INTEGER DEFAULT 0,
             withdrawpin INTEGER DEFAULT 878787,
             withdrawamt INTEGER DEFAULT 0,
-            withdrawtime INTEGER NOT NULL DEFAULT 0
+            withdrawtime INTEGER NOT NULL DEFAULT 0,
+            withdrawbtwn INTEGER NOT NULL DEFAULT 10,
         );
     """
     )
