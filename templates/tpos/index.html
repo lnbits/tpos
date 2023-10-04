@@ -188,7 +188,7 @@
             ></q-checkbox>
           </div>
         </div>
-        <div v-if="formDialog.advanced.tips">
+        <template v-if="formDialog.advanced.tips">
           <q-select
             filled
             dense
@@ -217,8 +217,8 @@
               (round amount to a value)
             </template>
           </q-select>
-        </div>
-        <div v-if="formDialog.advanced.otc">
+        </template>
+        <template v-if="formDialog.advanced.otc">
           <q-input
             filled
             dense
@@ -231,19 +231,17 @@
             dense
             v-model.number="formDialog.data.withdrawpin"
             type="number"
-            max="1000000"
             label="Withdraw pin"
           ></q-input>
-          <!-- TODO custom time between withdraws -->
-          <!-- <q-input
+          <q-input
             filled
             dense
             v-model.number="formDialog.data.withdrawbtwn"
             type="number"
             min="0"
             label="Time between withdraws (minutes)"
-          ></q-input> -->
-        </div>
+          ></q-input>
+        </template>
 
         <div class="row q-mt-lg">
           <q-btn
@@ -481,7 +479,7 @@
           data: {
             withdrawpin: 878787,
             tip_options: [],
-            withdrawbtwn: 0
+            withdrawbtwn: 10
           },
           advanced: {
             tips: false,
@@ -496,7 +494,7 @@
         this.formDialog.data = {
           withdrawpin: 878787,
           tip_options: [],
-          withdrawbtwn: 0
+          withdrawbtwn: 10
         }
       },
       getTPoSs: function () {
@@ -524,6 +522,10 @@
               )
             : JSON.stringify([]),
           tip_wallet: this.formDialog.data.tip_wallet || ''
+        }
+        // delete withdrawbtwn if value is empty string, defaults to 10 minutes
+        if (this.formDialog.data.withdrawbtwn == '') {
+          delete data.withdrawbtwn
         }
         const wallet = _.findWhere(this.g.user.wallets, {
           id: this.formDialog.data.wallet
