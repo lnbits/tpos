@@ -360,7 +360,7 @@
           <div class="text-h6">Withdraw pin</div>
         </q-card-section>
         <q-card-section>
-          <q-form @submit="atmSubmit" class="q-gutter-md">
+          <q-form autofocus @submit="atmSubmit" class="q-gutter-md">
             <q-input filled type="number" v-model="atmPin"></q-input>
             <div>
               <q-btn label="Submit" type="submit" color="primary"></q-btn>
@@ -457,11 +457,11 @@
       },
       sat: function () {
         if (!this.exchangeRate) return 0
-        return Math.ceil((this.amount / this.exchangeRate) * 100000000)
+        return Math.ceil(this.amount * this.exchangeRate)
       },
       tipAmountSat: function () {
         if (!this.exchangeRate) return 0
-        return Math.ceil((this.tipAmount / this.exchangeRate) * 100000000)
+        return Math.ceil(this.tipAmount * this.exchangeRate)
       },
       tipAmountFormatted: function () {
         return LNbits.utils.formatSat(this.tipAmountSat)
@@ -755,14 +755,13 @@
             readerAbortController.abort()
           })
       },
-      getRates: function () {
-        var self = this
-        axios
-          .get('https://api.opennode.com/v1/rates')
-          .then(function (response) {
-            self.exchangeRate =
-              response.data.data['BTC' + self.currency][self.currency]
+      getRates() {
+        LNbits.api
+          .request('GET', `/tpos/api/v1/rate/${this.currency}`)
+          .then(response => {
+            this.exchangeRate = response.data.rate
           })
+          .catch(e => console.error(e))
       },
       getLastPayments() {
         return axios
