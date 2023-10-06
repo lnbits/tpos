@@ -361,7 +361,17 @@
         </q-card-section>
         <q-card-section>
           <q-form autofocus @submit="atmSubmit" class="q-gutter-md">
-            <q-input filled type="number" v-model="atmPin"></q-input>
+            <q-input
+              filled
+              :type="hidePin ? 'password' : 'number'"
+              v-model.number="atmPin"
+              ><template v-slot:append>
+                <q-icon
+                  :name="hidePin ? 'visibility_off' : 'visibility'"
+                  class="cursor-pointer"
+                  @click="hidePin = !hidePin"
+                ></q-icon> </template
+            ></q-input>
             <div>
               <q-btn label="Submit" type="submit" color="primary"></q-btn>
             </div>
@@ -412,6 +422,7 @@
         hasNFC: false,
         atmBox: false,
         atmPin: null,
+        hidePin: true,
         atmMode: false,
         atmToken: '',
         nfcTagReading: false,
