@@ -1,7 +1,6 @@
 import asyncio
 
 from fastapi import APIRouter, Request, Response
-from fastapi.staticfiles import StaticFiles
 from fastapi.routing import APIRoute
 
 from lnbits.db import Database
