@@ -16,7 +16,6 @@ from lnbits.decorators import (
     get_key_type,
     require_admin_key,
 )
-from lnbits.settings import settings
 from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 
 from . import scheduled_tasks, tpos_ext
@@ -165,7 +164,7 @@ async def api_tpos_pay_invoice(
 
     async with httpx.AsyncClient() as client:
         try:
-            headers = {"user-agent": f"lnbits/tpos commit {settings.lnbits_commit[:7]}"}
+            headers = {"user-agent": f"lnbits/tpos"}
             r = await client.get(lnurl, follow_redirects=True, headers=headers)
             if r.is_error:
                 lnurl_response = {"success": False, "detail": "Error loading"}
