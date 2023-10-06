@@ -18,27 +18,27 @@ An easy, fast and secure way to accept Bitcoin, over Lightning Network, at your 
 
 ## Receiving Tips
 
-1. Create or edit an existing TPOS and activate _Enable tips_
+1. Create or edit an existing TPOS and activate _Enable tips_\
    ![tips](https://i.imgur.com/VRKPNop.png)
-2. Fill in the necessary fields:
+2. Fill in the necessary fields:\
    - select a wallet to receive tips in
    - define the tip (percentage)
    - hit _Enter_ after every option
    - if no values are defined, a default _Rounding_ option will be available. Round the check to a defined value.
-3. When using the TPOS, set a value to receive as normal and hit **OK**
+3. When using the TPOS, set a value to receive as normal and hit **OK**\
    ![tip amnt](https://i.imgur.com/Vyh0kqx.png)
-4. A new dialog will show to define a tip
+4. A new dialog will show to define a tip\
    ![set tip 1](https://i.imgur.com/1xxrAse.png)
-   - select the % or choose _Round to_ to round the value
+   - select the % or choose _Round to_ to round the value\
      ![set tip 2](https://i.imgur.com/gv48S8U.png)
-5. Present the invoice to the customer, with the updated amount with the tip
+5. Present the invoice to the customer, with the updated amount with the tip\
    ![pay tip](https://i.imgur.com/WuaRzph.png)
-   - after payment, the tip amount is sent to the defined wallet (for example an employees wallet) and the rest to the main wallet
+   - after payment, the tip amount is sent to the defined wallet (for example an employees wallet) and the rest to the main wallet\
      ![paym 1](https://i.imgur.com/zvDf1y5.png)
 
 ## OTC ATM functionality
 
-1. Create or edit an existing TPOS and activate _Enable selling bitcoin_
+1. Create or edit an existing TPOS and activate _Enable selling bitcoin_\
    ![atm](https://i.imgur.com/WF3jiFb.png)
 2. Fill in the necessary fields:
 
@@ -46,11 +46,11 @@ An easy, fast and secure way to accept Bitcoin, over Lightning Network, at your 
    - define a Pin to access the functionality
    - define a _cool down_ period between withdraws, to avoid exploitation (min. 1 minute)
 
-3. When using the TPOS, you'll see the **ATM** button, click and enter Pin
+3. When using the TPOS, you'll see the **ATM** button, click and enter Pin\
    ![atm pin](https://i.imgur.com/5QMYXX7.png)
-4. Set amount to sell and click **OK**
+4. Set amount to sell and click **OK**\
    ![atm amount](https://i.imgur.com/V3jlfhV.png)
-5. Show the LNURLw QR code to the buyer
+5. Show the LNURLw QR code to the buyer\
    ![atm withdraw](https://i.imgur.com/rYXtn93.png)
-6. After successful withdraw, the green check will show and TPOS exists ATM mode
+6. After successful withdraw, the green check will show and TPOS exists ATM mode\
    ![atm success](https://i.imgur.com/FaHltvW.png)
