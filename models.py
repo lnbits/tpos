@@ -21,7 +21,7 @@ class CreateTposData(BaseModel):
         ..., ge=1
     )  # Required and must be greater than or equal to 1
     withdrawamt: int = Field(
-        None, ge=1
+        None, ge=0
     )  # Optional, but if provided, must be greater than or equal to 1
     withdrawtime: int = Field(0)
     withdrawbtwn: int = Field(10, ge=1)
