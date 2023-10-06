@@ -16,7 +16,6 @@ from lnbits.decorators import (
     get_key_type,
     require_admin_key,
 )
-from lnbits.settings import settings
 from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 
 from . import scheduled_tasks, tpos_ext
