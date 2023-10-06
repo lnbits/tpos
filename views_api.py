@@ -35,7 +35,6 @@ async def api_tposs(
     if all_wallets:
         user = await get_user(wallet.wallet.user)
         wallet_ids = user.wallet_ids if user else []
-    print([tpos.dict() for tpos in await get_tposs(wallet_ids)])
     return [tpos.dict() for tpos in await get_tposs(wallet_ids)]
 
 
