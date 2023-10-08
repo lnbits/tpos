@@ -92,6 +92,8 @@
             (round amount to a value)
           </template>
         </q-select>
+        <q-checkbox filled dense emit-value v-model="formDialog.data.atm" :options="g.user.walletOptions"
+          label="ATM"></q-checkbox>
         <div class="row q-mt-lg">
           <q-btn unelevated color="primary" :disable="formDialog.data.currency == null || formDialog.data.name == null"
             type="submit">Create TPoS</q-btn>
@@ -314,7 +316,13 @@
               align: 'left',
               label: 'Tip Options %',
               field: 'tip_options'
-            }
+            },
+            {
+              name: 'atm',
+              align: 'left',
+              label: 'Allow ATM',
+              field: 'atm'
+            },
           ],
           pagination: {
             rowsPerPage: 10
@@ -354,7 +362,8 @@
               this.formDialog.data.tip_options.map(str => parseInt(str))
             )
             : JSON.stringify([]),
-          tip_wallet: this.formDialog.data.tip_wallet || ''
+          tip_wallet: this.formDialog.data.tip_wallet || '',
+          atm: this.formDialog.data.atm || 0
         }
         const wallet = _.findWhere(this.g.user.wallets, {
           id: this.formDialog.data.wallet

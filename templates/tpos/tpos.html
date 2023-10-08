@@ -53,6 +53,14 @@
     <q-page-sticky position="top-right" :offset="[18, 90]">
       <q-btn @click="toggleFullscreen" fab :icon="fullScreenIcon" color="primary" />
     </q-page-sticky>
+    <q-page-sticky position="top-right" :offset="[18, 162]">
+      <q-btn
+        :disabled="amount == 0"
+        @click="readAtmNfcTag"
+        fab
+        color="primary"
+      />ATM</q-btn>
+    </q-page-sticky>
     <q-dialog v-model="invoiceDialog.show" position="top" @hide="closeInvoiceDialog">
       <q-card v-if="invoiceDialog.data" class="q-pa-lg q-pt-xl lnbits__dialog-card">
         <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
@@ -187,6 +195,7 @@
         tposId: '{{ tpos.id }}',
         currency: '{{ tpos.currency }}',
         tip_options: null,
+        atm: null,
         exchangeRate: null,
         stack: [],
         tipAmount: 0.0,
@@ -431,6 +440,109 @@
               : 'An unexpected error has occurred.'
           })
         }
+      },
+      readAtmNfcTag: function () {
+        try {
+          const self = this
+
+          if (typeof NDEFReader == 'undefined') {
+            throw {
+              toString: function () {
+                return 'NFC not supported on this device or browser.'
+              }
+            }
+          }
+
+          const ndef = new NDEFReader()
+
+          const readerAbortController = new AbortController()
+          readerAbortController.signal.onabort = event => {
+            console.log('All NFC Read operations have been aborted.')
+          }
+
+          this.nfcTagReading = true
+          this.$q.notify({
+            message: 'Tap your NFC tag to pay this invoice with LNURLw.'
+          })
+
+          return ndef.scan({signal: readerAbortController.signal}).then(() => {
+            ndef.onreadingerror = () => {
+              self.nfcTagReading = false
+
+              this.$q.notify({
+                type: 'negative',
+                message: 'There was an error reading this NFC tag.'
+              })
+
+              readerAbortController.abort()
+            }
+
+            ndef.onreading = ({message}) => {
+              //Decode NDEF data from tag
+              const textDecoder = new TextDecoder('utf-8')
+
+              const record = message.records.find(el => {
+                const payload = textDecoder.decode(el.data)
+                return payload.toUpperCase().indexOf('LNURL') !== -1
+              })
+
+              const lnurl = textDecoder.decode(record.data)
+
+              //User feedback, show loader icon
+              self.nfcTagReading = false
+              //self.payInvoice(lnurl, readerAbortController)
+
+              axios.get(lnurl.replace('lnurlw://', 'https://')).then(function (response) {
+                console.log(response.data.payLink)
+                self.makeAtmWithdraw(response.data.payLink, readerAbortController)
+              })
+
+              this.$q.notify({
+                type: 'positive',
+                message: 'NFC tag read successfully.'
+              })
+            }
+          })
+        } catch (error) {
+          this.nfcTagReading = false
+          this.$q.notify({
+            type: 'negative',
+            message: error
+              ? error.toString()
+              : 'An unexpected error has occurred.'
+          })
+        }
+      },
+      makeAtmWithdraw: function (payLink, readerAbortController) {
+        const self = this
+
+        return axios
+          .post(
+            '/tpos/api/v1/tposs/' +
+              self.tposId +
+              '/atm/', null,
+            {
+              params: {
+                amount: this.sat,
+                memo: this.amountFormatted,
+                payLink: payLink
+              }
+            }
+          )
+          .then(response => {
+            if (!response.data.success) {
+              this.$q.notify({
+                type: 'negative',
+                message: response.data.detail
+              })
+            }
+            else {
+              this.stack = []
+              this.tipAmount = 0.0
+            }
+
+            readerAbortController.abort()
+          })
       },
       payInvoice: function (lnurl, readerAbortController) {
         const self = this

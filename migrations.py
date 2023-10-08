@@ -34,3 +34,13 @@ async def m003_addtip_options(db):
         ALTER TABLE tpos.tposs ADD tip_options TEXT NULL;
     """
     )
+
+async def m004_addatm_options(db):
+    """
+    Add tips to tposs table
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.tposs ADD atm BOOLEAN NULL;
+    """
+    )

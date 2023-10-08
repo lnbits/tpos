@@ -8,7 +8,7 @@ from starlette.exceptions import HTTPException
 
 from lnbits.core.crud import get_latest_payments_by_extension, get_user
 from lnbits.core.models import Payment
-from lnbits.core.services import create_invoice
+from lnbits.core.services import create_invoice, pay_invoice
 from lnbits.core.views.api import api_payment
 from lnbits.decorators import (
     WalletTypeInfo,
@@ -40,6 +40,7 @@ async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(get_key_type)
 ):
     tpos = await create_tpos(wallet_id=wallet.wallet.id, data=data)
+    print(data)
     return tpos.dict()
 
 
@@ -111,6 +112,62 @@ async def api_tpos_create_invoice(
 
     return {"payment_hash": payment_hash, "payment_request": payment_request}
 
+@tpos_ext.post("/api/v1/tposs/{tpos_id}/atm", status_code=HTTPStatus.OK)
+async def api_tpos_make_atm(
+    tpos_id: str, amount: int = Query(..., ge=1), memo: str = "", payLink: str = ""
+) -> dict:
+
+    tpos = await get_tpos(tpos_id)
+
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+
+    payLink = payLink.replace("lnurlp://", "https://") # pointless lnurlp:// -> https://
+
+    async with httpx.AsyncClient() as client:
+        try:
+            headers = {"user-agent": f"lnbits/tpos"}
+            r = await client.get(payLink, follow_redirects=True, headers=headers)
+
+            if r.is_error:
+                return {"success": False, "detail": "Error loading"}
+
+            resp = r.json()
+
+            amount = amount*1000 # convert to msats
+
+            if resp["tag"] != "payRequest":
+                return {"success": False, "detail": "Wrong tag type"}
+
+            if amount < resp["minSendable"]:
+                return {"success": False, "detail": "Amount too low"}
+
+            if amount > resp["maxSendable"]:
+                return {"success": False, "detail": "Amount too high"}
+
+            cb_res = await client.get(resp["callback"], follow_redirects=True, headers=headers, params={"amount": amount})
+            cb_resp = cb_res.json()
+
+            if cb_res.is_error:
+                return {"success": False, "detail": "Error loading callback"}
+
+            try:
+
+                payment_hash = await pay_invoice(
+                    wallet_id=tpos.wallet,
+                    payment_request=cb_resp["pr"],
+                    description="ATM Withdrawal",
+                    extra={"tag": "tpos_atm", "tpos": tpos.id},
+                )
+
+                return {"success": True, "detail": "Payment successful", "payment_hash": payment_hash}
+            except Exception as exc:
+                return {"success": False, "reason": f"Payment failed - {exc}"}
+
+        except Exception as e:
+            raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(e))
 
 @tpos_ext.get("/api/v1/tposs/{tpos_id}/invoices")
 async def api_tpos_get_latest_invoices(tpos_id: str):
