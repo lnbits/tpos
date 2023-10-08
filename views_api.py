@@ -123,6 +123,8 @@ async def api_tpos_make_atm(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
+    if (tpos.atm == 0 or tpos.atm == None):
+        return {"success": False, "detail": "ATM mode not allowed"} 
 
     payLink = payLink.replace("lnurlp://", "https://") # pointless lnurlp:// -> https://
 
