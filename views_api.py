@@ -40,7 +40,6 @@ async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(get_key_type)
 ):
     tpos = await create_tpos(wallet_id=wallet.wallet.id, data=data)
-    print(data)
     return tpos.dict()
 
 
