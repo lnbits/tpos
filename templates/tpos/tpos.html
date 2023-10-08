@@ -516,6 +516,14 @@
       makeAtmWithdraw: function (payLink, readerAbortController) {
         const self = this
 
+        if (!payLink){
+          this.$q.notify({
+                type: 'negative',
+                message: "Card doesn't support the ATM topup feature (LUD-19)"
+              })
+           return
+        }
+
         return axios
           .post(
             '/tpos/api/v1/tposs/' +
@@ -539,6 +547,10 @@
             else {
               this.stack = []
               this.tipAmount = 0.0
+              this.$q.notify({
+                type: 'positive',
+                message: "Topup successful!"
+              })
             }
 
             readerAbortController.abort()
