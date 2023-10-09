@@ -41,7 +41,7 @@
               color="primary">0</q-btn>
             <q-btn unelevated @click="stack = []" size="xl" :outline="!($q.dark.isActive)" rounded color="primary"
               class="btn-cancel">C</q-btn>
-            <q-btn unelevated :disabled="amount == 0" @click="submitForm()" size="xl" :outline="!($q.dark.isActive)"
+            <q-btn unelevated :disabled="amount == 0" @click="submitForm(); readNfcTag()" size="xl" :outline="!($q.dark.isActive)"
               rounded color="primary" class="btn-confirm">OK</q-btn>
           </div>
         </div>
@@ -69,7 +69,7 @@
             <span v-show="tip_options" style="font-size: 0.75rem">( + {{ tipAmountFormatted }} tip)</span>
             {% endraw %}
           </h5>
-          <q-btn outline color="grey" icon="nfc" @click="readNfcTag()" :disable="nfcTagReading"></q-btn>
+          <!--<q-btn outline color="grey" icon="nfc" @click="readNfcTag()" :disable="nfcTagReading"></q-btn>-->
         </div>
         <div class="row q-mt-lg">
           <q-btn outline color="grey" @click="copyText(invoiceDialog.data.payment_request)">Copy invoice</q-btn>
@@ -372,7 +372,9 @@
           if (typeof NDEFReader == 'undefined') {
             throw {
               toString: function () {
-                return 'NFC not supported on this device or browser.'
+                this.$q.notify({
+                  message: 'scanning nfc'
+                })
               }
             }
           }
