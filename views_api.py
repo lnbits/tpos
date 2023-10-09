@@ -155,17 +155,15 @@ async def api_tpos_make_atm(
                 return {"success": False, "detail": "Error loading callback"}
 
             try:
-
                 payment_hash = await pay_invoice(
                     wallet_id=tpos.wallet,
                     payment_request=cb_resp["pr"],
                     description="ATM Withdrawal",
                     extra={"tag": "tpos_atm", "tpos": tpos.id},
                 )
-
                 return {"success": True, "detail": "Payment successful", "payment_hash": payment_hash}
             except Exception as exc:
-                return {"success": False, "reason": f"Payment failed - {exc}"}
+                return {"success": False, "reason": exc, "detail": f"Payment failed - {exc}"}
 
         except Exception as e:
             raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(e))
