@@ -437,6 +437,7 @@
                 type: 'positive',
                 message: 'NFC tag read successfully.'
               })
+              readerAbortController.abort()
             }
           })
         } catch (error) {
