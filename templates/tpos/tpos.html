@@ -357,6 +357,9 @@
                     dialog.show = false
 
                     self.complete.show = true
+                    setTimeout(function () {
+                      self.complete.show = false
+                    }, 5000)
                   }
                 })
             }, 3000)
