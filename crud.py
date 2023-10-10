@@ -9,8 +9,12 @@ from loguru import logger
 
 async def get_current_timestamp():
     # Get current DB timestamp
-    now = int((await db.fetchone(f"SELECT {db.timestamp_now}"))[0])
-    return now
+    if db.type in {"POSTGRES", "COCKROACH"}:
+        timestamp_query = f"SELECT EXTRACT(EPOCH FROM {db.timestamp_now})"
+    elif db.type == "SQLITE":
+        timestamp_query = f"SELECT {db.timestamp_now}"
+    current_timestamp = (await db.fetchone(timestamp_query))[0]
+    return int(current_timestamp)
 
 
 async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
