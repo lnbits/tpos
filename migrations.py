@@ -51,7 +51,7 @@ async def m004_addwithdrawlimit(db):
             withdrawpin INTEGER DEFAULT 878787,
             withdrawamt INTEGER DEFAULT 0,
             withdrawtime INTEGER NOT NULL DEFAULT 0,
-            withdrawbtwn INTEGER NOT NULL DEFAULT 10,
+            withdrawbtwn INTEGER NOT NULL DEFAULT 10
         );
     """
     )
@@ -64,7 +64,7 @@ async def m004_addwithdrawlimit(db):
                 name,
                 currency,
                 tip_wallet,
-                tip_options,
+                tip_options
             )
             VALUES (?, ?, ?, ?, ?, ?)
             """,
@@ -83,7 +83,7 @@ async def m005_initial(db):
             id TEXT PRIMARY KEY,
             tpos_id TEXT NOT NULL,
             amount int,
-            claimed BOOLEAN DEFAULT 0
+            claimed BOOLEAN DEFAULT false
         );
     """
     )
