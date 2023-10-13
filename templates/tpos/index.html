@@ -93,7 +93,9 @@
           </template>
         </q-select>
         <div class="row q-mt-lg">
-          <q-btn unelevated color="primary" :disable="formDialog.data.currency == null || formDialog.data.name == null"
+          <q-btn v-if="formDialog.data.id" unelevated color="primary" :disable="formDialog.data.currency == null || formDialog.data.name == null"
+            type="submit">Update TPoS</q-btn>
+          <q-btn v-else unelevated color="primary" :disable="formDialog.data.currency == null || formDialog.data.name == null"
             type="submit">Create TPoS</q-btn>
           <q-btn v-close-popup flat color="grey" class="q-ml-auto">Cancel</q-btn>
         </div>
