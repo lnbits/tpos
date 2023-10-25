@@ -66,7 +66,7 @@ async def api_tpos_update(
 
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
-    tpos = await update_tpos(tpos_id=tpos_id, **data.dict())
+    tpos = await update_tpos(tpos_id=tpos_id, **data.dict(exclude_unset=True))
     return tpos.dict()
 
 

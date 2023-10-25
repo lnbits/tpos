@@ -1,5 +1,5 @@
 from sqlite3 import Row
-from typing import Optional
+from typing import Optional, Any
 
 from fastapi import Request
 from lnurl import Lnurl, LnurlWithdrawResponse
@@ -14,15 +14,9 @@ class CreateTposData(BaseModel):
     currency: Optional[str]
     tip_options: str = Field(None)
     tip_wallet: str = Field(None)
-    withdrawlimit: int = Field(
-        ..., ge=1
-    )  # Required and must be greater than or equal to 1
-    withdrawpin: int = Field(
-        ..., ge=1
-    )  # Required and must be greater than or equal to 1
-    withdrawamt: int = Field(
-        None, ge=0
-    )  # Optional, but if provided, must be greater than or equal to 1
+    withdrawlimit: int = Field(None, ge=1)
+    withdrawpin: int = Field(None, ge=1)
+    withdrawamt: int = Field(None, ge=0)
     withdrawtime: int = Field(0)
     withdrawbtwn: int = Field(10, ge=1)
 
@@ -34,8 +28,8 @@ class TPoS(BaseModel):
     currency: str
     tip_options: Optional[str]
     tip_wallet: Optional[str]
-    withdrawlimit: int
-    withdrawpin: int
+    withdrawlimit: Optional[int]
+    withdrawpin: Optional[int]
     withdrawamt: int
     withdrawtime: int
     withdrawbtwn: int
@@ -46,7 +40,7 @@ class TPoS(BaseModel):
 
     @property
     def withdrawamtposs(self) -> int:
-        return self.withdrawlimit - self.withdrawamt
+        return self.withdrawlimit - self.withdrawamt if self.withdrawlimit else 0
 
 
 class TPoSClean(BaseModel):
@@ -54,7 +48,7 @@ class TPoSClean(BaseModel):
     name: str
     currency: str
     tip_options: Optional[str]
-    withdrawlimit: int
+    withdrawlimit: Optional[int]
     withdrawamt: int
     withdrawtime: int
     withdrawbtwn: int
@@ -65,7 +59,7 @@ class TPoSClean(BaseModel):
 
     @property
     def withdrawamtposs(self) -> int:
-        return self.withdrawlimit - self.withdrawamt
+        return self.withdrawlimit - self.withdrawamt if self.withdrawlimit else 0
 
 
 class LNURLCharge(BaseModel):
