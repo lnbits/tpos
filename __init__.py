@@ -33,8 +33,9 @@ class LNURLErrorResponseHandler(APIRoute):
         return custom_route_handler
 
 
-tpos_ext: APIRouter = APIRouter(prefix="/tpos", tags=["TPoS"])
-tpos_ext.route_class = LNURLErrorResponseHandler
+tpos_ext: APIRouter = APIRouter(
+    prefix="/tpos", tags=["TPoS"], route_class=LNURLErrorResponseHandler
+)
 
 tpos_static_files = [
     {
