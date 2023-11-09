@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 import httpx
-from fastapi import Depends, Query
+from fastapi import Depends, Query, Request
 from lnurl import decode as decode_lnurl
 from loguru import logger
 from starlette.exceptions import HTTPException
@@ -18,9 +18,18 @@ from lnbits.decorators import (
 )
 from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 
-from . import scheduled_tasks, tpos_ext
-from .crud import create_tpos, delete_tpos, get_tpos, get_tposs, update_tpos
-from .models import CreateTposData, PayLnurlWData
+from . import tpos_ext
+from .crud import (
+    create_tpos,
+    update_tpos,
+    delete_tpos,
+    get_tpos,
+    get_tposs,
+    start_lnurlcharge,
+    get_lnurlcharge,
+    update_lnurlcharge,
+)
+from .models import CreateTposData, PayLnurlWData, LNURLCharge
 
 
 @tpos_ext.get("/api/v1/tposs", status_code=HTTPStatus.OK)
@@ -31,7 +40,6 @@ async def api_tposs(
     if all_wallets:
         user = await get_user(wallet.wallet.user)
         wallet_ids = user.wallet_ids if user else []
-
     return [tpos.dict() for tpos in await get_tposs(wallet_ids)]
 
 
@@ -58,7 +66,7 @@ async def api_tpos_update(
 
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
-    tpos = await update_tpos(tpos_id, **data.dict())
+    tpos = await update_tpos(tpos_id=tpos_id, **data.dict(exclude_unset=True))
     return tpos.dict()
 
 
@@ -216,20 +224,42 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
     return status
 
 
-@tpos_ext.delete(
-    "/api/v1",
-    status_code=HTTPStatus.OK,
-    dependencies=[Depends(check_admin)],
-    description="Stop the extension.",
-)
-async def api_stop():
-    for t in scheduled_tasks:
-        try:
-            t.cancel()
-        except Exception as ex:
-            logger.warning(ex)
+@tpos_ext.get("/api/v1/atm/{tpos_id}/{atmpin}", status_code=HTTPStatus.CREATED)
+async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
+    tpos = await get_tpos(tpos_id)
+    logger.debug(tpos)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+    if int(tpos.withdrawpin) != int(atmpin):
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wrong pin.")
+    token = await start_lnurlcharge(tpos_id)
+    return token
 
-    return {"success": True}
+
+@tpos_ext.get(
+    "/api/v1/atm/withdraw/{withdraw_token}/{amount}", status_code=HTTPStatus.CREATED
+)
+async def api_tpos_create_withdraw(
+    request: Request, withdraw_token: str, amount: str
+) -> dict:
+    lnurlcharge = await get_lnurlcharge(withdraw_token)
+    if not lnurlcharge:
+        return {
+            "status": "ERROR",
+            "reason": f"lnurlcharge {withdraw_token} not found on this server",
+        }
+    tpos = await get_tpos(lnurlcharge.tpos_id)
+    if not tpos:
+        return {
+            "status": "ERROR",
+            "reason": f"TPoS {lnurlcharge.tpos_id} not found on this server",
+        }
+    lnurlcharge = await update_lnurlcharge(
+        LNURLCharge(id=withdraw_token, tpos_id=lnurlcharge.tpos_id, amount=int(amount))
+    )
+    return {**lnurlcharge.dict(), **{"lnurl": lnurlcharge.lnurl(request)}}
 
 
 @tpos_ext.get("/api/v1/rate/{currency}", status_code=HTTPStatus.OK)

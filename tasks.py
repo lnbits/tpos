@@ -7,7 +7,7 @@ from lnbits.core.services import create_invoice, pay_invoice, websocketUpdater
 from lnbits.helpers import get_current_extension_name
 from lnbits.tasks import register_invoice_listener
 
-from .crud import get_tpos
+from .crud import get_tpos, update_lnurlcharge
 
 
 async def wait_for_paid_invoices():
@@ -52,7 +52,7 @@ async def on_invoice_paid(payment: Payment) -> None:
         wallet_id=wallet_id,
         amount=int(tipAmount),
         internal=True,
-        memo="tpos tip",
+        memo=f"tpos tip",
     )
     logger.debug(f"tpos: tip invoice created: {payment_hash}")
 
