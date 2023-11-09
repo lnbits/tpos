@@ -17,32 +17,137 @@
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4">
           <div class="keypad q-pa-sm">
-            <q-btn unelevated @click="stack.push(1)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">1</q-btn>
-            <q-btn unelevated @click="stack.push(2)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">2</q-btn>
-            <q-btn unelevated @click="stack.push(3)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">3</q-btn>
-            <q-btn unelevated @click="stack.push(4)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">4</q-btn>
-            <q-btn unelevated @click="stack.push(5)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">5</q-btn>
-            <q-btn unelevated @click="stack.push(6)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">6</q-btn>
-            <q-btn unelevated @click="stack.push(7)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">7</q-btn>
-            <q-btn unelevated @click="stack.push(8)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">8</q-btn>
-            <q-btn unelevated @click="stack.push(9)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">9</q-btn>
-            <q-btn unelevated @click="stack.splice(-1, 1)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">DEL</q-btn>
-            <q-btn unelevated @click="stack.push(0)" size="xl" :outline="!($q.dark.isActive)" rounded
-              color="primary">0</q-btn>
-            <q-btn unelevated @click="stack = []" size="xl" :outline="!($q.dark.isActive)" rounded color="primary"
-              class="btn-cancel">C</q-btn>
-            <q-btn unelevated :disabled="amount == 0" @click="submitForm()" size="xl" :outline="!($q.dark.isActive)"
-              rounded color="primary" class="btn-confirm">OK</q-btn>
+            <q-btn
+              unelevated
+              @click="stack.push(1)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >1</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.push(2)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >2</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.push(3)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >3</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.push(4)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >4</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.push(5)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >5</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.push(6)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >6</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.push(7)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >7</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.push(8)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >8</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.push(9)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >9</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.splice(-1, 1)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="negative"
+              >DEL</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack.push(0)"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              >0</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="stack = []"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="warning"
+              class="btn-cancel"
+              >C</q-btn
+            >
+            <q-btn
+              unelevated
+              :disabled="amount == 0"
+              @click="submitForm()"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="primary"
+              class="btn-plus"
+              >+</q-btn
+            >
+            <q-btn
+              unelevated
+              :disabled="amount == 0"
+              @click="submitForm()"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="positive"
+              class="btn-confirm"
+              >OK</q-btn
+            >
           </div>
         </div>
       </div>
@@ -165,14 +270,19 @@
     grid-gap: 8px;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(4, 1fr);
+    min-height: 40vh;
   }
 
   .keypad .btn {
     height: 100%;
+    min-height: 56px;
   }
 
   .keypad .btn-confirm {
-    grid-area: 1 / 4 / 5 / 4;
+    grid-area: 2 / 4 / 5 / 4;
+  }
+  .keypad .btn-plus {
+    grid-area: 1 / 4 / 2 / 4;
   }
 </style>
 {% endblock %} {% block scripts %}
