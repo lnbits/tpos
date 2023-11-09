@@ -21,7 +21,6 @@ async def lnurl_params(
     lnurlcharge_id: str,
     amount: int,
 ):
-    logger.debug(amount)
     lnurlcharge = await get_lnurlcharge(lnurlcharge_id)
     if not lnurlcharge:
         return {
@@ -59,7 +58,6 @@ async def lnurl_params(
     name="tpos.tposlnurlcharge.callback",
 )
 async def lnurl_callback(
-    request: Request,
     pr: Optional[str] = None,
     k1: Optional[str] = None,
 ):
