@@ -120,7 +120,7 @@
               size="xl"
               :outline="!($q.dark.isActive)"
               rounded
-              color="primary"
+              color="negative"
               >DEL</q-btn
             >
             <q-btn
@@ -138,7 +138,7 @@
               size="xl"
               :outline="!($q.dark.isActive)"
               rounded
-              color="primary"
+              color="warning"
               class="btn-cancel"
               >C</q-btn
             >
@@ -150,6 +150,17 @@
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
+              class="btn-plus"
+              >+</q-btn
+            >
+            <q-btn
+              unelevated
+              :disabled="amount == 0"
+              @click="submitForm()"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="positive"
               class="btn-confirm"
               >OK</q-btn
             >
@@ -392,14 +403,19 @@
     grid-gap: 8px;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(4, 1fr);
+    min-height: 40vh;
   }
 
   .keypad .btn {
     height: 100%;
+    min-height: 56px;
   }
 
   .keypad .btn-confirm {
-    grid-area: 1 / 4 / 5 / 4;
+    grid-area: 2 / 4 / 5 / 4;
+  }
+  .keypad .btn-plus {
+    grid-area: 1 / 4 / 2 / 4;
   }
 </style>
 {% endblock %} {% block scripts %}
