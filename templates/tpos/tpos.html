@@ -24,7 +24,7 @@
           <h5 class="q-mt-none q-mb-sm">${ fsat }<small> sat</small></h5>
           <div v-if="total > 0.0">
             <h5>
-              <i>Total: ${totalFormatted}<br>${totalfsat} sat</i>
+              <i>Total: ${totalFormatted}<br />${totalfsat} sat</i>
             </h5>
           </div>
         </div>
@@ -473,10 +473,7 @@
         )
       },
       totalFormatted() {
-        return LNbits.utils.formatCurrency(
-          this.total.toFixed(2),
-          this.currency
-        )
+        return LNbits.utils.formatCurrency(this.total.toFixed(2), this.currency)
       },
       amountWithTipFormatted: function () {
         return LNbits.utils.formatCurrency(
@@ -645,6 +642,8 @@
         this.showInvoice()
       },
       submitForm: function () {
+        this.stack = Array.from(String(this.total * 100), Number)
+        this.total = 0.0
         if (this.tip_options && this.tip_options.length) {
           this.rounding = false
           this.tipRounding = null
@@ -678,19 +677,10 @@
               dialog.data = response.data
               dialog.show = true
 
-            dialog.paymentChecker = setInterval(function () {
-              axios
-                .get(
-                  '/tpos/api/v1/tposs/' +
-                    self.tposId +
-                    '/invoices/' +
-                    response.data.payment_hash
-                )
-                .then(function (res) {
-                  if (res.data.paid) {
-                    clearInterval(dialog.paymentChecker)
-                    dialog.dismissMsg()
-                    dialog.show = false
+              dialog.dismissMsg = self.$q.notify({
+                timeout: 0,
+                message: 'Waiting for payment...'
+              })
 
               dialog.paymentChecker = setInterval(function () {
                 axios
