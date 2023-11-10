@@ -642,8 +642,11 @@
         this.showInvoice()
       },
       submitForm: function () {
-        this.stack = Array.from(String(this.total * 100), Number)
-        this.total = 0.0
+        if (this.total != 0.0) {
+          this.stack = Array.from(String(this.total * 100), Number)
+          this.total = 0.0
+        }
+
         if (this.tip_options && this.tip_options.length) {
           this.rounding = false
           this.tipRounding = null
