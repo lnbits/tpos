@@ -21,10 +21,10 @@
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
           <h3 class="q-mb-md">${ amountFormatted }</h3>
-          <h5 class="q-mt-none q-mb-sm">${ fsat }<small>sat</small></h5>
-          <div v-if="adding">
+          <h5 class="q-mt-none q-mb-sm">${ fsat }<small> sat</small></h5>
+          <div v-if="total > 0.0">
             <h5>
-              <i>Total: ${totalFormatted}</i>
+              <i>Total: ${totalFormatted}<br>${totalfsat} sat</i>
             </h5>
           </div>
         </div>
@@ -117,12 +117,12 @@
             >
             <q-btn
               unelevated
-              @click="stack.pop()"
+              @click="total > 0.0 ? cancelAddAmount() : stack = []"
               size="xl"
               :outline="!($q.dark.isActive)"
               rounded
               color="negative"
-              >DEL</q-btn
+              >C</q-btn
             >
             <q-btn
               unelevated
@@ -135,18 +135,17 @@
             >
             <q-btn
               unelevated
-              @click="adding ? cancelAddAmount() : stack = []"
+              @click="stack.pop()"
               size="xl"
               :outline="!($q.dark.isActive)"
               rounded
               color="warning"
               class="btn-cancel"
-              >C</q-btn
+              >⬅</q-btn
             >
             <q-btn
               unelevated
-              :disabled="adding || amount == 0"
-              @click="addingAmount()"
+              @click="addAmount()"
               size="xl"
               :outline="!($q.dark.isActive)"
               rounded
@@ -156,14 +155,13 @@
             >
             <q-btn
               unelevated
-              :disabled="amount == 0"
-              @click="adding ? addAmount() : submitForm()"
+              @click="submitForm()"
               size="xl"
               :outline="!($q.dark.isActive)"
               rounded
               color="positive"
               class="btn-confirm"
-              >${ adding ? 'Add' : 'Ok'}</q-btn
+              >Ok</q-btn
             >
           </div>
         </div>
@@ -214,7 +212,7 @@
           <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
           <h5 class="q-mt-none">
             ${ fsat }
-            <small>sat</small>
+            <small> sat</small>
             <span v-show="tip_options" style="font-size: 0.75rem"
               >( + ${ tipAmountFormatted } tip)</span
             >
@@ -460,7 +458,6 @@
         },
         rounding: false,
         isFullScreen: false,
-        adding: false,
         total: 0.0
       }
     },
@@ -477,7 +474,7 @@
       },
       totalFormatted() {
         return LNbits.utils.formatCurrency(
-          (this.total + this.amount).toFixed(2),
+          this.total.toFixed(2),
           this.currency
         )
       },
@@ -491,6 +488,10 @@
         if (!this.exchangeRate) return 0
         return Math.ceil(this.amount * this.exchangeRate)
       },
+      totalSat: function () {
+        if (!this.exchangeRate) return 0
+        return Math.ceil(this.total * this.exchangeRate)
+      },
       tipAmountSat: function () {
         if (!this.exchangeRate) return 0
         return Math.ceil(this.tipAmount * this.exchangeRate)
@@ -500,6 +501,9 @@
       },
       fsat: function () {
         return LNbits.utils.formatSat(this.sat)
+      },
+      totalfsat: function () {
+        return LNbits.utils.formatSat(this.totalSat)
       },
       isRoundValid() {
         return this.tipRounding > this.amount
@@ -527,21 +531,13 @@
       }
     },
     methods: {
-      addingAmount() {
-        this.adding = true
-        this.total = this.amount
-        this.stack = []
-      },
       addAmount() {
         this.total = +(this.total + this.amount).toFixed(2)
-        this.stack = Array.from(String(this.total * 100), Number)
-        this.total = 0.0
-        this.adding = false
+        this.stack = []
       },
       cancelAddAmount() {
-        this.stack = Array.from(String(this.total * 100), Number)
         this.total = 0.0
-        this.adding = false
+        this.stack = []
       },
       atm() {
         if (this.withdrawamtposs > 0) {
