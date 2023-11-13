@@ -1,5 +1,4 @@
 {% extends "public.html" %} {% block toolbar_title %} {{ tpos.name }}
-
 <q-btn
   flat
   dense
@@ -8,7 +7,6 @@
   icon="share"
   color="white"
 ></q-btn>
-
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
   <q-page>
@@ -22,10 +20,13 @@
       >
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
-          <h3 class="q-mb-md">{% raw %}{{ amountFormatted }}{% endraw %}</h3>
-          <h5 class="q-mt-none q-mb-sm">
-            {% raw %}{{ fsat }}{% endraw %} <small>sat</small>
-          </h5>
+          <h3 class="q-mb-md">${ amountFormatted }</h3>
+          <h5 class="q-mt-none q-mb-sm">${ fsat }<small> sat</small></h5>
+          <div v-if="total > 0.0">
+            <h5>
+              <i>Total: ${totalFormatted}<br />${totalfsat} sat</i>
+            </h5>
+          </div>
         </div>
       </div>
     </q-page-sticky>
@@ -116,12 +117,12 @@
             >
             <q-btn
               unelevated
-              @click="stack.splice(-1, 1)"
+              @click="total > 0.0 ? cancelAddAmount() : stack = []"
               size="xl"
               :outline="!($q.dark.isActive)"
               rounded
-              color="primary"
-              >DEL</q-btn
+              color="negative"
+              >C</q-btn
             >
             <q-btn
               unelevated
@@ -134,24 +135,33 @@
             >
             <q-btn
               unelevated
-              @click="stack = []"
+              @click="stack.pop()"
+              size="xl"
+              :outline="!($q.dark.isActive)"
+              rounded
+              color="warning"
+              class="btn-cancel"
+              >⬅</q-btn
+            >
+            <q-btn
+              unelevated
+              @click="addAmount()"
               size="xl"
               :outline="!($q.dark.isActive)"
               rounded
               color="primary"
-              class="btn-cancel"
-              >C</q-btn
+              class="btn-plus"
+              >+</q-btn
             >
             <q-btn
               unelevated
-              :disabled="amount == 0"
               @click="submitForm()"
               size="xl"
               :outline="!($q.dark.isActive)"
               rounded
-              color="primary"
+              color="positive"
               class="btn-confirm"
-              >OK</q-btn
+              >Ok</q-btn
             >
           </div>
         </div>
@@ -198,17 +208,14 @@
             class="rounded-borders"
           ></qrcode>
         </q-responsive>
-        <div class="text-center" v-show="!atmMode">
-          <h3 class="q-my-md">
-            {% raw %}{{ amountWithTipFormatted }}{% endraw %}
-          </h3>
+        <div class="text-center">
+          <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
           <h5 class="q-mt-none">
-            {% raw %}{{ fsat }}
-            <small>sat</small>
+            ${ fsat }
+            <small> sat</small>
             <span v-show="tip_options" style="font-size: 0.75rem"
-              >( + {{ tipAmountFormatted }} tip)</span
+              >( + ${ tipAmountFormatted } tip)</span
             >
-            {% endraw %}
           </h5>
           <q-btn
             outline
@@ -223,7 +230,7 @@
             outline
             color="grey"
             @click="copyText(invoiceDialog.data.payment_request)"
-            >Copy</q-btn
+            >Copy invoice</q-btn
           >
           <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
         </div>
@@ -246,7 +253,7 @@
             color="primary"
             v-for="tip in tip_options.filter(f => f != 'Round')"
             :key="tip"
-            >{% raw %}{{ tip }}{% endraw %}%</q-btn
+            >${ tip }%</q-btn
           >
           <q-btn
             style="padding: 10px; margin: 3px"
@@ -335,20 +342,18 @@
             </q-item-section>
           </q-item>
           <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
-            {%raw%}
             <q-item-section>
               <q-item-label class="text-bold"
-                >{{payment.amount / 1000}} sats</q-item-label
+                >${payment.amount / 1000} sats</q-item-label
               >
               <q-item-label caption lines="2"
-                >Hash: {{payment.checking_id.slice(0, 30)}}...</q-item-label
+                >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
               >
             </q-item-section>
             <q-item-section side top>
-              <q-item-label caption>{{payment.dateFrom}}</q-item-label>
+              <q-item-label caption>${payment.dateFrom}</q-item-label>
               <q-icon name="check" color="green" />
             </q-item-section>
-            {%endraw%}
           </q-item>
         </q-list>
       </q-card>
@@ -392,14 +397,19 @@
     grid-gap: 8px;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(4, 1fr);
+    min-height: 40vh;
   }
 
   .keypad .btn {
     height: 100%;
+    min-height: 56px;
   }
 
   .keypad .btn-confirm {
-    grid-area: 1 / 4 / 5 / 4;
+    grid-area: 2 / 4 / 5 / 4;
+  }
+  .keypad .btn-plus {
+    grid-area: 1 / 4 / 2 / 4;
   }
 </style>
 {% endblock %} {% block scripts %}
@@ -409,6 +419,7 @@
   new Vue({
     el: '#vue',
     mixins: [windowMixin],
+    delimiters: ['${', '}'],
     data: function () {
       return {
         tposId: '{{ tpos.id }}',
@@ -446,19 +457,23 @@
           show: false
         },
         rounding: false,
-        isFullScreen: false
+        isFullScreen: false,
+        total: 0.0
       }
     },
     computed: {
       amount: function () {
         if (!this.stack.length) return 0.0
-        return Number(this.stack.join('') / 100)
+        return this.stack.reduce((acc, dig) => acc * 10 + dig, 0) * 0.01
       },
       amountFormatted: function () {
         return LNbits.utils.formatCurrency(
           this.amount.toFixed(2),
           this.currency
         )
+      },
+      totalFormatted() {
+        return LNbits.utils.formatCurrency(this.total.toFixed(2), this.currency)
       },
       amountWithTipFormatted: function () {
         return LNbits.utils.formatCurrency(
@@ -470,6 +485,10 @@
         if (!this.exchangeRate) return 0
         return Math.ceil(this.amount * this.exchangeRate)
       },
+      totalSat: function () {
+        if (!this.exchangeRate) return 0
+        return Math.ceil(this.total * this.exchangeRate)
+      },
       tipAmountSat: function () {
         if (!this.exchangeRate) return 0
         return Math.ceil(this.tipAmount * this.exchangeRate)
@@ -479,6 +498,9 @@
       },
       fsat: function () {
         return LNbits.utils.formatSat(this.sat)
+      },
+      totalfsat: function () {
+        return LNbits.utils.formatSat(this.totalSat)
       },
       isRoundValid() {
         return this.tipRounding > this.amount
@@ -506,6 +528,14 @@
       }
     },
     methods: {
+      addAmount() {
+        this.total = +(this.total + this.amount).toFixed(2)
+        this.stack = []
+      },
+      cancelAddAmount() {
+        this.total = 0.0
+        this.stack = []
+      },
       atm() {
         if (this.withdrawamtposs > 0) {
           this.atmBox = true
@@ -612,6 +642,11 @@
         this.showInvoice()
       },
       submitForm: function () {
+        if (this.total != 0.0) {
+          this.stack = Array.from(String(this.total * 100), Number)
+          this.total = 0.0
+        }
+
         if (this.tip_options && this.tip_options.length) {
           this.rounding = false
           this.tipRounding = null
@@ -803,7 +838,7 @@
               this.isFullScreen = document.fullscreenElement
             })
           })
-          .catch(err => console.debug(err))
+          .catch(err => console.log(err))
       }
     },
     created: function () {
