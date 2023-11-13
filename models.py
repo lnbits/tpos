@@ -19,6 +19,7 @@ class CreateTposData(BaseModel):
     withdrawamt: int = Field(None, ge=0)
     withdrawtime: int = Field(0)
     withdrawbtwn: int = Field(10, ge=1)
+    items: Optional[str] = Field(None)
 
 
 class TPoS(BaseModel):
@@ -33,6 +34,7 @@ class TPoS(BaseModel):
     withdrawamt: int
     withdrawtime: int
     withdrawbtwn: int
+    items: Optional[str]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoS":
@@ -52,6 +54,7 @@ class TPoSClean(BaseModel):
     withdrawamt: int
     withdrawtime: int
     withdrawbtwn: int
+    items: Optional[str]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoSClean":

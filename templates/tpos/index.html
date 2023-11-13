@@ -276,6 +276,7 @@
     )
     obj.fsat = new Intl.NumberFormat(LOCALE).format(obj.amount)
     obj.tpos = ['/tpos/', obj.id].join('')
+    obj.items = JSON.parse(obj.items)
     return obj
   }
 
