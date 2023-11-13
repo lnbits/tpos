@@ -32,6 +32,7 @@
           <template v-slot:header="props">
             <q-tr :props="props">
               <q-th auto-width></q-th>
+              <q-th auto-width></q-th>
               <q-th v-for="col in props.cols" :key="col.name" :props="props">
                 {{ col.label }}
               </q-th>
@@ -46,6 +47,16 @@
 
           <template v-slot:body="props">
             <q-tr :props="props">
+              <q-td auto-width>
+                <q-btn
+                  size="sm"
+                  color="accent"
+                  round
+                  dense
+                  @click="props.expand = !props.expand"
+                  :icon="props.expand ? 'expand_less' : 'expand_more'"
+                />
+              </q-td>
               <q-td auto-width>
                 <q-btn
                   unelevated
@@ -125,6 +136,89 @@
                 ></q-btn>
               </q-td>
             </q-tr>
+            <q-tr v-show="props.expand" :props="props">
+              <q-td colspan="100%">
+                <div class="row items-center q-mb-lg">
+                  <div class="col-12">
+                    <q-tabs
+                      v-model="tab"
+                      no-caps
+                      class="bg-dark text-white shadow-2"
+                    >
+                      <q-tab name="info" label="PoS Info"></q-tab>
+                      <q-tab name="items" label="Items"></q-tab>
+                    </q-tabs>
+                    <q-tab-panels v-model="tab">
+                      <q-tab-panel name="items">
+                        <div>
+                          <div class="row items-center no-wrap q-mb-md">
+                            <div class="col-3 q-pr-lg">
+                              <q-btn
+                                unelevated
+                                outline
+                                @click="openItemDialog(props.row.id)"
+                                class="float-left q-my-sm"
+                                >Add Item</q-btn
+                              >
+                            </div>
+                          </div>
+
+                          <div class="row items-center no-wrap q-mb-md">
+                            <div class="col-12">
+                              <q-table
+                                flat
+                                dense
+                                :data="props.row.items"
+                                row-key="id"
+                                :columns="itemsTable.columns"
+                                :pagination.sync="itemsTable.pagination"
+                              >
+                                <template v-slot:body="props">
+                                  <q-tr :props="props">
+                                    <q-td auto-width>
+                                      <q-btn
+                                        size="sm"
+                                        color="pink"
+                                        dense
+                                        @click=""
+                                        icon="delete"
+                                      ></q-btn>
+                                    </q-td>
+                                    <q-td auto-width>
+                                      <q-btn
+                                        size="sm"
+                                        color="accent"
+                                        dense
+                                        @click="openItemDialog(props.row.tpos, props.row.id)"
+                                        icon="edit"
+                                      ></q-btn>
+                                    </q-td>
+
+                                    <q-td key="id" :props="props">
+                                      {{props.row.id}}
+                                    </q-td>
+                                    <q-td key="title" :props="props">
+                                      {{props.row.title}}
+                                    </q-td>
+                                    <q-td key="price" :props="props">
+                                      {{itemFormatPrice(props.row.price,
+                                      props.row.tpos)}}
+                                    </q-td>
+                                    <q-td key="disabled" :props="props">
+                                      {{props.row.disabled}}
+                                    </q-td>
+                                  </q-tr>
+                                </template>
+                              </q-table>
+                            </div>
+                          </div>
+                        </div>
+                      </q-tab-panel>
+                    </q-tab-panels>
+                  </div>
+                </div>
+              </q-td>
+            </q-tr>
           </template>
           {% endraw %}
         </q-table>
@@ -132,7 +226,7 @@
     </q-card>
   </div>
 
-  <div class="col-12 col-md-5 q-gutter-y-md">
+  <div class="col-12 col-md-4 col-lg-5 q-gutter-y-md">
     <q-card>
       <q-card-section>
         <h6 class="text-subtitle1 q-my-none">{{SITE_TITLE}} TPoS extension</h6>
@@ -266,17 +360,75 @@
       </q-form>
     </q-card>
   </q-dialog>
+  <q-dialog v-model="itemDialog.show" position="top" @hide="closeItemDialog">
+    <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
+      <q-form @submit="addItems" class="q-gutter-md">
+        <q-input
+          filled
+          dense
+          v-model.trim="itemDialog.data.title"
+          label="Title"
+        ></q-input>
+        <q-input
+          filled
+          dense
+          v-model.trim="itemDialog.data.image"
+          label="Image URL"
+        ></q-input>
+        <q-input
+          filled
+          dense
+          v-model.number="itemDialog.data.price"
+          label="Price"
+        ></q-input>
+        <q-checkbox
+          v-model="itemDialog.data.disabled"
+          label="Disable"
+        ></q-checkbox>
+        <div class="row q-mt-lg">
+          <q-btn
+            v-if="itemDialog.data.id"
+            unelevated
+            color="primary"
+            type="submit"
+            >Update Item</q-btn
+          >
+          <q-btn
+            v-else
+            unelevated
+            color="primary"
+            :disable="!Boolean(itemDialog.data.title) || !Boolean(itemDialog.data.price)"
+            type="submit"
+            >Create Item</q-btn
+          >
+          <q-btn
+            v-close-popup
+            @hide="closeItemDialog"
+            flat
+            color="grey"
+            class="q-ml-auto"
+            >Cancel</q-btn
+          >
+        </div>
+      </q-form>
+    </q-card>
+  </q-dialog>
 </div>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
 <script>
-  var mapTPoS = function (obj) {
+  const mapTPoS = function (obj) {
     obj.date = Quasar.utils.date.formatDate(
       new Date(obj.time * 1000),
       'YYYY-MM-DD HH:mm'
     )
-    obj.fsat = new Intl.NumberFormat(LOCALE).format(obj.amount)
     obj.tpos = ['/tpos/', obj.id].join('')
     obj.items = JSON.parse(obj.items)
+    obj.itemsMap = new Map()
+    obj.items.forEach((item, idx) => {
+      item.tpos = obj.id
+      item.id = idx + 1
+      obj.itemsMap.set(item.id, item)
+    })
     return obj
   }
 
@@ -486,6 +638,60 @@
             tips: false,
             otc: false
           }
+        },
+        itemDialog: {
+          show: false,
+          data: {
+            title: '',
+            image: '',
+            price: '',
+            disabled: false
+          }
+        },
+        tab: 'items',
+        itemsTable: {
+          columns: [
+            {
+              name: 'delete',
+              align: 'left',
+              label: '',
+              field: ''
+            },
+            {
+              name: 'edit',
+              align: 'left',
+              label: '',
+              field: ''
+            },
+
+            {
+              name: 'id',
+              align: 'left',
+              label: 'ID',
+              field: 'id'
+            },
+            {
+              name: 'title',
+              align: 'left',
+              label: 'Title',
+              field: 'title'
+            },
+            {
+              name: 'price',
+              align: 'left',
+              label: 'Price',
+              field: 'price'
+            },
+            {
+              name: 'disabled',
+              align: 'left',
+              label: 'Disabled',
+              field: 'disabled'
+            }
+          ],
+          pagination: {
+            rowsPerPage: 10
+          }
         }
       }
     },
@@ -606,6 +812,64 @@
       },
       exportCSV: function () {
         LNbits.utils.exportCSV(this.tpossTable.columns, this.tposs)
+      },
+      itemFormatPrice(price, tpos) {
+        const currency = _.findWhere(this.tposs, {id: tpos}).currency
+        return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
+      },
+      openItemDialog(tposId, itemId) {
+        if (itemId != null) {
+          const tpos = _.findWhere(this.tposs, {id: tposId})
+          const item = tpos.itemsMap.get(itemId)
+          this.itemDialog.data = {
+            ...item,
+            id: itemId,
+            tpos: tposId
+          }
+        } else {
+          this.itemDialog.data.tpos = tposId
+        }
+        this.itemDialog.show = true
+      },
+      closeItemDialog() {
+        this.itemDialog.show = false
+        this.itemDialog.data = {
+          title: '',
+          image: '',
+          price: '',
+          disabled: false
+        }
+      },
+      addItems() {
+        const tpos = _.findWhere(this.tposs, {id: this.itemDialog.data.tpos})
+        const wallet = _.findWhere(this.g.user.wallets, {
+          id: tpos.wallet
+        })
+        if (this.itemDialog.data.id) {
+          tpos.itemsMap.set(this.itemDialog.data.id, this.itemDialog.data)
+        }
+        const data = {
+          items: this.itemDialog.data.id
+            ? [...tpos.itemsMap.values()]
+            : [...tpos.items, this.itemDialog.data]
+        }
+        LNbits.api
+          .request(
+            'PUT',
+            `/tpos/api/v1/tposs/${tpos.id}/items`,
+            wallet.inkey,
+            data
+          )
+          .then(response => {
+            this.tposs = _.reject(this.tposs, obj => {
+              return obj.id == tpos.id
+            })
+            this.tposs.push(mapTPoS(response.data))
+            this.closeItemDialog()
+          })
+          .catch(error => {
+            LNbits.utils.notifyApiError(error)
+          })
       }
     },
     created: function () {

@@ -1,5 +1,5 @@
 from sqlite3 import Row
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 from fastapi import Request
 from lnurl import Lnurl, LnurlWithdrawResponse
@@ -105,3 +105,14 @@ class HashCheck(BaseModel):
 
 class PayLnurlWData(BaseModel):
     lnurl: str
+
+
+class Item(BaseModel):
+    image: Optional[str]
+    price: int
+    title: str
+    disabled: bool = False
+
+
+class CreateUpdateItemData(BaseModel):
+    items: List[Item]

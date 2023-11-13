@@ -95,7 +95,6 @@ async def m006_items(db):
     Example:
     [
         {
-            "id": <STRING>,
             "image": <IMG_URL>,
             "price": <INT>,
             "title": <STRING>,
