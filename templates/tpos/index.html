@@ -145,7 +145,6 @@
                       no-caps
                       class="bg-dark text-white shadow-2"
                     >
-                      <q-tab name="info" label="PoS Info"></q-tab>
                       <q-tab name="items" label="Items"></q-tab>
                     </q-tabs>
                     <q-tab-panels v-model="tab">
@@ -168,7 +167,7 @@
                               <q-table
                                 flat
                                 dense
-                                :data="props.row.items"
+                                :data="itemsArray(props.row.id)"
                                 row-key="id"
                                 :columns="itemsTable.columns"
                                 :pagination.sync="itemsTable.pagination"
@@ -180,7 +179,7 @@
                                         size="sm"
                                         color="pink"
                                         dense
-                                        @click=""
+                                        @click="deleteItem(props.row.id)"
                                         icon="delete"
                                       ></q-btn>
                                     </q-td>
@@ -189,20 +188,20 @@
                                         size="sm"
                                         color="accent"
                                         dense
-                                        @click="openItemDialog(props.row.tpos, props.row.id)"
+                                        @click="openItemDialog(props.row.id)"
                                         icon="edit"
                                       ></q-btn>
                                     </q-td>
 
                                     <q-td key="id" :props="props">
-                                      {{props.row.id}}
+                                      {{props.row.id.split(':')[1]}}
                                     </q-td>
                                     <q-td key="title" :props="props">
                                       {{props.row.title}}
                                     </q-td>
                                     <q-td key="price" :props="props">
                                       {{itemFormatPrice(props.row.price,
-                                      props.row.tpos)}}
+                                      props.row.id)}}
                                     </q-td>
                                     <q-td key="disabled" :props="props">
                                       {{props.row.disabled}}
@@ -416,7 +415,7 @@
 </div>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
 <script>
-  const mapTPoS = function (obj) {
+  const mapTPoS = obj => {
     obj.date = Quasar.utils.date.formatDate(
       new Date(obj.time * 1000),
       'YYYY-MM-DD HH:mm'
@@ -425,9 +424,8 @@
     obj.items = JSON.parse(obj.items)
     obj.itemsMap = new Map()
     obj.items.forEach((item, idx) => {
-      item.tpos = obj.id
-      item.id = idx + 1
-      obj.itemsMap.set(item.id, item)
+      let id = `${obj.id}:${idx + 1}`
+      obj.itemsMap.set(id, {...item, id})
     })
     return obj
   }
@@ -813,17 +811,23 @@
       exportCSV: function () {
         LNbits.utils.exportCSV(this.tpossTable.columns, this.tposs)
       },
-      itemFormatPrice(price, tpos) {
+      itemsArray(tposId) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        return [...tpos.itemsMap.values()]
+      },
+      itemFormatPrice(price, id) {
+        const tpos = id.split(':')[0]
         const currency = _.findWhere(this.tposs, {id: tpos}).currency
         return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
       },
-      openItemDialog(tposId, itemId) {
-        if (itemId != null) {
+      openItemDialog(id) {
+        const [tposId, itemId] = id.split(':')
+        console.log(id, tposId, itemId)
+        if (itemId) {
           const tpos = _.findWhere(this.tposs, {id: tposId})
-          const item = tpos.itemsMap.get(itemId)
+          const item = tpos.itemsMap.get(id)
           this.itemDialog.data = {
             ...item,
-            id: itemId,
             tpos: tposId
           }
         } else {
@@ -840,6 +844,19 @@
           disabled: false
         }
       },
+      deleteItem(id) {
+        const [tposId, itemId] = id.split(':')
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        LNbits.utils
+          .confirmDialog('Are you sure you want to delete this item?')
+          .onOk(() => {
+            tpos.itemsMap.delete(id)
+            const data = {
+              items: [...tpos.itemsMap.values()]
+            }
+            this.updateTposItems(tpos.id, tpos.wallet, data)
+          })
+      },
       addItems() {
         const tpos = _.findWhere(this.tposs, {id: this.itemDialog.data.tpos})
         const wallet = _.findWhere(this.g.user.wallets, {
@@ -853,16 +870,19 @@
             ? [...tpos.itemsMap.values()]
             : [...tpos.items, this.itemDialog.data]
         }
+        this.updateTposItems(tpos.id, wallet, data)
+      },
+      updateTposItems(tposId, wallet, data) {
         LNbits.api
           .request(
             'PUT',
-            `/tpos/api/v1/tposs/${tpos.id}/items`,
+            `/tpos/api/v1/tposs/${tposId}/items`,
             wallet.inkey,
             data
           )
           .then(response => {
             this.tposs = _.reject(this.tposs, obj => {
-              return obj.id == tpos.id
+              return obj.id == tposId
             })
             this.tposs.push(mapTPoS(response.data))
             this.closeItemDialog()
