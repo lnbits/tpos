@@ -28,13 +28,13 @@
           :columns="tpossTable.columns"
           :pagination.sync="tpossTable.pagination"
         >
-          {% raw %}
           <template v-slot:header="props">
             <q-tr :props="props">
               <q-th auto-width></q-th>
               <q-th auto-width></q-th>
+              <q-th auto-width></q-th>
               <q-th v-for="col in props.cols" :key="col.name" :props="props">
-                {{ col.label }}
+                ${ col.label }
               </q-th>
               <q-th auto-width>Tip Wallet</q-th>
               <q-th auto-width>Tip Options %</q-th>
@@ -61,7 +61,17 @@
                 <q-btn
                   unelevated
                   dense
-                  size="xs"
+                  size="sm"
+                  icon="qr_code"
+                  :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
+                  class="q-mr-sm"
+                  @click="openUrlDialog(props.row.id)"
+                  ><q-tooltip>PoS QR</q-tooltip></q-btn
+                >
+                <q-btn
+                  unelevated
+                  dense
+                  size="sm"
                   icon="launch"
                   :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
                   type="a"
@@ -78,7 +88,7 @@
                   copy="copy"
                   @click="copyText(props.row.id)"
                   ><q-tooltip>Click to copy</q-tooltip
-                  >{{props.row.id.substring(0,6)}}...</q-btn
+                  >${props.row.id.substring(0,6)}...</q-btn
                 >
               </q-td>
 
@@ -88,8 +98,8 @@
                 :key="col.name"
                 :props="props"
               >
-                {{ (col.name == 'tip_options' && col.value ?
-                JSON.parse(col.value).join(", ") : col.value) }}
+                ${ (col.name == 'tip_options' && col.value ?
+                JSON.parse(col.value).join(", ") : col.value) }
               </q-td>
               <q-td v-if="props.row.tip_wallet != ''" auto-width>
                 <q-btn
@@ -99,20 +109,20 @@
                   copy="copy"
                   @click="copyText(props.row.tip_wallet)"
                   ><q-tooltip>Click to copy</q-tooltip
-                  >{{props.row.tip_wallet.substring(0,6)}}...</q-btn
+                  >${props.row.tip_wallet.substring(0,6)}...</q-btn
                 >
               </q-td>
               <q-td v-else auto-width> N/A </q-td>
               <q-td v-if="props.row.tip_wallet != ''" auto-width>
-                {{props.row.tip_options}}
+                ${props.row.tip_options}
               </q-td>
               <q-td v-else auto-width>this N/A </q-td>
               <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
-                {{props.row.withdrawpin}}
+                ${props.row.withdrawpin}
               </q-td>
               <q-td v-else auto-width> N/A </q-td>
               <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
-                {{props.row.withdrawlimit}}
+                ${props.row.withdrawlimit}
               </q-td>
               <q-td v-else auto-width> N/A </q-td>
               <q-td auto-width>
@@ -194,17 +204,17 @@
                                     </q-td>
 
                                     <q-td key="id" :props="props">
-                                      {{props.row.id.split(':')[1]}}
+                                      ${props.row.id.split(':')[1]}
                                     </q-td>
                                     <q-td key="title" :props="props">
-                                      {{props.row.title}}
+                                      ${props.row.title}
                                     </q-td>
                                     <q-td key="price" :props="props">
-                                      {{itemFormatPrice(props.row.price,
-                                      props.row.id)}}
+                                      ${itemFormatPrice(props.row.price,
+                                      props.row.id)}
                                     </q-td>
                                     <q-td key="disabled" :props="props">
-                                      {{props.row.disabled}}
+                                      ${props.row.disabled}
                                     </q-td>
                                   </q-tr>
                                 </template>
@@ -219,7 +229,6 @@
               </q-td>
             </q-tr>
           </template>
-          {% endraw %}
         </q-table>
       </q-card-section>
     </q-card>
@@ -412,6 +421,28 @@
       </q-form>
     </q-card>
   </q-dialog>
+  <q-dialog v-model="urlDialog.show" position="top">
+    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
+      <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
+        <lnbits-qrcode :value="urlDialog.data.shareUrl"></lnbits-qrcode>
+      </q-responsive>
+      <div class="text-center q-mb-xl">
+        <p style="word-break: break-all">
+          <strong>${ urlDialog.data.name }</strong><br />${
+          urlDialog.data.shareUrl }
+        </p>
+      </div>
+      <div class="row q-mt-lg">
+        <q-btn
+          outline
+          color="grey"
+          @click="copyText(urlDialog.data.shareUrl, 'TPoS URL copied to clipboard!')"
+          >Copy URL</q-btn
+        >
+        <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+      </div>
+    </q-card>
+  </q-dialog>
 </div>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
 <script>
@@ -421,6 +452,12 @@
       'YYYY-MM-DD HH:mm'
     )
     obj.tpos = ['/tpos/', obj.id].join('')
+    obj.shareUrl = [
+      window.location.protocol,
+      '//',
+      window.location.host,
+      obj.tpos
+    ].join('')
     obj.items = JSON.parse(obj.items)
     obj.itemsMap = new Map()
     obj.items.forEach((item, idx) => {
@@ -433,6 +470,7 @@
   new Vue({
     el: '#vue',
     mixins: [windowMixin],
+    delimiters: ['${', '}'],
     data: function () {
       return {
         tposs: [],
@@ -690,6 +728,10 @@
           pagination: {
             rowsPerPage: 10
           }
+        },
+        urlDialog: {
+          show: false,
+          data: {}
         }
       }
     },
@@ -890,6 +932,11 @@
           .catch(error => {
             LNbits.utils.notifyApiError(error)
           })
+      },
+      openUrlDialog(id) {
+        this.urlDialog.data = _.findWhere(this.tposs, {id})
+        console.log(this.urlDialog.data)
+        this.urlDialog.show = true
       }
     },
     created: function () {
