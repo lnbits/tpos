@@ -327,13 +327,13 @@
 
             <q-card-section class="q-mb-auto">
               <div class="text-h6 ellipsis">${item.title}</div>
+              <div class="text-subtitle1">${item.formattedPrice}</div>
               <div
                 v-if="item.description"
-                class="text-subtitle1 ellipsis-2-lines"
+                class="text-caption ellipsis-2-lines q-py-sm"
               >
                 ${item.description}
               </div>
-              <div class="text-subtitle2">${item.formattedPrice}</div>
             </q-card-section>
 
             <q-card-actions vertical class="q-pa-md">
