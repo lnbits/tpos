@@ -374,7 +374,13 @@
           filled
           dense
           v-model.trim="itemDialog.data.title"
-          label="Title"
+          label="Title *"
+        ></q-input>
+        <q-input
+          filled
+          dense
+          v-model.trim="itemDialog.data.description"
+          label="Description"
         ></q-input>
         <q-input
           filled
@@ -386,7 +392,7 @@
           filled
           dense
           v-model.number="itemDialog.data.price"
-          label="Price"
+          label="Price *"
         ></q-input>
         <q-input
           filled

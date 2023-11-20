@@ -318,15 +318,21 @@
           v-for="item in filteredItems"
           :key="item.name"
         >
-          <q-card class="full-height">
+          <q-card class="full-height column">
             <img
               v-if="item.image"
               class="q-pa-md responsive-img"
               :src="item.image"
             />
 
-            <q-card-section class="q-mt-auto">
+            <q-card-section class="q-mb-auto">
               <div class="text-h6 ellipsis">${item.title}</div>
+              <div
+                v-if="item.description"
+                class="text-subtitle1 ellipsis-2-lines"
+              >
+                ${item.description}
+              </div>
               <div class="text-subtitle2">${item.formattedPrice}</div>
             </q-card-section>
 
@@ -770,12 +776,13 @@
         return this.isFullScreen ? 'fullscreen_exit' : 'fullscreen'
       },
       filteredItems() {
-        if (!this.searchTerm) return this.items
+        if (!this.searchTerm) return this.items.filter(item => !item.disabled)
 
         return this.items.filter(item => {
-          return item.title
-            .toLowerCase()
-            .includes(this.searchTerm.toLowerCase())
+          return (
+            !item.disabled &&
+            item.title.toLowerCase().includes(this.searchTerm.toLowerCase())
+          )
         })
       }
     },

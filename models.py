@@ -111,6 +111,7 @@ class Item(BaseModel):
     image: Optional[str]
     price: int
     title: str
+    description: Optional[str]
     disabled: bool = False
 
 

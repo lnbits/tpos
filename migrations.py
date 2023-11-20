@@ -98,7 +98,9 @@ async def m006_items(db):
             "image": <IMG_URL>,
             "price": <INT>,
             "title": <STRING>,
-            "disabled": <BOOLEAN>
+            "description": <STRING>,
+            "disabled": <BOOLEAN>,
+            "tax": <INT>,
         },
         ...
     ]
