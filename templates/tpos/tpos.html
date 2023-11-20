@@ -10,6 +10,19 @@
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
   <q-page>
+    <q-page-sticky v-if="exchangeRate && showPoS" expand position="top">
+      <div class="row justify-center full-width">
+        <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
+          <h3 class="q-mb-md">${ amountFormatted }</h3>
+          <h5 class="q-mt-none q-mb-sm">${ fsat }<small> sat</small></h5>
+          <div v-if="total > 0.0">
+            <h5>
+              <i>Total: ${totalFormatted}<br />${totalfsat} sat</i>
+            </h5>
+          </div>
+        </div>
+      </div>
+    </q-page-sticky>
     <template v-if="showPoS">
       <q-page-sticky expand position="bottom">
         <div class="row justify-center full-width">
@@ -180,6 +193,7 @@
           fab
           icon="point_of_sale"
           color="primary"
+          :disable="atmMode"
         ></q-btn>
       </q-page-sticky>
     </template>
@@ -344,19 +358,6 @@
         ></q-page-sticky
       >
     </template>
-    <q-page-sticky v-if="exchangeRate && showPoS" expand position="top">
-      <div class="row justify-center full-width">
-        <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
-          <h3 class="q-mb-md">${ amountFormatted }</h3>
-          <h5 class="q-mt-none q-mb-sm">${ fsat }<small> sat</small></h5>
-          <div v-if="total > 0.0">
-            <h5>
-              <i>Total: ${totalFormatted}<br />${totalfsat} sat</i>
-            </h5>
-          </div>
-        </div>
-      </div>
-    </q-page-sticky>
     <q-btn
       v-show="atmMode"
       color="negative"
