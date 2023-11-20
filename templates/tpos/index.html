@@ -392,7 +392,7 @@
           filled
           dense
           v-model.number="itemDialog.data.price"
-          label="Price *"
+          :label="`Price (${itemDialog.data.currency})*`"
         ></q-input>
         <q-input
           filled
@@ -875,8 +875,8 @@
       },
       openItemDialog(id) {
         const [tposId, itemId] = id.split(':')
+        const tpos = _.findWhere(this.tposs, {id: tposId})
         if (itemId) {
-          const tpos = _.findWhere(this.tposs, {id: tposId})
           const item = tpos.itemsMap.get(id)
           this.itemDialog.data = {
             ...item,
@@ -885,6 +885,7 @@
         } else {
           this.itemDialog.data.tpos = tposId
         }
+        this.itemDialog.data.currency = tpos.currency
         this.itemDialog.show = true
       },
       closeItemDialog() {
