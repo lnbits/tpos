@@ -19,7 +19,6 @@ class CreateTposData(BaseModel):
     withdrawamt: int = Field(None, ge=0)
     withdrawtime: int = Field(0)
     withdrawbtwn: int = Field(10, ge=1)
-    items: Optional[str] = Field(None)
 
 
 class TPoS(BaseModel):
@@ -109,9 +108,10 @@ class PayLnurlWData(BaseModel):
 
 class Item(BaseModel):
     image: Optional[str]
-    price: int
+    price: float
     title: str
     description: Optional[str]
+    tax: Optional[float] = 0.0
     disabled: bool = False
 
 

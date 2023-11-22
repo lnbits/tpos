@@ -92,18 +92,7 @@ async def m005_initial(db):
 async def m006_items(db):
     """
     Add items to tpos table for storing various items (JSON format)
-    Example:
-    [
-        {
-            "image": <IMG_URL>,
-            "price": <INT>,
-            "title": <STRING>,
-            "description": <STRING>,
-            "disabled": <BOOLEAN>,
-            "tax": <INT>,
-        },
-        ...
-    ]
+    See `Item` class in models.
     """
     await db.execute(
         """

@@ -281,6 +281,7 @@ async def api_tpos_create_items(data: CreateUpdateItemData, tpos_id: str):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
-    items = data.dict()["items"]
-    tpos = await update_tpos(tpos_id=tpos_id, items=json.dumps(items))
+
+    items = json.dumps(data.dict()["items"])
+    tpos = await update_tpos(tpos_id=tpos_id, items=items)
     return tpos.dict()
