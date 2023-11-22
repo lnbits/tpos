@@ -160,14 +160,62 @@
                       <q-tab-panel name="items">
                         <div>
                           <div class="row items-center no-wrap q-mb-md">
-                            <div class="col-3 q-pr-lg">
+                            <div class="col-12 q-pr-lg">
                               <q-btn
+                                color="primary"
                                 unelevated
-                                outline
                                 @click="openItemDialog(props.row.id)"
                                 class="float-left q-my-sm"
                                 >Add Item</q-btn
                               >
+                              <q-btn
+                                color="grey"
+                                outline
+                                unelevated
+                                @click="deleteAllItems(props.row.id)"
+                                class="float-left q-my-sm q-ml-sm"
+                                >Delete All</q-btn
+                              >
+                              <q-btn-dropdown
+                                class="float-right q-my-sm"
+                                outline
+                                color="primary"
+                                label="Import/Export"
+                              >
+                                <q-list>
+                                  <q-item
+                                    clickable
+                                    v-close-popup
+                                    @click="importJSON(props.row.id)"
+                                  >
+                                    <input
+                                      id="import"
+                                      type="file"
+                                      accept=".json"
+                                      style="display: none"
+                                    />
+                                    <q-item-section>
+                                      <q-item-label>Import</q-item-label>
+                                      <q-item-label caption
+                                        >Import a JSON file</q-item-label
+                                      >
+                                    </q-item-section>
+                                  </q-item>
+
+                                  <q-item
+                                    clickable
+                                    v-close-popup
+                                    @click="exportJSON(props.row.id)"
+                                  >
+                                    <q-item-section>
+                                      <q-item-label>Export</q-item-label>
+                                      <q-item-label caption
+                                        >Export a JSON file</q-item-label
+                                      >
+                                    </q-item-section>
+                                  </q-item>
+                                </q-list>
+                              </q-btn-dropdown>
                             </div>
                           </div>
 
@@ -441,6 +489,41 @@
           color="grey"
           @click="copyText(urlDialog.data.shareUrl, 'TPoS URL copied to clipboard!')"
           >Copy URL</q-btn
+        >
+        <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+      </div>
+    </q-card>
+  </q-dialog>
+  <q-dialog v-model="fileDataDialog.show" position="top">
+    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
+      <q-card-section>
+        <h6 class="text-subtitle1 q-my-none">
+          Importing ${fileDataDialog?.count} items
+        </h6>
+      </q-card-section>
+      <q-list bordered padding separator>
+        <q-item v-for="item in fileDataDialog.data" :key="item.name">
+          <q-item-section v-if="item.image" top avatar>
+            <q-avatar>
+              <img :src="item.image" style="object-fit: scale-down" />
+            </q-avatar>
+          </q-item-section>
+
+          <q-item-section>
+            <q-item-label>${item.title}</q-item-label>
+            <q-item-label v-if="item.description" caption
+              >${item.description}</q-item-label
+            >
+          </q-item-section>
+
+          <q-item-section side top>
+            <q-badge :label="item.formattedPrice" />
+          </q-item-section>
+        </q-item>
+      </q-list>
+      <div class="row q-mt-lg">
+        <q-btn outline color="primary" @click="fileDataDialog.import"
+          >Import</q-btn
         >
         <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
       </div>
@@ -732,6 +815,11 @@
             rowsPerPage: 10
           }
         },
+        fileDataDialog: {
+          show: false,
+          data: {},
+          import: () => {}
+        },
         urlDialog: {
           show: false,
           data: {}
@@ -760,6 +848,7 @@
             self.tposs = response.data.map(function (obj) {
               return mapTPoS(obj)
             })
+            console.log(self.tposs)
           })
       },
       sendTPosData() {
@@ -925,6 +1014,21 @@
         }
         this.updateTposItems(tpos.id, wallet, data)
       },
+      deleteAllItems(tposId) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        const wallet = _.findWhere(this.g.user.wallets, {
+          id: tpos.wallet
+        })
+        LNbits.utils
+          .confirmDialog('Are you sure you want to delete ALL items?')
+          .onOk(() => {
+            tpos.itemsMap.clear()
+            const data = {
+              items: []
+            }
+            this.updateTposItems(tpos.id, wallet, data)
+          })
+      },
       updateTposItems(tposId, wallet, data) {
         LNbits.api
           .request(
@@ -943,6 +1047,73 @@
           .catch(error => {
             LNbits.utils.notifyApiError(error)
           })
+      },
+      exportJSON(tposId) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        const data = [...tpos.items]
+        const filename = `items_${tpos.id}.json`
+        const json = JSON.stringify(data, null, 2)
+        let status = Quasar.utils.exportFile(filename, json)
+        if (status !== true) {
+          this.$q.notify({
+            message: 'Browser denied file download...',
+            color: 'negative'
+          })
+        }
+      },
+      importJSON(tposId) {
+        try {
+          let input = document.getElementById('import')
+          input.click()
+          input.onchange = e => {
+            let file = e.target.files[0]
+            let reader = new FileReader()
+            reader.readAsText(file, 'UTF-8')
+            reader.onload = async readerEvent => {
+              try {
+                let content = readerEvent.target.result
+                let data = JSON.parse(content).filter(
+                  obj => obj.title && obj.price
+                )
+                if (!data.length) {
+                  throw new Error('Invalid JSON or missing data.')
+                }
+                this.openFileDataDialog(tposId, data)
+              } catch (error) {
+                this.$q.notify({
+                  message: `Error importing file. ${error.message}`,
+                  color: 'negative'
+                })
+                return
+              }
+            }
+          }
+        } catch (error) {
+          this.$q.notify({
+            message: 'Error importing file',
+            color: 'negative'
+          })
+        }
+      },
+      openFileDataDialog(tposId, data) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        data.forEach(item => {
+          item.formattedPrice = LNbits.utils.formatCurrency(
+            Number(item.price).toFixed(2),
+            tpos.currency
+          )
+        })
+        this.fileDataDialog.data = data
+        this.fileDataDialog.count = data.length
+        this.fileDataDialog.show = true
+        this.fileDataDialog.import = () => {
+          let updatedData = {
+            items: [...tpos.items, ...data]
+          }
+          this.updateTposItems(tpos.id, tpos.wallet, updatedData)
+          this.fileDataDialog.data = {}
+          this.fileDataDialog.show = false
+        }
       },
       openUrlDialog(id) {
         this.urlDialog.data = _.findWhere(this.tposs, {id})
