@@ -115,7 +115,7 @@
                 size="xl"
                 :outline="!($q.dark.isActive)"
                 rounded
-                color="negative"
+                color="secondary"
                 >C</q-btn
               >
               <q-btn
@@ -133,7 +133,7 @@
                 size="xl"
                 :outline="!($q.dark.isActive)"
                 rounded
-                color="warning"
+                color="secondary"
                 class="btn-cancel"
                 >⬅</q-btn
               >
@@ -153,7 +153,7 @@
                 size="xl"
                 :outline="!($q.dark.isActive)"
                 rounded
-                color="positive"
+                color="secondary"
                 class="btn-confirm"
                 >Ok</q-btn
               >
@@ -203,7 +203,7 @@
         v-model="cartDrawer"
         show-if-above
         bordered
-        :width="450"
+        :width="drawerWidth"
         :breakpoint="1200"
       >
         <div class="row full-width q-pa-md">
@@ -287,6 +287,7 @@
               color="positive"
               label="Pay"
               padding="md"
+              :disabled="cart.size == 0"
             ></q-btn>
           </div>
           <div class="col-12 col-sm-6">
@@ -338,7 +339,7 @@
 
             <q-card-actions vertical class="q-pa-md">
               <q-btn @click="addToCart(item)" padding="md" color="primary"
-                >Add (${item.formattedPrice})</q-btn
+                >Add</q-btn
               >
             </q-card-actions>
           </q-card>
@@ -381,11 +382,11 @@
         class="q-pa-lg q-pt-xl lnbits__dialog-card"
       >
         <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
-          <qrcode
+          <lnbits-qrcode
             :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
             :options="{width: 800}"
             class="rounded-borders"
-          ></qrcode>
+          ></lnbits-qrcode>
         </q-responsive>
         <div class="text-center">
           <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
@@ -476,11 +477,11 @@
     <q-dialog v-model="urlDialog.show" position="top">
       <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
         <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
-          <qrcode
+          <lnbits-qrcode
             value="{{ request.url }}"
             :options="{width: 800}"
             class="rounded-borders"
-          ></qrcode>
+          ></lnbits-qrcode>
         </q-responsive>
         <div class="text-center q-mb-xl">
           <p style="word-break: break-all">
@@ -602,6 +603,11 @@
     max-height: 210px;
     object-fit: scale-down;
   }
+
+  /* .q-drawer {
+    width: 85% !important;
+    max-width: 450px;
+  } */
 
   .table {
     border-collapse: collapse;
@@ -784,6 +790,9 @@
             item.title.toLowerCase().includes(this.searchTerm.toLowerCase())
           )
         })
+      },
+      drawerWidth() {
+        return this.$q.screen.width < 500 ? 375 : 450
       }
     },
     methods: {
@@ -933,7 +942,6 @@
       submitForm: function () {
         if (this.total != 0.0) {
           this.stack = Array.from(String(this.total * 100), Number)
-          this.clearCart()
         }
 
         if (this.tip_options && this.tip_options.length) {
@@ -987,6 +995,7 @@
                       clearInterval(dialog.paymentChecker)
                       dialog.dismissMsg()
                       dialog.show = false
+                      self.clearCart()
 
                       self.complete.show = true
                     }
@@ -1142,7 +1151,7 @@
         this.tip_options.push('Round')
       }
 
-      this.items = JSON.parse('{{ tpos.items | safe }}')
+      this.items = JSON.parse(`{{ tpos.items | safe }}`)
       this.items.forEach((item, id) => {
         item.formattedPrice = LNbits.utils.formatCurrency(
           item.price,
@@ -1158,6 +1167,7 @@
       setInterval(function () {
         getRates()
       }, 120000)
+      console.log(this.cart.size)
     }
   })
 </script>
