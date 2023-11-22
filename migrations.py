@@ -87,3 +87,15 @@ async def m005_initial(db):
         );
     """
     )
+
+
+async def m006_items(db):
+    """
+    Add items to tpos table for storing various items (JSON format)
+    See `Item` class in models.
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD items TEXT DEFAULT '[]';
+        """
+    )

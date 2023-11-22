@@ -1,4 +1,5 @@
 from http import HTTPStatus
+import json
 
 import httpx
 from fastapi import Depends, Query, Request
@@ -29,7 +30,7 @@ from .crud import (
     get_lnurlcharge,
     update_lnurlcharge,
 )
-from .models import CreateTposData, PayLnurlWData, LNURLCharge
+from .models import CreateTposData, PayLnurlWData, LNURLCharge, CreateUpdateItemData
 
 
 @tpos_ext.get("/api/v1/tposs", status_code=HTTPStatus.OK)
@@ -270,3 +271,17 @@ async def api_check_fiat_rate(currency):
         rate = None
 
     return {"rate": rate}
+
+
+## ITEMS
+@tpos_ext.put("/api/v1/tposs/{tpos_id}/items", status_code=HTTPStatus.CREATED)
+async def api_tpos_create_items(data: CreateUpdateItemData, tpos_id: str):
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+
+    items = json.dumps(data.dict()["items"])
+    tpos = await update_tpos(tpos_id=tpos_id, items=items)
+    return tpos.dict()

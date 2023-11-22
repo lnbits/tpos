@@ -28,12 +28,12 @@
           :columns="tpossTable.columns"
           :pagination.sync="tpossTable.pagination"
         >
-          {% raw %}
           <template v-slot:header="props">
             <q-tr :props="props">
               <q-th auto-width></q-th>
+              <q-th auto-width></q-th>
               <q-th v-for="col in props.cols" :key="col.name" :props="props">
-                {{ col.label }}
+                ${ col.label }
               </q-th>
               <q-th auto-width>Tip Wallet</q-th>
               <q-th auto-width>Tip Options %</q-th>
@@ -48,9 +48,29 @@
             <q-tr :props="props">
               <q-td auto-width>
                 <q-btn
+                  size="sm"
+                  color="accent"
+                  round
+                  dense
+                  @click="props.expand = !props.expand"
+                  :icon="props.expand ? 'expand_less' : 'expand_more'"
+                />
+              </q-td>
+              <q-td auto-width>
+                <q-btn
                   unelevated
                   dense
-                  size="xs"
+                  size="sm"
+                  icon="qr_code"
+                  :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
+                  class="q-mr-sm"
+                  @click="openUrlDialog(props.row.id)"
+                  ><q-tooltip>PoS QR</q-tooltip></q-btn
+                >
+                <q-btn
+                  unelevated
+                  dense
+                  size="sm"
                   icon="launch"
                   :color="($q.dark.isActive) ? 'grey-7' : 'grey-5'"
                   type="a"
@@ -67,7 +87,7 @@
                   copy="copy"
                   @click="copyText(props.row.id)"
                   ><q-tooltip>Click to copy</q-tooltip
-                  >{{props.row.id.substring(0,6)}}...</q-btn
+                  >${props.row.id.substring(0,6)}...</q-btn
                 >
               </q-td>
 
@@ -77,8 +97,8 @@
                 :key="col.name"
                 :props="props"
               >
-                {{ (col.name == 'tip_options' && col.value ?
-                JSON.parse(col.value).join(", ") : col.value) }}
+                ${ (col.name == 'tip_options' && col.value ?
+                JSON.parse(col.value).join(", ") : col.value) }
               </q-td>
               <q-td v-if="props.row.tip_wallet != ''" auto-width>
                 <q-btn
@@ -88,20 +108,20 @@
                   copy="copy"
                   @click="copyText(props.row.tip_wallet)"
                   ><q-tooltip>Click to copy</q-tooltip
-                  >{{props.row.tip_wallet.substring(0,6)}}...</q-btn
+                  >${props.row.tip_wallet.substring(0,6)}...</q-btn
                 >
               </q-td>
               <q-td v-else auto-width> N/A </q-td>
               <q-td v-if="props.row.tip_wallet != ''" auto-width>
-                {{props.row.tip_options}}
+                ${props.row.tip_options}
               </q-td>
-              <q-td v-else auto-width>this N/A </q-td>
+              <q-td v-else auto-width>N/A </q-td>
               <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
-                {{props.row.withdrawpin}}
+                ${props.row.withdrawpin}
               </q-td>
               <q-td v-else auto-width> N/A </q-td>
               <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
-                {{props.row.withdrawlimit}}
+                ${props.row.withdrawlimit}
               </q-td>
               <q-td v-else auto-width> N/A </q-td>
               <q-td auto-width>
@@ -125,14 +145,143 @@
                 ></q-btn>
               </q-td>
             </q-tr>
+            <q-tr v-show="props.expand" :props="props">
+              <q-td colspan="100%">
+                <div class="row items-center q-mb-lg">
+                  <div class="col-12">
+                    <q-tabs
+                      v-model="tab"
+                      no-caps
+                      class="bg-dark text-white shadow-2"
+                    >
+                      <q-tab name="items" label="Items"></q-tab>
+                    </q-tabs>
+                    <q-tab-panels v-model="tab">
+                      <q-tab-panel name="items">
+                        <div>
+                          <div class="row items-center no-wrap q-mb-md">
+                            <div class="col-12 q-pr-lg">
+                              <q-btn
+                                color="primary"
+                                unelevated
+                                @click="openItemDialog(props.row.id)"
+                                class="float-left q-my-sm"
+                                >Add Item</q-btn
+                              >
+                              <q-btn
+                                color="grey"
+                                outline
+                                unelevated
+                                @click="deleteAllItems(props.row.id)"
+                                class="float-left q-my-sm q-ml-sm"
+                                >Delete All</q-btn
+                              >
+                              <q-btn-dropdown
+                                class="float-right q-my-sm"
+                                outline
+                                color="primary"
+                                label="Import/Export"
+                              >
+                                <q-list>
+                                  <q-item
+                                    clickable
+                                    v-close-popup
+                                    @click="importJSON(props.row.id)"
+                                  >
+                                    <input
+                                      id="import"
+                                      type="file"
+                                      accept=".json"
+                                      style="display: none"
+                                    />
+                                    <q-item-section>
+                                      <q-item-label>Import</q-item-label>
+                                      <q-item-label caption
+                                        >Import a JSON file</q-item-label
+                                      >
+                                    </q-item-section>
+                                  </q-item>
+
+                                  <q-item
+                                    clickable
+                                    v-close-popup
+                                    @click="exportJSON(props.row.id)"
+                                  >
+                                    <q-item-section>
+                                      <q-item-label>Export</q-item-label>
+                                      <q-item-label caption
+                                        >Export a JSON file</q-item-label
+                                      >
+                                    </q-item-section>
+                                  </q-item>
+                                </q-list>
+                              </q-btn-dropdown>
+                            </div>
+                          </div>
+
+                          <div class="row items-center no-wrap q-mb-md">
+                            <div class="col-12">
+                              <q-table
+                                flat
+                                dense
+                                :data="itemsArray(props.row.id)"
+                                row-key="id"
+                                :columns="itemsTable.columns"
+                                :pagination.sync="itemsTable.pagination"
+                              >
+                                <template v-slot:body="props">
+                                  <q-tr :props="props">
+                                    <q-td auto-width>
+                                      <q-btn
+                                        size="sm"
+                                        color="pink"
+                                        dense
+                                        @click="deleteItem(props.row.id)"
+                                        icon="delete"
+                                      ></q-btn>
+                                    </q-td>
+                                    <q-td auto-width>
+                                      <q-btn
+                                        size="sm"
+                                        color="accent"
+                                        dense
+                                        @click="openItemDialog(props.row.id)"
+                                        icon="edit"
+                                      ></q-btn>
+                                    </q-td>
+
+                                    <q-td key="id" :props="props">
+                                      ${props.row.id.split(':')[1]}
+                                    </q-td>
+                                    <q-td key="title" :props="props">
+                                      ${props.row.title}
+                                    </q-td>
+                                    <q-td key="price" :props="props">
+                                      ${itemFormatPrice(props.row.price,
+                                      props.row.id)}
+                                    </q-td>
+                                    <q-td key="disabled" :props="props">
+                                      ${props.row.disabled}
+                                    </q-td>
+                                  </q-tr>
+                                </template>
+                              </q-table>
+                            </div>
+                          </div>
+                        </div>
+                      </q-tab-panel>
+                    </q-tab-panels>
+                  </div>
+                </div>
+              </q-td>
+            </q-tr>
           </template>
-          {% endraw %}
         </q-table>
       </q-card-section>
     </q-card>
   </div>
 
-  <div class="col-12 col-md-5 q-gutter-y-md">
+  <div class="col-12 col-md-4 col-lg-5 q-gutter-y-md">
     <q-card>
       <q-card-section>
         <h6 class="text-subtitle1 q-my-none">{{SITE_TITLE}} TPoS extension</h6>
@@ -266,22 +415,148 @@
       </q-form>
     </q-card>
   </q-dialog>
+  <q-dialog v-model="itemDialog.show" position="top" @hide="closeItemDialog">
+    <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
+      <q-form @submit="addItems" class="q-gutter-md">
+        <q-input
+          filled
+          dense
+          v-model.trim="itemDialog.data.title"
+          label="Title *"
+        ></q-input>
+        <q-input
+          filled
+          dense
+          v-model.trim="itemDialog.data.description"
+          label="Description"
+        ></q-input>
+        <q-input
+          filled
+          dense
+          v-model.trim="itemDialog.data.image"
+          label="Image URL"
+        ></q-input>
+        <q-input
+          filled
+          dense
+          v-model.number="itemDialog.data.price"
+          :label="`Price (${itemDialog.data.currency})*`"
+        ></q-input>
+        <q-input
+          filled
+          dense
+          v-model.number="itemDialog.data.tax"
+          label="Tax %"
+        ></q-input>
+        <q-checkbox
+          v-model="itemDialog.data.disabled"
+          label="Disable"
+        ></q-checkbox>
+        <div class="row q-mt-lg">
+          <q-btn
+            unelevated
+            color="primary"
+            :disable="!Boolean(itemDialog.data.title) || !Boolean(itemDialog.data.price)"
+            type="submit"
+            >${itemDialog.data.id ? 'Update Item' : 'Create Item'}</q-btn
+          >
+          <q-btn
+            v-close-popup
+            @hide="closeItemDialog"
+            flat
+            color="grey"
+            class="q-ml-auto"
+            >Cancel</q-btn
+          >
+        </div>
+      </q-form>
+    </q-card>
+  </q-dialog>
+  <q-dialog v-model="urlDialog.show" position="top">
+    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
+      <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
+        <lnbits-qrcode :value="urlDialog.data.shareUrl"></lnbits-qrcode>
+      </q-responsive>
+      <div class="text-center q-mb-xl">
+        <p style="word-break: break-all">
+          <strong>${ urlDialog.data.name }</strong><br />${
+          urlDialog.data.shareUrl }
+        </p>
+      </div>
+      <div class="row q-mt-lg">
+        <q-btn
+          outline
+          color="grey"
+          @click="copyText(urlDialog.data.shareUrl, 'TPoS URL copied to clipboard!')"
+          >Copy URL</q-btn
+        >
+        <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+      </div>
+    </q-card>
+  </q-dialog>
+  <q-dialog v-model="fileDataDialog.show" position="top">
+    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
+      <q-card-section>
+        <h6 class="text-subtitle1 q-my-none">
+          Importing ${fileDataDialog?.count} items
+        </h6>
+      </q-card-section>
+      <q-list bordered padding separator>
+        <q-item v-for="item in fileDataDialog.data" :key="item.name">
+          <q-item-section v-if="item.image" top avatar>
+            <q-avatar>
+              <img :src="item.image" style="object-fit: scale-down" />
+            </q-avatar>
+          </q-item-section>
+
+          <q-item-section>
+            <q-item-label>${item.title}</q-item-label>
+            <q-item-label v-if="item.description" caption
+              >${item.description}</q-item-label
+            >
+          </q-item-section>
+
+          <q-item-section side top>
+            <q-badge :label="item.formattedPrice" />
+          </q-item-section>
+        </q-item>
+      </q-list>
+      <div class="row q-mt-lg">
+        <q-btn outline color="primary" @click="fileDataDialog.import"
+          >Import</q-btn
+        >
+        <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+      </div>
+    </q-card>
+  </q-dialog>
 </div>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
 <script>
-  var mapTPoS = function (obj) {
+  const mapTPoS = obj => {
     obj.date = Quasar.utils.date.formatDate(
       new Date(obj.time * 1000),
       'YYYY-MM-DD HH:mm'
     )
-    obj.fsat = new Intl.NumberFormat(LOCALE).format(obj.amount)
     obj.tpos = ['/tpos/', obj.id].join('')
+    obj.shareUrl = [
+      window.location.protocol,
+      '//',
+      window.location.host,
+      obj.tpos
+    ].join('')
+    obj.items = JSON.parse(obj.items)
+    obj.itemsMap = new Map()
+    obj.items.forEach((item, idx) => {
+      let id = `${obj.id}:${idx + 1}`
+      obj.itemsMap.set(id, {...item, id})
+    })
     return obj
   }
 
   new Vue({
     el: '#vue',
     mixins: [windowMixin],
+    delimiters: ['${', '}'],
     data: function () {
       return {
         tposs: [],
@@ -485,6 +760,69 @@
             tips: false,
             otc: false
           }
+        },
+        itemDialog: {
+          show: false,
+          data: {
+            title: '',
+            image: '',
+            price: '',
+            disabled: false
+          }
+        },
+        tab: 'items',
+        itemsTable: {
+          columns: [
+            {
+              name: 'delete',
+              align: 'left',
+              label: '',
+              field: ''
+            },
+            {
+              name: 'edit',
+              align: 'left',
+              label: '',
+              field: ''
+            },
+
+            {
+              name: 'id',
+              align: 'left',
+              label: 'ID',
+              field: 'id'
+            },
+            {
+              name: 'title',
+              align: 'left',
+              label: 'Title',
+              field: 'title'
+            },
+            {
+              name: 'price',
+              align: 'left',
+              label: 'Price',
+              field: 'price'
+            },
+            {
+              name: 'disabled',
+              align: 'left',
+              label: 'Disabled',
+              field: 'disabled'
+            }
+          ],
+          pagination: {
+            rowsPerPage: 10
+          }
+        },
+        fileDataDialog: {
+          show: false,
+          data: {},
+          import: () => {}
+        },
+        urlDialog: {
+          show: false,
+          data: {}
         }
       }
     },
@@ -516,16 +854,25 @@
       sendTPosData() {
         const data = {
           ...this.formDialog.data,
-          tip_options: this.formDialog.data.tip_options
-            ? JSON.stringify(
-                this.formDialog.data.tip_options.map(str => parseInt(str))
-              )
-            : JSON.stringify([]),
-          tip_wallet: this.formDialog.data.tip_wallet || ''
+          tip_options:
+            this.formDialog.advanced.tips && this.formDialog.data.tip_options
+              ? JSON.stringify(
+                  this.formDialog.data.tip_options.map(str => parseInt(str))
+                )
+              : JSON.stringify([]),
+          tip_wallet:
+            (this.formDialog.advanced.tips &&
+              this.formDialog.data.tip_wallet) ||
+            '',
+          items: JSON.stringify(this.formDialog.data.items)
         }
         // delete withdrawbtwn if value is empty string, defaults to 10 minutes
         if (this.formDialog.data.withdrawbtwn == '') {
           delete data.withdrawbtwn
+        }
+        if (!this.formDialog.advanced.otc) {
+          data.withdrawlimit = null
+          data.withdrawpin = null
         }
         const wallet = _.findWhere(this.g.user.wallets, {
           id: this.formDialog.data.wallet
@@ -605,6 +952,172 @@
       },
       exportCSV: function () {
         LNbits.utils.exportCSV(this.tpossTable.columns, this.tposs)
+      },
+      itemsArray(tposId) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        return [...tpos.itemsMap.values()]
+      },
+      itemFormatPrice(price, id) {
+        const tpos = id.split(':')[0]
+        const currency = _.findWhere(this.tposs, {id: tpos}).currency
+        return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
+      },
+      openItemDialog(id) {
+        const [tposId, itemId] = id.split(':')
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        if (itemId) {
+          const item = tpos.itemsMap.get(id)
+          this.itemDialog.data = {
+            ...item,
+            tpos: tposId
+          }
+        } else {
+          this.itemDialog.data.tpos = tposId
+        }
+        this.itemDialog.data.currency = tpos.currency
+        this.itemDialog.show = true
+      },
+      closeItemDialog() {
+        this.itemDialog.show = false
+        this.itemDialog.data = {
+          title: '',
+          image: '',
+          price: '',
+          disabled: false
+        }
+      },
+      deleteItem(id) {
+        const [tposId, itemId] = id.split(':')
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        LNbits.utils
+          .confirmDialog('Are you sure you want to delete this item?')
+          .onOk(() => {
+            tpos.itemsMap.delete(id)
+            const data = {
+              items: [...tpos.itemsMap.values()]
+            }
+            this.updateTposItems(tpos.id, tpos.wallet, data)
+          })
+      },
+      addItems() {
+        const tpos = _.findWhere(this.tposs, {id: this.itemDialog.data.tpos})
+        const wallet = _.findWhere(this.g.user.wallets, {
+          id: tpos.wallet
+        })
+        if (this.itemDialog.data.id) {
+          tpos.itemsMap.set(this.itemDialog.data.id, this.itemDialog.data)
+        }
+        const data = {
+          items: this.itemDialog.data.id
+            ? [...tpos.itemsMap.values()]
+            : [...tpos.items, this.itemDialog.data]
+        }
+        this.updateTposItems(tpos.id, wallet, data)
+      },
+      deleteAllItems(tposId) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        const wallet = _.findWhere(this.g.user.wallets, {
+          id: tpos.wallet
+        })
+        LNbits.utils
+          .confirmDialog('Are you sure you want to delete ALL items?')
+          .onOk(() => {
+            tpos.itemsMap.clear()
+            const data = {
+              items: []
+            }
+            this.updateTposItems(tpos.id, wallet, data)
+          })
+      },
+      updateTposItems(tposId, wallet, data) {
+        LNbits.api
+          .request(
+            'PUT',
+            `/tpos/api/v1/tposs/${tposId}/items`,
+            wallet.inkey,
+            data
+          )
+          .then(response => {
+            this.tposs = _.reject(this.tposs, obj => {
+              return obj.id == tposId
+            })
+            this.tposs.push(mapTPoS(response.data))
+            this.closeItemDialog()
+          })
+          .catch(error => {
+            LNbits.utils.notifyApiError(error)
+          })
+      },
+      exportJSON(tposId) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        const data = [...tpos.items]
+        const filename = `items_${tpos.id}.json`
+        const json = JSON.stringify(data, null, 2)
+        let status = Quasar.utils.exportFile(filename, json)
+        if (status !== true) {
+          this.$q.notify({
+            message: 'Browser denied file download...',
+            color: 'negative'
+          })
+        }
+      },
+      importJSON(tposId) {
+        try {
+          let input = document.getElementById('import')
+          input.click()
+          input.onchange = e => {
+            let file = e.target.files[0]
+            let reader = new FileReader()
+            reader.readAsText(file, 'UTF-8')
+            reader.onload = async readerEvent => {
+              try {
+                let content = readerEvent.target.result
+                let data = JSON.parse(content).filter(
+                  obj => obj.title && obj.price
+                )
+                if (!data.length) {
+                  throw new Error('Invalid JSON or missing data.')
+                }
+                this.openFileDataDialog(tposId, data)
+              } catch (error) {
+                this.$q.notify({
+                  message: `Error importing file. ${error.message}`,
+                  color: 'negative'
+                })
+                return
+              }
+            }
+          }
+        } catch (error) {
+          this.$q.notify({
+            message: 'Error importing file',
+            color: 'negative'
+          })
+        }
+      },
+      openFileDataDialog(tposId, data) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        data.forEach(item => {
+          item.formattedPrice = LNbits.utils.formatCurrency(
+            Number(item.price).toFixed(2),
+            tpos.currency
+          )
+        })
+        this.fileDataDialog.data = data
+        this.fileDataDialog.count = data.length
+        this.fileDataDialog.show = true
+        this.fileDataDialog.import = () => {
+          let updatedData = {
+            items: [...tpos.items, ...data]
+          }
+          this.updateTposItems(tpos.id, tpos.wallet, updatedData)
+          this.fileDataDialog.data = {}
+          this.fileDataDialog.show = false
+        }
+      },
+      openUrlDialog(id) {
+        this.urlDialog.data = _.findWhere(this.tposs, {id})
+        this.urlDialog.show = true
       }
     },
     created: function () {
