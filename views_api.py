@@ -279,7 +279,7 @@ async def api_check_fiat_rate(currency):
 async def api_tpos_create_items(
     data: CreateUpdateItemData,
     tpos_id: str,
-    wallet: WalletTypeInfo = Depends(require_invoice_key),
+    wallet: WalletTypeInfo = Depends(require_admin_key),
 ):
     tpos = await get_tpos(tpos_id)
     if not tpos:

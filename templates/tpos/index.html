@@ -1033,7 +1033,7 @@
           .request(
             'PUT',
             `/tpos/api/v1/tposs/${tposId}/items`,
-            wallet.inkey,
+            wallet.adminkey,
             data
           )
           .then(response => {
