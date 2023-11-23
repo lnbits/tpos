@@ -16,6 +16,7 @@ from lnbits.decorators import (
     check_admin,
     get_key_type,
     require_admin_key,
+    require_invoice_key,
 )
 from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 
@@ -275,12 +276,18 @@ async def api_check_fiat_rate(currency):
 
 ## ITEMS
 @tpos_ext.put("/api/v1/tposs/{tpos_id}/items", status_code=HTTPStatus.CREATED)
-async def api_tpos_create_items(data: CreateUpdateItemData, tpos_id: str):
+async def api_tpos_create_items(
+    data: CreateUpdateItemData,
+    tpos_id: str,
+    wallet: WalletTypeInfo = Depends(require_invoice_key),
+):
     tpos = await get_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
+    if wallet.wallet.id != tpos.wallet:
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
 
     items = json.dumps(data.dict()["items"])
     tpos = await update_tpos(tpos_id=tpos_id, items=items)
