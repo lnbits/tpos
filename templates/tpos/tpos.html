@@ -7,6 +7,17 @@
   icon="share"
   color="white"
 ></q-btn>
+<q-btn-toggle
+  v-model="monochrome"
+  toggle-color="primary"
+  :options="[
+        {label: 'Color', value: false},
+        {label: 'Mono', value: true}
+      ]"
+  size="sm"
+  @input="handleColorScheme"
+  class="q-ml-md"
+/>
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
   <q-page>
@@ -115,7 +126,7 @@
                 size="xl"
                 :outline="!($q.dark.isActive)"
                 rounded
-                color="secondary"
+                :color="monochrome ? 'secondary' : 'negative'"
                 >C</q-btn
               >
               <q-btn
@@ -133,7 +144,7 @@
                 size="xl"
                 :outline="!($q.dark.isActive)"
                 rounded
-                color="secondary"
+                :color="monochrome ? 'secondary' : 'warning'"
                 class="btn-cancel"
                 >⬅</q-btn
               >
@@ -153,7 +164,7 @@
                 size="xl"
                 :outline="!($q.dark.isActive)"
                 rounded
-                color="secondary"
+                :color="monochrome ? 'secondary' : 'positive'"
                 class="btn-confirm"
                 >Ok</q-btn
               >
@@ -604,11 +615,6 @@
     object-fit: scale-down;
   }
 
-  /* .q-drawer {
-    width: 85% !important;
-    max-width: 450px;
-  } */
-
   .table {
     border-collapse: collapse;
     width: 100%;
@@ -710,6 +716,7 @@
             rowsPerPage: 10
           }
         },
+        monochrome: this.$q.localStorage.getItem('lnbits.tpos.color'),
         showPoS: true,
         cartDrawer: this.$q.screen.width > 1200,
         searchTerm: '',
@@ -1137,6 +1144,9 @@
             })
           })
           .catch(err => console.error(err))
+      },
+      handleColorScheme(val) {
+        this.$q.localStorage.set('lnbits.tpos.color', val)
       }
     },
     created: function () {
@@ -1167,7 +1177,6 @@
       setInterval(function () {
         getRates()
       }, 120000)
-      console.log(this.cart.size)
     }
   })
 </script>
