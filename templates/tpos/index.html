@@ -1096,6 +1096,9 @@
       },
       openFileDataDialog(tposId, data) {
         const tpos = _.findWhere(this.tposs, {id: tposId})
+        const wallet = _.findWhere(this.g.user.wallets, {
+          id: tpos.wallet
+        })
         data.forEach(item => {
           item.formattedPrice = LNbits.utils.formatCurrency(
             Number(item.price).toFixed(2),
@@ -1109,7 +1112,7 @@
           let updatedData = {
             items: [...tpos.items, ...data]
           }
-          this.updateTposItems(tpos.id, tpos.wallet, updatedData)
+          this.updateTposItems(tpos.id, wallet, updatedData)
           this.fileDataDialog.data = {}
           this.fileDataDialog.show = false
         }
