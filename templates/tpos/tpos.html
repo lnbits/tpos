@@ -970,13 +970,32 @@
           this.atmGetWithdraw()
         } else {
           var dialog = this.invoiceDialog
+          let params = {
+            amount: this.sat,
+            memo: this.amountFormatted,
+            tipAmount: this.tipAmountSat
+          }
+          if (this.cart.size) {
+            let details = [...this.cart.values()].map(item => {
+              return {
+                price: item.price,
+                formattedPrice: item.formattedPrice,
+                quantity: item.quantity,
+                title: item.title,
+                tax: item.tax
+              }
+            })
+
+            params.details = JSON.stringify({
+              currency: this.currency,
+              exchangeRate: this.exchangeRate,
+              items: details
+            })
+          }
+
           axios
             .post('/tpos/api/v1/tposs/' + this.tposId + '/invoices', null, {
-              params: {
-                amount: this.sat,
-                memo: this.amountFormatted,
-                tipAmount: this.tipAmountSat
-              }
+              params: {...params}
             })
             .then(function (response) {
               dialog.data = response.data
