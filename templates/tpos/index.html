@@ -848,7 +848,6 @@
             self.tposs = response.data.map(function (obj) {
               return mapTPoS(obj)
             })
-            console.log(self.tposs)
           })
       },
       sendTPosData() {
@@ -1034,7 +1033,7 @@
           .request(
             'PUT',
             `/tpos/api/v1/tposs/${tposId}/items`,
-            wallet.inkey,
+            wallet.adminkey,
             data
           )
           .then(response => {
@@ -1097,6 +1096,9 @@
       },
       openFileDataDialog(tposId, data) {
         const tpos = _.findWhere(this.tposs, {id: tposId})
+        const wallet = _.findWhere(this.g.user.wallets, {
+          id: tpos.wallet
+        })
         data.forEach(item => {
           item.formattedPrice = LNbits.utils.formatCurrency(
             Number(item.price).toFixed(2),
@@ -1110,7 +1112,7 @@
           let updatedData = {
             items: [...tpos.items, ...data]
           }
-          this.updateTposItems(tpos.id, tpos.wallet, updatedData)
+          this.updateTposItems(tpos.id, wallet, updatedData)
           this.fileDataDialog.data = {}
           this.fileDataDialog.show = false
         }
