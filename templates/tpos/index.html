@@ -37,7 +37,7 @@
               </q-th>
               <q-th auto-width>Tip Wallet</q-th>
               <q-th auto-width>Tip Options %</q-th>
-              <q-th auto-width>Withdraw Pin</q-th>
+              <q-th auto-width>Withdraw PIN</q-th>
               <q-th auto-width>Withdraw Limit</q-th>
               <q-th auto-width></q-th>
               <q-th auto-width></q-th>
@@ -333,7 +333,7 @@
           <div class="col">
             <q-checkbox
               v-model="formDialog.advanced.otc"
-              label="Enable selling bitcoin"
+              label="Enable selling Bitcoin (ATM)"
             ></q-checkbox>
           </div>
         </div>
@@ -380,7 +380,7 @@
             dense
             v-model.number="formDialog.data.withdrawpin"
             type="number"
-            label="Withdraw pin"
+            label="Withdraw PIN"
           ></q-input>
           <q-input
             filled

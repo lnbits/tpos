@@ -91,10 +91,10 @@ On the regular TPoS you can also add value to a total. Enter a value and click t
 2. Fill in the necessary fields:
 
    - set a maximum withdrawable per day
-   - define a Pin to access the functionality
+   - define a PIN to access the functionality
    - define a _cool down_ period between withdraws, to avoid exploitation (min. 1 minute)
 
-3. When using the TPOS, you'll see the **ATM** button, click and enter Pin\
+3. When using the TPOS, you'll see the **ATM** button, click and enter PIN\
    ![atm pin](https://i.imgur.com/5QMYXX7.png)
 4. Set amount to sell and click **OK**\
    ![atm amount](https://i.imgur.com/V3jlfhV.png)
