@@ -988,6 +988,9 @@
       deleteItem(id) {
         const [tposId, itemId] = id.split(':')
         const tpos = _.findWhere(this.tposs, {id: tposId})
+        const wallet = _.findWhere(this.g.user.wallets, {
+          id: tpos.wallet
+        })
         LNbits.utils
           .confirmDialog('Are you sure you want to delete this item?')
           .onOk(() => {
@@ -995,7 +998,7 @@
             const data = {
               items: [...tpos.itemsMap.values()]
             }
-            this.updateTposItems(tpos.id, tpos.wallet, data)
+            this.updateTposItems(tpos.id, wallet, data)
           })
       },
       addItems() {
