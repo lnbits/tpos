@@ -39,6 +39,7 @@
               <q-th auto-width>Tip Options %</q-th>
               <q-th auto-width>Withdraw Pin</q-th>
               <q-th auto-width>Withdraw Limit</q-th>
+              <q-th auto-width>Withdraw Premium</q-th>
               <q-th auto-width></q-th>
               <q-th auto-width></q-th>
             </q-tr>
@@ -124,6 +125,10 @@
                 ${props.row.withdrawlimit}
               </q-td>
               <q-td v-else auto-width> N/A </q-td>
+              <q-td v-if="props.row.withdrawpremium > 0" auto-width>
+                ${props.row.withdrawpremium}%
+              </q-td>
+              <q-td v-else auto-width> 0 </q-td>
               <q-td auto-width>
                 <q-btn
                   flat
@@ -389,6 +394,15 @@
             type="number"
             min="0"
             label="Time between withdraws (minutes)"
+          ></q-input>
+          <q-input
+            filled
+            dense
+            v-model.number="formDialog.data.withdrawpremium"
+            type="number"
+            label="Withdraw premium"
+            step="0.01"
+            min="0.01"
           ></q-input>
         </template>
 
@@ -872,6 +886,7 @@
         if (!this.formDialog.advanced.otc) {
           data.withdrawlimit = null
           data.withdrawpin = null
+          data.withdrawpremium = null
         }
         const wallet = _.findWhere(this.g.user.wallets, {
           id: this.formDialog.data.wallet

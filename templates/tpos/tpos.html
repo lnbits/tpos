@@ -635,6 +635,7 @@
         tposId: '{{ tpos.id }}',
         currency: '{{ tpos.currency }}',
         withdrawamtposs: `{{ withdrawamtposs }}`,
+        atmPremium: Number('{{ tpos.withdrawpremium }}') / 100,
         tip_options: null,
         exchangeRate: null,
         stack: [],
@@ -1109,6 +1110,9 @@
           .request('GET', `/tpos/api/v1/rate/${this.currency}`)
           .then(response => {
             this.exchangeRate = response.data.rate
+            if (this.atmPremium > 0) {
+              this.exchangeRate = this.exchangeRate * (1 + this.atmPremium)
+            }
           })
           .catch(e => console.error(e))
       },
