@@ -373,6 +373,19 @@
           ></q-btn
         ></q-page-sticky
       >
+      <q-page-sticky
+        v-if="!cartDrawer && cart.size > 0"
+        position="bottom-right"
+        :offset="[18, 162]"
+      >
+        <q-btn
+          @click="cartDrawer = !cartDrawer"
+          fab
+          icon="shopping_bag"
+          color="primary"
+          ><q-badge color="red" floating>${cart.size}</q-badge></q-btn
+        ></q-page-sticky
+      >
     </template>
     <q-btn
       v-show="atmMode"
