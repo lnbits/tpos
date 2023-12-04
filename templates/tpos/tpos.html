@@ -947,7 +947,7 @@
       },
       submitForm: function () {
         if (this.total != 0.0) {
-          this.stack = Array.from(String(this.total * 100), Number)
+          this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
         }
 
         if (this.tip_options && this.tip_options.length) {
@@ -967,6 +967,7 @@
       },
       showInvoice: function () {
         var self = this
+        console.log(this.sat, typeof this.sat)
         if (self.atmMode) {
           this.atmGetWithdraw()
         } else {
