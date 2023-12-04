@@ -7,7 +7,7 @@
         <q-btn
           unelevated
           color="primary"
-          @click="formDialog.show = true; formDialog.data.withdrawpin = genratePIN()"
+          @click="formDialog.show = true; formDialog.data.withdrawpin = generatePIN()"
           >New TPoS</q-btn
         >
       </q-card-section>
@@ -844,9 +844,9 @@
       }
     },
     methods: {
-      genratePIN() {
+      generatePIN() {
         // random 6 digit PIN
-        return Math.floor(100000 + Math.random() * 999999)
+        return Math.floor(100000 + Math.random() * 900000)
       },
       closeFormDialog() {
         this.formDialog.show = false
@@ -917,7 +917,7 @@
           this.formDialog.advanced.otc = true
         }
         if (!this.formDialog.data.withdrawpin) {
-          this.formDialog.data.withdrawpin = this.genratePIN()
+          this.formDialog.data.withdrawpin = this.generatePIN()
         }
         this.formDialog.show = true
       },
