@@ -962,6 +962,14 @@
         if (this.total != 0.0) {
           this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
         }
+        if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
+          this.$q.notify({
+            type: 'negative',
+            message:
+              'Exchange rate not available, or wrong value. Please try again later.'
+          })
+          return
+        }
 
         if (this.tip_options && this.tip_options.length) {
           this.rounding = false
