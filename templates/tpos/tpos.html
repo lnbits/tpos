@@ -335,8 +335,8 @@
               :src="item.image"
             />
 
-            <q-card-section class="q-mb-auto">
-              <div class="text-h6 ellipsis">${item.title}</div>
+            <q-card-section class="q-mt-auto">
+              <div class="text-h6">${item.title}</div>
               <div class="text-subtitle1">${item.formattedPrice}</div>
               <div
                 v-if="item.description"
@@ -371,6 +371,19 @@
           ><q-tooltip
             >${cartDrawer ? 'Hide Cart' :' Open Cart'}</q-tooltip
           ></q-btn
+        ></q-page-sticky
+      >
+      <q-page-sticky
+        v-if="!cartDrawer && cart.size > 0"
+        position="bottom-right"
+        :offset="[18, 162]"
+      >
+        <q-btn
+          @click="cartDrawer = !cartDrawer"
+          fab
+          icon="shopping_bag"
+          color="primary"
+          ><q-badge color="red" floating>${cart.size}</q-badge></q-btn
         ></q-page-sticky
       >
     </template>
@@ -615,8 +628,8 @@
   }
 
   .responsive-img {
-    height: 100%;
     width: 100%;
+    height: auto;
     max-height: 210px;
     object-fit: scale-down;
   }
@@ -955,7 +968,15 @@
       },
       submitForm: function () {
         if (this.total != 0.0) {
-          this.stack = Array.from(String(this.total * 100), Number)
+          this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
+        }
+        if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
+          this.$q.notify({
+            type: 'negative',
+            message:
+              'Exchange rate not available, or wrong value. Please try again later.'
+          })
+          return
         }
 
         if (this.tip_options && this.tip_options.length) {
