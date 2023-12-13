@@ -1224,6 +1224,44 @@
         this.showPoS = false
       }
 
+      window.addEventListener('keyup', (event) => {
+        // do nothing if the event was already processed
+        if (event.defaultPrevented) return
+
+        // active only in the the PoS mode, not in the Cart mode
+        if (!this.showPoS) return
+
+        const { key } = event
+        if (key >= '0' && key <= '9') { // buttons 0 ... 9
+          this.stack.push(Number(key))
+        } else switch (key) {
+          case 'Backspace': // button ⬅
+            this.stack.pop()
+            break
+          case 'Enter': // button OK
+            this.submitForm()
+            break
+          case 'c': // button C
+          case 'C':
+          case 'Escape':
+            if (this.total > 0.0) {
+              this.cancelAddAmount()
+            } else {
+              this.stack = []
+            }
+            break
+          case '+': // button +
+            this.addAmount()
+            break
+          default:
+            // return if we didn't handle anything
+            return
+        }
+
+        // cancel the default action to avoid it being handled twice
+        event.preventDefault()
+      })
+
       setInterval(function () {
         getRates()
       }, 120000)
