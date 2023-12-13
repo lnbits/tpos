@@ -383,7 +383,7 @@
           fab
           icon="shopping_bag"
           color="primary"
-          ><q-badge color="red" floating>${cart.size}</q-badge></q-btn
+          ><q-badge color="red" floating>${[...this.cart.values()].reduce((a,i)=>a+i.quantity,0)}</q-badge></q-btn
         ></q-page-sticky
       >
     </template>
