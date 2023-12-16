@@ -867,7 +867,7 @@
         if (this.withdrawamtposs > 0) {
           this.atmBox = true
           if (this.atmPremium > 0) {
-            this.exchangeRate = this.exchangeRate * (1 - this.atmPremium)
+            this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
           }
         }
       },
