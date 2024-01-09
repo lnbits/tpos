@@ -459,6 +459,17 @@
           v-model.number="itemDialog.data.price"
           :label="`Price (${itemDialog.data.currency})*`"
         ></q-input>
+        <q-select
+          label="Unique values only"
+          filled
+          v-model="itemDialog.data.categories"
+          use-input
+          use-chips
+          multiple
+          hide-dropdown-icon
+          input-debounce="0"
+          @new-value="createValue"
+        ></q-select>
         <q-input
           filled
           dense
@@ -784,6 +795,7 @@
             title: '',
             image: '',
             price: '',
+            categories: [],
             disabled: false
           }
         },
@@ -986,6 +998,9 @@
         const currency = _.findWhere(this.tposs, {id: tpos}).currency
         return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
       },
+      createValue(val, done) {
+        done(val, 'add-unique')
+      },
       openItemDialog(id) {
         const [tposId, itemId] = id.split(':')
         const tpos = _.findWhere(this.tposs, {id: tposId})
@@ -1007,6 +1022,7 @@
           title: '',
           image: '',
           price: '',
+          categories: [],
           disabled: false
         }
       },
