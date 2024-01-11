@@ -827,18 +827,23 @@
         return this.isFullScreen ? 'fullscreen_exit' : 'fullscreen'
       },
       filteredItems() {
-        if (!this.searchTerm && !this.categoryFilter)
-          return this.items.filter(item => !item.disabled)
-
-        return this.items.filter(item => {
-          return (
-            !item.disabled &&
-            item.title.toLowerCase().includes(this.searchTerm.toLowerCase()) &&
-            item.categories
+        // filter out disabled items
+        let items = this.items.filter(item => !item.disabled)
+        // if searchTerm entered, filter out items that don't match
+        if (this.searchTerm) {
+          items = items.filter(item => {
+            return item.title.toLowerCase().includes(this.searchTerm.toLowerCase())
+          })
+        }
+        // if categoryFilter entered, filter out items that don't match
+        if (this.categoryFilter) {
+          items = items.filter(item => {
+            return item.categories
               .map(c => c.toLowerCase())
               .includes(this.categoryFilter.toLowerCase())
-          )
-        })
+          })
+        }
+        return items
       },
       drawerWidth() {
         return this.$q.screen.width < 500 ? 375 : 450
