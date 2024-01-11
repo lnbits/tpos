@@ -333,7 +333,7 @@
             padding="lg"
             :label="category"
             @click="handleCategoryBtn(category)"
-            :outline="categoryFilter !== category"
+            :outline="!(categoryFilter === category || (categoryFilter === '' && category === 'All'))"
           ></q-btn>
         </template>
       </div>
