@@ -363,7 +363,6 @@
             v-if="formDialog.data.tip_wallet"
             use-input
             use-chips
-            multiple
             hide-dropdown-icon
             input-debounce="0"
             new-value-mode="add-unique"
@@ -460,15 +459,18 @@
           :label="`Price (${itemDialog.data.currency})*`"
         ></q-input>
         <q-select
-          label="Unique values only"
           filled
+          multiple
+          dense
+          emit-value
           v-model="itemDialog.data.categories"
           :options="categoryList"
           use-input
           use-chips
-          multiple
+          hide-dropdown-icon
           input-debounce="0"
-          @new-value="createValue"
+          new-value-mode="add-unique"
+          label="Categories (hit enter to add values)"
         ></q-select>
         <q-input
           filled
@@ -859,6 +861,7 @@
       categoryList() {
         return this.tposs.reduce((acc, tpos) => {
           tpos.items.forEach(item => {
+            item.categories &&
             item.categories.forEach(category => {
               if (!acc.includes(category)) {
                 acc.push(category)
@@ -1011,9 +1014,6 @@
         const tpos = id.split(':')[0]
         const currency = _.findWhere(this.tposs, {id: tpos}).currency
         return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
-      },
-      createValue(val, done) {
-        done(val, 'add-unique')
       },
       openItemDialog(id) {
         const [tposId, itemId] = id.split(':')
