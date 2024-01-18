@@ -405,29 +405,34 @@
         v-if="invoiceDialog.data"
         class="q-pa-lg q-pt-xl lnbits__dialog-card"
       >
-        <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
-          <lnbits-qrcode
-            :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
-            :options="{width: 800}"
-            class="rounded-borders"
-          ></lnbits-qrcode>
-        </q-responsive>
+        <a
+          :href="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
+            <lnbits-qrcode
+              :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
+              :options="{width: 800}"
+              class="rounded-borders"
+            ></lnbits-qrcode>
+          </q-responsive>
+          <q-tooltip>Pay in wallet</q-tooltip>
+        </a>
         <div class="text-center">
           <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
-          <h5 class="q-mt-none">
+          <h5 class="q-mt-none q-mb-sm">
             ${ fsat }
             <small> sat</small>
             <span v-show="tip_options" style="font-size: 0.75rem"
               >( + ${ tipAmountFormatted } tip)</span
             >
           </h5>
-          <q-btn
-            outline
-            color="grey"
-            icon="nfc"
-            @click="readNfcTag()"
-            :disable="nfcTagReading"
-          ></q-btn>
+          <q-chip v-if="nfcTagReading" square>
+            <q-avatar icon="nfc" color="positive" text-color="white"></q-avatar>
+            NFC supported
+          </q-chip>
+          <span v-else class="text-caption text-grey">NFC not supported</span>
         </div>
         <div class="row q-mt-lg">
           <q-btn
@@ -435,14 +440,6 @@
             color="grey"
             @click="copyText(invoiceDialog.data.payment_request)"
             >Copy invoice</q-btn
-          >
-          <q-btn
-            outline
-            color="grey"
-            class="q-ml-md"
-            type="a"
-            :href="'lightning:'+invoiceDialog.data.payment_request"
-            >Pay in wallet</q-btn
           >
           <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
         </div>
@@ -738,7 +735,7 @@
             rowsPerPage: 10
           }
         },
-        monochrome: this.$q.localStorage.getItem('lnbits.tpos.color'),
+        monochrome: this.$q.localStorage.getItem('lnbits.tpos.color') || false,
         showPoS: true,
         cartDrawer: this.$q.screen.width > 1200,
         searchTerm: '',
@@ -1036,6 +1033,7 @@
             .then(function (response) {
               dialog.data = response.data
               dialog.show = true
+              self.readNfcTag()
 
               dialog.dismissMsg = self.$q.notify({
                 timeout: 0,
@@ -1072,11 +1070,8 @@
           const self = this
 
           if (typeof NDEFReader == 'undefined') {
-            throw {
-              toString: function () {
-                return 'NFC not supported on this device or browser.'
-              }
-            }
+            console.debug('NFC not supported on this device or browser.')
+            return
           }
 
           const ndef = new NDEFReader()
