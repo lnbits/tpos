@@ -116,6 +116,7 @@ class Item(BaseModel):
     description: Optional[str]
     tax: Optional[float] = 0.0
     disabled: bool = False
+    categories: Optional[List[str]] = []
 
 
 class CreateUpdateItemData(BaseModel):

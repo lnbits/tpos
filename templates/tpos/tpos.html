@@ -322,6 +322,21 @@
           </q-input>
         </div>
       </div>
+      <div
+        v-if="categories && categories.length"
+        class="flex justify-center q-pa-md q-gutter-md"
+      >
+        <template v-for="category in Array.from(categories.values())">
+          <q-btn
+            color="secondary"
+            size="lg"
+            padding="lg"
+            :label="category"
+            @click="handleCategoryBtn(category)"
+            :outline="!(categoryFilter === category || (categoryFilter === '' && category === 'All'))"
+          ></q-btn>
+        </template>
+      </div>
       <div class="row q-col-gutter-md q-pa-md">
         <div
           class="col-12 col-sm-6 col-md-4 col-lg-3"
@@ -742,6 +757,7 @@
         showPoS: true,
         cartDrawer: this.$q.screen.width > 1200,
         searchTerm: '',
+        categoryFilter: '',
         cart: new Map()
       }
     },
@@ -811,14 +827,23 @@
         return this.isFullScreen ? 'fullscreen_exit' : 'fullscreen'
       },
       filteredItems() {
-        if (!this.searchTerm) return this.items.filter(item => !item.disabled)
-
-        return this.items.filter(item => {
-          return (
-            !item.disabled &&
-            item.title.toLowerCase().includes(this.searchTerm.toLowerCase())
-          )
-        })
+        // filter out disabled items
+        let items = this.items.filter(item => !item.disabled)
+        // if searchTerm entered, filter out items that don't match
+        if (this.searchTerm) {
+          items = items.filter(item => {
+            return item.title.toLowerCase().includes(this.searchTerm.toLowerCase())
+          })
+        }
+        // if categoryFilter entered, filter out items that don't match
+        if (this.categoryFilter) {
+          items = items.filter(item => {
+            return item.categories
+              .map(c => c.toLowerCase())
+              .includes(this.categoryFilter.toLowerCase())
+          })
+        }
+        return items
       },
       drawerWidth() {
         return this.$q.screen.width < 500 ? 375 : 450
@@ -1200,6 +1225,27 @@
       },
       handleColorScheme(val) {
         this.$q.localStorage.set('lnbits.tpos.color', val)
+      },
+      extractCategories(items) {
+        let categories = new Set()
+        items
+          .map(item => {
+            item.categories &&
+              item.categories.forEach(category => categories.add(category))
+          })
+          .filter(Boolean)
+
+        if (categories.size) {
+          categories = ['All', ...categories]
+        }
+        return Array.from(categories)
+      },
+      handleCategoryBtn(category) {
+        if (this.categoryFilter == category) {
+          this.categoryFilter = ''
+        } else {
+          this.categoryFilter = category == 'All' ? '' : category
+        }
       }
     },
     created: function () {
@@ -1225,6 +1271,7 @@
       })
       if (this.items.length > 0) {
         this.showPoS = false
+        this.categories = this.extractCategories(this.items)
       }
 
       window.addEventListener('keyup', event => {

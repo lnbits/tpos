@@ -363,7 +363,6 @@
             v-if="formDialog.data.tip_wallet"
             use-input
             use-chips
-            multiple
             hide-dropdown-icon
             input-debounce="0"
             new-value-mode="add-unique"
@@ -459,6 +458,20 @@
           v-model.number="itemDialog.data.price"
           :label="`Price (${itemDialog.data.currency})*`"
         ></q-input>
+        <q-select
+          filled
+          multiple
+          dense
+          emit-value
+          v-model="itemDialog.data.categories"
+          :options="categoryList"
+          use-input
+          use-chips
+          hide-dropdown-icon
+          input-debounce="0"
+          new-value-mode="add-unique"
+          label="Categories (hit enter to add values)"
+        ></q-select>
         <q-input
           filled
           dense
@@ -784,6 +797,7 @@
             title: '',
             image: '',
             price: '',
+            categories: [],
             disabled: false
           }
         },
@@ -841,6 +855,21 @@
           show: false,
           data: {}
         }
+      }
+    },
+    computed: {
+      categoryList() {
+        return this.tposs.reduce((acc, tpos) => {
+          tpos.items.forEach(item => {
+            item.categories &&
+            item.categories.forEach(category => {
+              if (!acc.includes(category)) {
+                acc.push(category)
+              }
+            })
+          })
+          return acc
+        }, [])
       }
     },
     methods: {
@@ -1007,6 +1036,7 @@
           title: '',
           image: '',
           price: '',
+          categories: [],
           disabled: false
         }
       },
