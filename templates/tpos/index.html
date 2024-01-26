@@ -862,11 +862,11 @@
         return this.tposs.reduce((acc, tpos) => {
           tpos.items.forEach(item => {
             item.categories &&
-            item.categories.forEach(category => {
-              if (!acc.includes(category)) {
-                acc.push(category)
-              }
-            })
+              item.categories.forEach(category => {
+                if (!acc.includes(category)) {
+                  acc.push(category)
+                }
+              })
           })
           return acc
         }, [])
@@ -952,7 +952,7 @@
       },
       createTPoS(wallet, data) {
         LNbits.api
-          .request('POST', '/tpos/api/v1/tposs', wallet.inkey, data)
+          .request('POST', '/tpos/api/v1/tposs', wallet.adminkey, data)
           .then(response => {
             this.tposs.push(mapTPoS(response.data))
             this.closeFormDialog()

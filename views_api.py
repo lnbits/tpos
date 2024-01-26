@@ -47,7 +47,7 @@ async def api_tposs(
 
 @tpos_ext.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
 async def api_tpos_create(
-    data: CreateTposData, wallet: WalletTypeInfo = Depends(get_key_type)
+    data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
 ):
     tpos = await create_tpos(wallet_id=wallet.wallet.id, data=data)
     return tpos.dict()
