@@ -25,7 +25,9 @@
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
           <h3 class="q-mb-md">${ amountFormatted }</h3>
-          <h5 class="q-mt-none q-mb-sm">${ fsat }<small> sat</small></h5>
+          <h5 v-show="isNotSatsDenom" class="q-mt-none q-mb-sm">
+            ${ fsat }<small> sat</small>
+          </h5>
           <div v-if="total > 0.0">
             <h5>
               <i>Total: ${totalFormatted}<br />${totalfsat} sat</i>
@@ -220,7 +222,9 @@
         <div class="row full-width q-pa-md">
           <div class="col-12 text-center">
             <h3 class="q-mb-md">${totalFormatted}</h3>
-            <h5 class="q-mt-none q-mb-sm">${totalfsat}<small> sat</small></h5>
+            <h5 v-show="isNotSatsDenom" class="q-mt-none q-mb-sm">
+              ${totalfsat}<small> sat</small>
+            </h5>
           </div>
           <div class="col-12">
             <table class="table full-width">
@@ -755,24 +759,40 @@
         cartDrawer: this.$q.screen.width > 1200,
         searchTerm: '',
         categoryFilter: '',
-        cart: new Map()
+        cart: new Map(),
+        isNotSatsDenom: '{{ tpos.currency }}' != 'satoshis'
       }
     },
     computed: {
       amount: function () {
         if (!this.stack.length) return 0.0
-        return this.stack.reduce((acc, dig) => acc * 10 + dig, 0) * 0.01
+        return (
+          this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
+          (this.currency == 'satoshis' ? 1 : 0.01)
+        )
       },
       amountFormatted: function () {
+        if (this.currency == 'satoshis') {
+          return this.amount.toFixed(0) + ' sat'
+        }
+
         return LNbits.utils.formatCurrency(
           this.amount.toFixed(2),
           this.currency
         )
       },
       totalFormatted() {
+        if (this.currency == 'satoshis') {
+          return this.total.toFixed(0) + ' sat'
+        }
+
         return LNbits.utils.formatCurrency(this.total.toFixed(2), this.currency)
       },
       amountWithTipFormatted: function () {
+        if (this.currency == 'satoshis') {
+          return this.amount.toFixed(0) + ' sat'
+        }
+
         return LNbits.utils.formatCurrency(
           (this.amount + this.tipAmount).toFixed(2),
           this.currency
@@ -829,7 +849,9 @@
         // if searchTerm entered, filter out items that don't match
         if (this.searchTerm) {
           items = items.filter(item => {
-            return item.title.toLowerCase().includes(this.searchTerm.toLowerCase())
+            return item.title
+              .toLowerCase()
+              .includes(this.searchTerm.toLowerCase())
           })
         }
         // if categoryFilter entered, filter out items that don't match
@@ -996,7 +1018,12 @@
       },
       submitForm: function () {
         if (this.total != 0.0) {
-          this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
+          this.stack = Array.from(
+            String(
+              Math.ceil(this.total * (this.currency == 'satoshis' ? 1 : 100))
+            ),
+            Number
+          )
         }
         if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
           this.$q.notify({
@@ -1180,12 +1207,16 @@
           })
       },
       getRates() {
-        LNbits.api
-          .request('GET', `/tpos/api/v1/rate/${this.currency}`)
-          .then(response => {
-            this.exchangeRate = response.data.rate
-          })
-          .catch(e => console.error(e))
+        if (this.currency == 'satoshis') {
+          this.exchangeRate = 1
+        } else {
+          LNbits.api
+            .request('GET', `/tpos/api/v1/rate/${this.currency}`)
+            .then(response => {
+              this.exchangeRate = response.data.rate
+            })
+            .catch(e => console.error(e))
+        }
       },
       getLastPayments() {
         return axios
@@ -1257,10 +1288,14 @@
 
       this.items = JSON.parse(`{{ tpos.items | safe }}`)
       this.items.forEach((item, id) => {
-        item.formattedPrice = LNbits.utils.formatCurrency(
-          item.price,
-          this.currency
-        )
+        if (this.currency == 'satoshis') {
+          item.formattedPrice = item.price + ' sat'
+        } else {
+          item.formattedPrice = LNbits.utils.formatCurrency(
+            item.price,
+            this.currency
+          )
+        }
         item.id = id
         return item
       })
