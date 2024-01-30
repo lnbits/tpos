@@ -760,7 +760,7 @@
         searchTerm: '',
         categoryFilter: '',
         cart: new Map(),
-        isNotSatsDenom: '{{ tpos.currency }}' != 'satoshis'
+        isNotSatsDenom: '{{ tpos.currency }}' != 'satoshi'
       }
     },
     computed: {
@@ -768,35 +768,38 @@
         if (!this.stack.length) return 0.0
         return (
           this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
-          (this.currency == 'satoshis' ? 1 : 0.01)
+          (this.currency == 'satoshi' ? 1 : 0.01)
         )
       },
       amountFormatted: function () {
-        if (this.currency == 'satoshis') {
-          return this.amount.toFixed(0) + ' sat'
+        if (this.currency == 'satoshi') {
+          return LNbits.utils.formatSat(this.amount.toFixed(0)) + ' sat'
+        } else {
+          return LNbits.utils.formatCurrency(
+            this.amount.toFixed(2),
+            this.currency
+          )
         }
-
-        return LNbits.utils.formatCurrency(
-          this.amount.toFixed(2),
-          this.currency
-        )
       },
       totalFormatted() {
-        if (this.currency == 'satoshis') {
-          return this.total.toFixed(0) + ' sat'
+        if (this.currency == 'satoshi') {
+          return LNbits.utils.formatSat(this.total.toFixed(0)) + ' sat'
+        } else {
+          return LNbits.utils.formatCurrency(
+            this.total.toFixed(2),
+            this.currency
+          )
         }
-
-        return LNbits.utils.formatCurrency(this.total.toFixed(2), this.currency)
       },
       amountWithTipFormatted: function () {
-        if (this.currency == 'satoshis') {
-          return this.amount.toFixed(0) + ' sat'
+        if (this.currency == 'satoshi') {
+          return LNbits.utils.formatSat(this.amount.toFixed(0)) + ' sat'
+        } else {
+          return LNbits.utils.formatCurrency(
+            (this.amount + this.tipAmount).toFixed(2),
+            this.currency
+          )
         }
-
-        return LNbits.utils.formatCurrency(
-          (this.amount + this.tipAmount).toFixed(2),
-          this.currency
-        )
       },
       sat: function () {
         if (!this.exchangeRate) return 0
@@ -1020,7 +1023,7 @@
         if (this.total != 0.0) {
           this.stack = Array.from(
             String(
-              Math.ceil(this.total * (this.currency == 'satoshis' ? 1 : 100))
+              Math.ceil(this.total * (this.currency == 'satoshi' ? 1 : 100))
             ),
             Number
           )
@@ -1207,7 +1210,7 @@
           })
       },
       getRates() {
-        if (this.currency == 'satoshis') {
+        if (this.currency == 'satoshi') {
           this.exchangeRate = 1
         } else {
           LNbits.api
@@ -1288,8 +1291,8 @@
 
       this.items = JSON.parse(`{{ tpos.items | safe }}`)
       this.items.forEach((item, id) => {
-        if (this.currency == 'satoshis') {
-          item.formattedPrice = item.price + ' sat'
+        if (this.currency == 'satoshi') {
+          item.formattedPrice = LNbits.utils.formatSat(item.price) + ' sat'
         } else {
           item.formattedPrice = LNbits.utils.formatCurrency(
             item.price,

@@ -591,7 +591,7 @@
       return {
         tposs: [],
         currencyOptions: [
-          'satoshis',
+          'satoshi',
           'USD',
           'EUR',
           'GBP',
@@ -1015,11 +1015,11 @@
         const tpos = id.split(':')[0]
         const currency = _.findWhere(this.tposs, {id: tpos}).currency
 
-        if (currency == 'satoshis') {
-          return Number(price).toFixed(0) + ' sat'
+        if (currency == 'satoshi') {
+          return LNbits.utils.formatSat(Number(price).toFixed(0)) + ' sat'
+        } else {
+          return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
         }
-
-        return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
       },
       openItemDialog(id) {
         const [tposId, itemId] = id.split(':')
@@ -1164,8 +1164,10 @@
           id: tpos.wallet
         })
         data.forEach(item => {
-          if (tpos.currency == 'satoshis') {
-            item.formattedPrice = Number(item.price).toFixed(0) + ' sat'
+          if (tpos.currency == 'satoshi') {
+            item.formattedPrice = LNbits.utils.formatSat(
+              Number(item.price).toFixed(0) + ' sat'
+            )
           } else {
             item.formattedPrice = LNbits.utils.formatCurrency(
               Number(item.price).toFixed(2),
