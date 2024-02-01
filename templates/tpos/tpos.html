@@ -773,7 +773,7 @@
       },
       amountFormatted: function () {
         if (this.currency == 'satoshi') {
-          return LNbits.utils.formatSat(this.amount.toFixed(0)) + ' sat'
+          return LNbits.utils.formatSat(this.amount) + ' sat'
         } else {
           return LNbits.utils.formatCurrency(
             this.amount.toFixed(2),
@@ -783,7 +783,7 @@
       },
       totalFormatted() {
         if (this.currency == 'satoshi') {
-          return LNbits.utils.formatSat(this.total.toFixed(0)) + ' sat'
+          return LNbits.utils.formatSat(this.total) + ' sat'
         } else {
           return LNbits.utils.formatCurrency(
             this.total.toFixed(2),
@@ -793,7 +793,7 @@
       },
       amountWithTipFormatted: function () {
         if (this.currency == 'satoshi') {
-          return LNbits.utils.formatSat(this.amount.toFixed(0)) + ' sat'
+          return LNbits.utils.formatSat(this.amount) + ' sat'
         } else {
           return LNbits.utils.formatCurrency(
             (this.amount + this.tipAmount).toFixed(2),
@@ -1021,12 +1021,11 @@
       },
       submitForm: function () {
         if (this.total != 0.0) {
-          this.stack = Array.from(
-            String(
-              Math.ceil(this.total * (this.currency == 'satoshi' ? 1 : 100))
-            ),
-            Number
-          )
+          if (this.currency == 'satoshi') {
+              this.stack = Array.from(String(Math.ceil(this.total), Number)
+          } else {
+              this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
+          }
         }
         if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
           this.$q.notify({

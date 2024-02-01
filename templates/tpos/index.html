@@ -1016,7 +1016,7 @@
         const currency = _.findWhere(this.tposs, {id: tpos}).currency
 
         if (currency == 'satoshi') {
-          return LNbits.utils.formatSat(Number(price).toFixed(0)) + ' sat'
+          return LNbits.utils.formatSat(price) + ' sat'
         } else {
           return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
         }
@@ -1165,9 +1165,7 @@
         })
         data.forEach(item => {
           if (tpos.currency == 'satoshi') {
-            item.formattedPrice = LNbits.utils.formatSat(
-              Number(item.price).toFixed(0) + ' sat'
-            )
+            item.formattedPrice = LNbits.utils.formatSat(item.price) + ' sat'
           } else {
             item.formattedPrice = LNbits.utils.formatCurrency(
               Number(item.price).toFixed(2),
