@@ -25,7 +25,7 @@
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
           <h3 class="q-mb-md">${ amountFormatted }</h3>
-          <h5 v-show="isNotSatsDenom" class="q-mt-none q-mb-sm">
+          <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
             ${ fsat }<small> sat</small>
           </h5>
           <div v-if="total > 0.0">
@@ -222,7 +222,7 @@
         <div class="row full-width q-pa-md">
           <div class="col-12 text-center">
             <h3 class="q-mb-md">${totalFormatted}</h3>
-            <h5 v-show="isNotSatsDenom" class="q-mt-none q-mb-sm">
+            <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
               ${totalfsat}<small> sat</small>
             </h5>
           </div>
@@ -760,7 +760,7 @@
         searchTerm: '',
         categoryFilter: '',
         cart: new Map(),
-        isNotSatsDenom: '{{ tpos.currency }}' != 'satoshi'
+        denomIsSats: '{{ tpos.currency }}' == 'satoshi'
       }
     },
     computed: {
@@ -1022,7 +1022,7 @@
       submitForm: function () {
         if (this.total != 0.0) {
           if (this.currency == 'satoshi') {
-              this.stack = Array.from(String(Math.ceil(this.total), Number)
+              this.stack = Array.from(String(Math.ceil(this.total), Number))
           } else {
               this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
           }
