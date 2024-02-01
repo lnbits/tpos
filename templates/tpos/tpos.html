@@ -1022,9 +1022,9 @@
       submitForm: function () {
         if (this.total != 0.0) {
           if (this.currency == 'satoshi') {
-              this.stack = Array.from(String(Math.ceil(this.total), Number))
+            this.stack = Array.from(String(Math.ceil(this.total), Number))
           } else {
-              this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
+            this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
           }
         }
         if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
