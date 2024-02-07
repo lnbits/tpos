@@ -859,17 +859,13 @@
     },
     computed: {
       categoryList() {
-        return this.tposs.reduce((acc, tpos) => {
-          tpos.items.forEach(item => {
-            item.categories &&
-              item.categories.forEach(category => {
-                if (!acc.includes(category)) {
-                  acc.push(category)
-                }
-              })
-          })
-          return acc
-        }, [])
+        return Array.from(
+          new Set(
+            this.tposs.flatMap(tpos =>
+              tpos.items.flatMap(item => item.categories || [])
+            )
+          )
+        )
       }
     },
     methods: {
