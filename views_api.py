@@ -13,10 +13,8 @@ from lnbits.core.services import create_invoice
 from lnbits.core.views.api import api_payment
 from lnbits.decorators import (
     WalletTypeInfo,
-    check_admin,
     get_key_type,
     require_admin_key,
-    require_invoice_key,
 )
 from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 
@@ -243,6 +241,65 @@ async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wrong PIN.")
     token = await start_lnurlcharge(tpos_id)
     return token
+
+
+@tpos_ext.get("/api/v1/atm/withdraw/{k1}/{amount}/pay", status_code=HTTPStatus.OK)
+async def api_tpos_atm_pay(
+    request: Request, k1: str, amount: int, payLink: str = Query(...)
+):
+    try:
+        # get the payment_request from the lnurl
+        payLink = payLink.replace("lnurlp://", "https://")
+        logger.debug(payLink)
+        async with httpx.AsyncClient() as client:
+            headers = {"user-agent": f"lnbits/tpos"}
+            r = await client.get(payLink, follow_redirects=True, headers=headers)
+            if r.is_error:
+                return {"success": False, "detail": "Error loading"}
+            resp = r.json()
+
+            amount = amount * 1000  # convert to msats
+
+            if resp["tag"] != "payRequest":
+                return {"success": False, "detail": "Wrong tag type"}
+
+            if amount < resp["minSendable"]:
+                return {"success": False, "detail": "Amount too low"}
+
+            if amount > resp["maxSendable"]:
+                return {"success": False, "detail": "Amount too high"}
+
+            cb_res = await client.get(
+                resp["callback"],
+                follow_redirects=True,
+                headers=headers,
+                params={"amount": amount},
+            )
+            cb_resp = cb_res.json()
+            if cb_res.is_error:
+                return {"success": False, "detail": "Error loading callback"}
+
+            # pay the invoice
+            lnurl_cb_url = str(request.url_for("tpos.tposlnurlcharge.callback"))
+            pay_invoice = await client.get(
+                lnurl_cb_url,
+                params={"pr": cb_resp["pr"], "k1": k1},
+            )
+            if pay_invoice.status_code != 200:
+                return {"success": False, "detail": "Error paying invoice"}
+            return {"success": True, "detail": "Payment successful"}
+
+    except AssertionError as ex:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail=str(ex),
+        )
+    except Exception as ex:
+        logger.warning(ex)
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail="Cannot process atm withdraw",
+        )
 
 
 @tpos_ext.get(

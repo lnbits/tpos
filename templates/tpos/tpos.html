@@ -829,7 +829,9 @@
         // if searchTerm entered, filter out items that don't match
         if (this.searchTerm) {
           items = items.filter(item => {
-            return item.title.toLowerCase().includes(this.searchTerm.toLowerCase())
+            return item.title
+              .toLowerCase()
+              .includes(this.searchTerm.toLowerCase())
           })
         }
         // if categoryFilter entered, filter out items that don't match
@@ -920,6 +922,7 @@
             lnurl = res.data.lnurl
             dialog.data = {payment_request: lnurl}
             dialog.show = true
+            self.readNfcTag()
             dialog.dismissMsg = self.$q.notify({
               timeout: 0,
               message: 'Withdraw...'
@@ -949,6 +952,7 @@
                 self.atmToken = ''
                 self.complete.show = true
                 self.atmMode = false
+                this.connectionWithdraw.close()
               }
             }
             this.getRates()
@@ -1108,7 +1112,9 @@
 
           this.nfcTagReading = true
           this.$q.notify({
-            message: 'Tap your NFC tag to pay this invoice with LNURLw.'
+            message: this.atmMode
+              ? 'Tap your NFC tag to withdraw with LNURLp.'
+              : 'Tap your NFC tag to pay this invoice with LNURLw.'
           })
 
           return ndef.scan({signal: readerAbortController.signal}).then(() => {
@@ -1136,7 +1142,15 @@
 
               //User feedback, show loader icon
               self.nfcTagReading = false
-              self.payInvoice(lnurl, readerAbortController)
+              if (self.atmMode) {
+                LNbits.api
+                  .request('GET', `${lnurl.replace('lnurlw://', 'https://')}`)
+                  .then(res => {
+                    self.makeWithdraw(res.data.payLink)
+                  })
+              } else {
+                self.payInvoice(lnurl, readerAbortController)
+              }
 
               this.$q.notify({
                 type: 'positive',
@@ -1153,6 +1167,36 @@
               : 'An unexpected error has occurred.'
           })
         }
+      },
+      makeWithdraw(payLink, readerAbortController) {
+        if (!payLink) {
+          this.$q.notify({
+            type: 'negative',
+            message: 'LNURL not found in NFC tag.'
+          })
+          return
+        }
+        LNbits.api
+          .request(
+            'GET',
+            `/tpos/api/v1/atm/withdraw/${this.atmToken}/${this.sat}/pay?payLink=${payLink}`
+          )
+          .then(res => {
+            if (!res.data.success) {
+              this.$q.notify({
+                type: 'negative',
+                message: res.data.detail
+              })
+            } else {
+              this.stack = []
+              this.total = 0.0
+              this.$q.notify({
+                type: 'positive',
+                message: 'Topup successful!'
+              })
+            }
+            readerAbortController.abort()
+          })
       },
       payInvoice: function (lnurl, readerAbortController) {
         const self = this
