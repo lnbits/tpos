@@ -591,7 +591,7 @@
       return {
         tposs: [],
         currencyOptions: [
-          'satoshi',
+          'sats',
           'USD',
           'EUR',
           'GBP',
@@ -1015,11 +1015,7 @@
         const tpos = id.split(':')[0]
         const currency = _.findWhere(this.tposs, {id: tpos}).currency
 
-        if (currency == 'satoshi') {
-          return LNbits.utils.formatSat(price) + ' sat'
-        } else {
-          return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
-        }
+        return this.formatAmount(price, currency)
       },
       openItemDialog(id) {
         const [tposId, itemId] = id.split(':')
@@ -1164,14 +1160,7 @@
           id: tpos.wallet
         })
         data.forEach(item => {
-          if (tpos.currency == 'satoshi') {
-            item.formattedPrice = LNbits.utils.formatSat(item.price) + ' sat'
-          } else {
-            item.formattedPrice = LNbits.utils.formatCurrency(
-              Number(item.price).toFixed(2),
-              tpos.currency
-            )
-          }
+          item.formattedPrice = this.formatAmount(item.price, tpos.currency)
         })
         this.fileDataDialog.data = data
         this.fileDataDialog.count = data.length
@@ -1188,6 +1177,16 @@
       openUrlDialog(id) {
         this.urlDialog.data = _.findWhere(this.tposs, {id})
         this.urlDialog.show = true
+      },
+      formatAmount: function (amount, currency) {
+        if (currency == 'sats') {
+          return LNbits.utils.formatSat(amount) + ' sat'
+        } else {
+          return LNbits.utils.formatCurrency(
+            Number(amount).toFixed(2),
+            currency
+          )
+        }
       }
     },
     created: function () {
