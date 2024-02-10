@@ -119,4 +119,4 @@ async def m009_atm_premium(db):
     """
     Add a premium % to ATM withdraws
     """
-    await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawpindisabled BOOL DEFAULT 1;")
+    await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawpindisabled BOOLEAN DEFAULT false;")
