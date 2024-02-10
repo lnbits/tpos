@@ -109,7 +109,7 @@ async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
     # Calculate the time between withdrawals in seconds
     now = await get_current_timestamp()
     time_elapsed = now - data.withdrawtime
-    # withdraw_time_seconds = data.withdrawbtwn * 60
+    withdraw_time_seconds = data.withdrawbtwn * 60
     if data.withdrawtimeopt != "secs":
         withdraw_time_seconds = data.withdrawbtwn * 60
 
