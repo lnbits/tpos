@@ -21,8 +21,8 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
     tpos_id = urlsafe_short_hash()
     await db.execute(
         """
-        INSERT INTO tpos.pos (id, wallet, name, currency, tip_options, tip_wallet, withdrawlimit, withdrawpin, withdrawamt, withdrawtime, withdrawbtwn)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tpos.pos (id, wallet, name, currency, tip_options, tip_wallet, withdrawlimit, withdrawpin, withdrawamt, withdrawtime, withdrawbtwn, withdrawtimeopt, withdrawpindisabled)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             tpos_id,
@@ -36,6 +36,8 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
             0,
             0,
             data.withdrawbtwn,
+            data.withdrawtimeopt,
+            data.withdrawpindisabled,
         ),
     )
     tpos = await get_tpos(tpos_id)
@@ -54,6 +56,8 @@ async def start_lnurlcharge(tpos_id: str):
 
     now = await get_current_timestamp()
     withdraw_time_seconds = tpos.withdrawbtwn * 60
+    if tpos.withdrawtimeopt == "secs":
+        withdraw_time_seconds = tpos.withdrawbtwn
     assert (
         now - tpos.withdrawtime > withdraw_time_seconds
     ), f"Last withdraw was made too recently, please try again in {int(withdraw_time_seconds - (now - tpos.withdrawtime))} secs"

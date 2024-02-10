@@ -18,8 +18,10 @@ class CreateTposData(BaseModel):
     withdrawpin: int = Field(None, ge=1)
     withdrawamt: int = Field(None, ge=0)
     withdrawtime: int = Field(0)
+    withdrawtimeopt: Optional[str]
     withdrawbtwn: int = Field(10, ge=1)
     withdrawpremium: float = Field(None)
+    withdrawpindisabled: bool = Field(False)
 
 
 class TPoS(BaseModel):
@@ -33,8 +35,10 @@ class TPoS(BaseModel):
     withdrawpin: Optional[int]
     withdrawamt: int
     withdrawtime: int
+    withdrawtimeopt: Optional[str]
     withdrawbtwn: int
     withdrawpremium: Optional[float]
+    withdrawpindisabled: Optional[bool]
     items: Optional[str]
 
     @classmethod
@@ -54,8 +58,10 @@ class TPoSClean(BaseModel):
     withdrawlimit: Optional[int]
     withdrawamt: int
     withdrawtime: int
+    withdrawtimeopt: Optional[str]
     withdrawbtwn: int
     withdrawpremium: Optional[float]
+    withdrawpindisabled: Optional[bool]
     items: Optional[str]
 
     @classmethod

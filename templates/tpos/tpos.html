@@ -671,6 +671,7 @@
         currency: '{{ tpos.currency }}',
         withdrawamtposs: `{{ withdrawamtposs }}`,
         atmPremium: Number('{{ tpos.withdrawpremium }}') / 100,
+        withdrawpinopen:Number('{{ withdrawpinopen }}'),
         tip_options: null,
         exchangeRate: null,
         stack: [],
@@ -888,11 +889,16 @@
         this.total = 0.0
       },
       atm() {
-        if (this.withdrawamtposs > 0) {
-          this.atmBox = true
-          if (this.atmPremium > 0) {
+        if (this.atmPremium > 0) {
             this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
           }
+        if (this.withdrawpinopen != 0) {
+          this.atmPin = this.withdrawpinopen
+          this.atmSubmit()
+          return
+        }
+        if (this.withdrawamtposs > 0) {
+          this.atmBox = true
         }
       },
       atmSubmit() {
