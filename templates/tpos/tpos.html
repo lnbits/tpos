@@ -671,7 +671,7 @@
         currency: '{{ tpos.currency }}',
         withdrawamtposs: `{{ withdrawamtposs }}`,
         atmPremium: Number('{{ tpos.withdrawpremium }}') / 100,
-        withdrawpinopen:Number('{{ withdrawpinopen }}'),
+        withdrawpinopen: Number('{{ withdrawpinopen }}'),
         tip_options: null,
         exchangeRate: null,
         stack: [],
@@ -890,8 +890,8 @@
       },
       atm() {
         if (this.atmPremium > 0) {
-            this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
-          }
+          this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
+        }
         if (this.withdrawpinopen != 0) {
           this.atmPin = this.withdrawpinopen
           this.atmSubmit()
@@ -1149,10 +1149,11 @@
               //User feedback, show loader icon
               self.nfcTagReading = false
               if (self.atmMode) {
+                const URL = lnurl.replace('lnurlp://', 'https://')
                 LNbits.api
                   .request('GET', `${lnurl.replace('lnurlw://', 'https://')}`)
                   .then(res => {
-                    self.makeWithdraw(res.data.payLink)
+                    self.makeWithdraw(res.data.payLink, readerAbortController)
                   })
               } else {
                 self.payInvoice(lnurl, readerAbortController)
@@ -1201,6 +1202,10 @@
                 message: 'Topup successful!'
               })
             }
+            readerAbortController.abort()
+          })
+          .catch(e => {
+            console.error(e)
             readerAbortController.abort()
           })
       },
@@ -1296,6 +1301,7 @@
     created: function () {
       var getRates = this.getRates
       getRates()
+      this.pinDisabled = JSON.parse('{{ tpos.withdrawpindisabled | tojson }}')
       this.tip_options =
         '{{ tpos.tip_options | tojson }}' == 'null'
           ? null

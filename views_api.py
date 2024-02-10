@@ -232,7 +232,6 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
 @tpos_ext.get("/api/v1/atm/{tpos_id}/{atmpin}", status_code=HTTPStatus.CREATED)
 async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
     tpos = await get_tpos(tpos_id)
-    logger.debug(tpos)
     if not tpos:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."

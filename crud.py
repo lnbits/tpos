@@ -55,9 +55,9 @@ async def start_lnurlcharge(tpos_id: str):
     assert tpos, f"TPoS with {tpos_id} not found!"
 
     now = await get_current_timestamp()
-    withdraw_time_seconds = tpos.withdrawbtwn * 60
-    if tpos.withdrawtimeopt == "secs":
-        withdraw_time_seconds = tpos.withdrawbtwn
+    withdraw_time_seconds = (
+        tpos.withdrawbtwn * 60 if tpos.withdrawtimeopt != "secs" else tpos.withdrawbtwn
+    )
     assert (
         now - tpos.withdrawtime > withdraw_time_seconds
     ), f"Last withdraw was made too recently, please try again in {int(withdraw_time_seconds - (now - tpos.withdrawtime))} secs"
@@ -109,9 +109,9 @@ async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
     # Calculate the time between withdrawals in seconds
     now = await get_current_timestamp()
     time_elapsed = now - data.withdrawtime
-    withdraw_time_seconds = data.withdrawbtwn * 60
-    if data.withdrawtimeopt != "secs":
-        withdraw_time_seconds = data.withdrawbtwn * 60
+    withdraw_time_seconds = (
+        data.withdrawbtwn * 60 if data.withdrawtimeopt != "secs" else data.withdrawbtwn
+    )
 
     logger.debug(f"Time between: {time_elapsed} seconds")
 
