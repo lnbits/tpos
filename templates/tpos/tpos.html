@@ -1,5 +1,4 @@
 {% extends "public.html" %} {% block toolbar_title %} {{ tpos.name }}
-
 <q-btn
   flat
   dense
@@ -8,180 +7,410 @@
   icon="share"
   color="white"
 ></q-btn>
-
+<q-btn-toggle
+  v-model="monochrome"
+  toggle-color="primary"
+  :options="[
+        {label: 'Color', value: false},
+        {label: 'Mono', value: true}
+      ]"
+  size="sm"
+  @input="handleColorScheme"
+  class="q-ml-md"
+/>
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
   <q-page>
-    <q-page-sticky v-if="exchangeRate" expand position="top">
-      <q-btn
-        v-show="atmMode"
-        color="negative"
-        @click="atmMode = false"
-        class="absolute-top-left"
-        >EXIT ATM MODE</q-btn
-      >
+    <q-page-sticky v-if="exchangeRate && showPoS" expand position="top">
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
-          <h3 class="q-mb-md">{% raw %}{{ amountFormatted }}{% endraw %}</h3>
-          <h5 class="q-mt-none q-mb-sm">
-            {% raw %}{{ fsat }}{% endraw %} <small>sat</small>
-          </h5>
-        </div>
-      </div>
-    </q-page-sticky>
-    <q-page-sticky expand position="bottom">
-      <div class="row justify-center full-width">
-        <div class="col-12 col-sm-8 col-md-6 col-lg-4">
-          <div class="keypad q-pa-sm">
-            <q-btn
-              unelevated
-              @click="stack.push(1)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >1</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(2)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >2</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(3)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >3</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(4)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >4</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(5)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >5</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(6)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >6</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(7)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >7</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(8)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >8</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(9)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >9</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.splice(-1, 1)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >DEL</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack.push(0)"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              >0</q-btn
-            >
-            <q-btn
-              unelevated
-              @click="stack = []"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              class="btn-cancel"
-              >C</q-btn
-            >
-            <q-btn
-              unelevated
-              :disabled="amount == 0"
-              @click="submitForm()"
-              size="xl"
-              :outline="!($q.dark.isActive)"
-              rounded
-              color="primary"
-              class="btn-confirm"
-              >OK</q-btn
-            >
+          <h3 class="q-mb-md">${ amountFormatted }</h3>
+          <h5 class="q-mt-none q-mb-sm">${ fsat }<small> sat</small></h5>
+          <div v-if="total > 0.0">
+            <h5>
+              <i>Total: ${totalFormatted}<br />${totalfsat} sat</i>
+            </h5>
           </div>
         </div>
       </div>
     </q-page-sticky>
-    <q-page-sticky position="top-right" :offset="[18, 18]">
-      <q-btn
-        @click="showLastPayments"
-        fab
-        icon="receipt_long"
-        color="primary"
-      ></q-btn
-    ></q-page-sticky>
-    <q-page-sticky position="top-right" :offset="[18, 90]">
-      <q-btn
-        @click="toggleFullscreen"
-        fab
-        :icon="fullScreenIcon"
-        color="primary"
-      ></q-btn>
-    </q-page-sticky>
-    <q-page-sticky position="top-right" :offset="[18, 162]">
-      <q-btn
-        @click="atm"
-        v-if="withdrawamtposs > 0"
-        fab
-        icon="atm"
-        color="primary"
-      ></q-btn>
-    </q-page-sticky>
+    <template v-if="showPoS">
+      <q-page-sticky expand position="bottom">
+        <div class="row justify-center full-width">
+          <div class="col-12 col-sm-8 col-md-6 col-lg-4">
+            <div class="keypad q-pa-sm">
+              <q-btn
+                unelevated
+                @click="stack.push(1)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >1</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.push(2)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >2</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.push(3)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >3</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.push(4)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >4</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.push(5)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >5</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.push(6)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >6</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.push(7)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >7</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.push(8)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >8</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.push(9)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >9</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="total > 0.0 ? cancelAddAmount() : stack = []"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                :color="monochrome ? 'secondary' : 'negative'"
+                >C</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.push(0)"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                >0</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="stack.pop()"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                :color="monochrome ? 'secondary' : 'warning'"
+                class="btn-cancel"
+                >⬅</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="addAmount()"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                color="primary"
+                class="btn-plus"
+                >+</q-btn
+              >
+              <q-btn
+                unelevated
+                @click="submitForm()"
+                size="xl"
+                :outline="!($q.dark.isActive)"
+                rounded
+                :color="monochrome ? 'secondary' : 'positive'"
+                class="btn-confirm"
+                >Ok</q-btn
+              >
+            </div>
+          </div>
+        </div>
+      </q-page-sticky>
+      <q-page-sticky position="top-right" :offset="[18, 18]">
+        <q-btn
+          @click="showLastPayments"
+          fab
+          icon="receipt_long"
+          color="primary"
+        ></q-btn
+      ></q-page-sticky>
+      <q-page-sticky position="top-right" :offset="[18, 90]">
+        <q-btn
+          @click="toggleFullscreen"
+          fab
+          :icon="fullScreenIcon"
+          color="primary"
+        ></q-btn>
+      </q-page-sticky>
+      <q-page-sticky position="top-right" :offset="[18, 162]">
+        <q-btn
+          @click="atm"
+          v-if="withdrawamtposs > 0"
+          fab
+          icon="atm"
+          color="primary"
+        ></q-btn>
+      </q-page-sticky>
+      <q-page-sticky position="top-right" :offset="[18, 234]">
+        <q-btn
+          @click="showPoS = false"
+          v-if="items.length > 0"
+          fab
+          icon="point_of_sale"
+          color="primary"
+          :disable="atmMode"
+        ></q-btn>
+      </q-page-sticky>
+    </template>
+    <template v-else>
+      <q-drawer
+        side="right"
+        v-model="cartDrawer"
+        show-if-above
+        bordered
+        :width="drawerWidth"
+        :breakpoint="1200"
+      >
+        <div class="row full-width q-pa-md">
+          <div class="col-12 text-center">
+            <h3 class="q-mb-md">${totalFormatted}</h3>
+            <h5 class="q-mt-none q-mb-sm">${totalfsat}<small> sat</small></h5>
+          </div>
+          <div class="col-12">
+            <table class="table full-width">
+              <colgroup>
+                <col width="50%" />
+                <col width="25%" />
+                <col width="0%" />
+                <col width="0%" />
+              </colgroup>
+              <tbody>
+                <tr v-for="item in [...cart.values()]" :key="item.id">
+                  <td
+                    class="text-bold ellipsis"
+                    style="
+                      white-space: nowrap;
+                      text-overflow: ellipsis;
+                      overflow: hidden;
+                      max-width: 1px;
+                    "
+                  >
+                    ${item.title}
+                  </td>
+                  <td>
+                    <div
+                      class="flex justify-evenly"
+                      style="align-items: center"
+                    >
+                      <q-btn
+                        @click="removeFromCart(item)"
+                        flat
+                        dense
+                        round
+                        size="sm"
+                        icon="remove"
+                        :disabled="item.quantity == 1"
+                      ></q-btn>
+                      <div class="text-center">
+                        <span class="text-bold">${item.quantity}</span>
+                      </div>
+                      <q-btn
+                        @click="addToCart(item)"
+                        flat
+                        dense
+                        round
+                        size="sm"
+                        icon="add"
+                      ></q-btn>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="text-center">${item.formattedPrice}</span>
+                  </td>
+                  <td>
+                    <q-btn
+                      @click="removeFromCart(item, item.quantity)"
+                      color="negative"
+                      size="sm"
+                      round
+                      icon="delete"
+                    ></q-btn>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="row q-col-gutter-md q-pa-md absolute-bottom q-mb-lg">
+          <div class="col-12 col-sm-6">
+            <q-btn
+              class="full-width"
+              @click="submitForm"
+              color="positive"
+              label="Pay"
+              padding="md"
+              :disabled="cart.size == 0"
+            ></q-btn>
+          </div>
+          <div class="col-12 col-sm-6">
+            <q-btn
+              class="full-width"
+              @click="clearCart"
+              color="negative"
+              label="Clear cart"
+              padding="md"
+            ></q-btn>
+          </div>
+        </div>
+      </q-drawer>
+      <div class="row justify-center q-col-gutter-md q-pa-md">
+        <div class="col-12 col-sm-8 col-md-6">
+          <q-input v-model="searchTerm" label="Filter">
+            <q-icon
+              v-if="searchTerm !== ''"
+              name="close"
+              @click="searchTerm = ''"
+              class="cursor-pointer"
+            />
+          </q-input>
+        </div>
+      </div>
+      <div
+        v-if="categories && categories.length"
+        class="flex justify-center q-pa-md q-gutter-md"
+      >
+        <template v-for="category in Array.from(categories.values())">
+          <q-btn
+            color="secondary"
+            size="lg"
+            padding="lg"
+            :label="category"
+            @click="handleCategoryBtn(category)"
+            :outline="!(categoryFilter === category || (categoryFilter === '' && category === 'All'))"
+          ></q-btn>
+        </template>
+      </div>
+      <div class="row q-col-gutter-md q-pa-md">
+        <div
+          class="col-12 col-sm-6 col-md-4 col-lg-3"
+          v-for="item in filteredItems"
+          :key="item.name"
+        >
+          <q-card class="full-height column">
+            <img
+              v-if="item.image"
+              class="q-pa-md responsive-img"
+              :src="item.image"
+            />
+
+            <q-card-section class="q-mt-auto">
+              <div class="text-h6">${item.title}</div>
+              <div class="text-subtitle1">${item.formattedPrice}</div>
+              <div
+                v-if="item.description"
+                class="text-caption ellipsis-2-lines q-py-sm"
+              >
+                ${item.description}
+              </div>
+            </q-card-section>
+
+            <q-card-actions vertical class="q-pa-md">
+              <q-btn @click="addToCart(item)" padding="md" color="primary"
+                >Add</q-btn
+              >
+            </q-card-actions>
+          </q-card>
+        </div>
+      </div>
+      <q-page-sticky position="bottom-right" :offset="[18, 18]">
+        <q-btn
+          @click="showPoS = true"
+          fab
+          icon="dialpad"
+          color="primary"
+        ></q-btn
+      ></q-page-sticky>
+      <q-page-sticky position="bottom-right" :offset="[18, 90]">
+        <q-btn
+          @click="cartDrawer = !cartDrawer"
+          fab
+          :icon="cartDrawer ? 'chevron_right' : 'chevron_left'"
+          color="primary"
+          ><q-tooltip
+            >${cartDrawer ? 'Hide Cart' :' Open Cart'}</q-tooltip
+          ></q-btn
+        ></q-page-sticky
+      >
+      <q-page-sticky
+        v-if="!cartDrawer && cart.size > 0"
+        position="bottom-right"
+        :offset="[18, 162]"
+      >
+        <q-btn
+          @click="cartDrawer = !cartDrawer"
+          fab
+          icon="shopping_bag"
+          color="primary"
+          ><q-badge color="red" floating
+            >${[...this.cart.values()].reduce((a,i)=>a+i.quantity,0)}</q-badge
+          ></q-btn
+        ></q-page-sticky
+      >
+    </template>
+    <q-btn
+      v-show="atmMode"
+      color="negative"
+      @click="() => {atmMode = false; getRates()}"
+      class="absolute-top-left"
+      >EXIT ATM MODE</q-btn
+    >
     <q-dialog
       v-model="invoiceDialog.show"
       position="top"
@@ -191,39 +420,41 @@
         v-if="invoiceDialog.data"
         class="q-pa-lg q-pt-xl lnbits__dialog-card"
       >
-        <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
-          <qrcode
-            :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
-            :options="{width: 800}"
-            class="rounded-borders"
-          ></qrcode>
-        </q-responsive>
-        <div class="text-center" v-show="!atmMode">
-          <h3 class="q-my-md">
-            {% raw %}{{ amountWithTipFormatted }}{% endraw %}
-          </h3>
-          <h5 class="q-mt-none">
-            {% raw %}{{ fsat }}
-            <small>sat</small>
+        <a
+          :href="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
+            <lnbits-qrcode
+              :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
+              :options="{width: 800}"
+              class="rounded-borders"
+            ></lnbits-qrcode>
+          </q-responsive>
+          <q-tooltip>Pay in wallet</q-tooltip>
+        </a>
+        <div class="text-center">
+          <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
+          <h5 class="q-mt-none q-mb-sm">
+            ${ fsat }
+            <small> sat</small>
             <span v-show="tip_options" style="font-size: 0.75rem"
-              >( + {{ tipAmountFormatted }} tip)</span
+              >( + ${ tipAmountFormatted } tip)</span
             >
-            {% endraw %}
           </h5>
-          <q-btn
-            outline
-            color="grey"
-            icon="nfc"
-            @click="readNfcTag()"
-            :disable="nfcTagReading"
-          ></q-btn>
+          <q-chip v-if="nfcTagReading" square>
+            <q-avatar icon="nfc" color="positive" text-color="white"></q-avatar>
+            NFC supported
+          </q-chip>
+          <span v-else class="text-caption text-grey">NFC not supported</span>
         </div>
         <div class="row q-mt-lg">
           <q-btn
             outline
             color="grey"
             @click="copyText(invoiceDialog.data.payment_request)"
-            >Copy</q-btn
+            >Copy invoice</q-btn
           >
           <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
         </div>
@@ -246,7 +477,7 @@
             color="primary"
             v-for="tip in tip_options.filter(f => f != 'Round')"
             :key="tip"
-            >{% raw %}{{ tip }}{% endraw %}%</q-btn
+            >${ tip }%</q-btn
           >
           <q-btn
             style="padding: 10px; margin: 3px"
@@ -290,11 +521,11 @@
     <q-dialog v-model="urlDialog.show" position="top">
       <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
         <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
-          <qrcode
+          <lnbits-qrcode
             value="{{ request.url }}"
             :options="{width: 800}"
             class="rounded-borders"
-          ></qrcode>
+          ></lnbits-qrcode>
         </q-responsive>
         <div class="text-center q-mb-xl">
           <p style="word-break: break-all">
@@ -335,20 +566,18 @@
             </q-item-section>
           </q-item>
           <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
-            {%raw%}
             <q-item-section>
               <q-item-label class="text-bold"
-                >{{payment.amount / 1000}} sats</q-item-label
+                >${payment.amount / 1000} sats</q-item-label
               >
               <q-item-label caption lines="2"
-                >Hash: {{payment.checking_id.slice(0, 30)}}...</q-item-label
+                >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
               >
             </q-item-section>
             <q-item-section side top>
-              <q-item-label caption>{{payment.dateFrom}}</q-item-label>
+              <q-item-label caption>${payment.dateFrom}</q-item-label>
               <q-icon name="check" color="green" />
             </q-item-section>
-            {%endraw%}
           </q-item>
         </q-list>
       </q-card>
@@ -357,7 +586,7 @@
     <q-dialog v-model="atmBox" @hide="atmPin = null">
       <q-card>
         <q-card-section class="row items-center q-pb-none">
-          <div class="text-h6">Withdraw pin</div>
+          <div class="text-h6">Withdraw PIN</div>
         </q-card-section>
         <q-card-section>
           <q-form autofocus @submit="atmSubmit" class="q-gutter-md">
@@ -392,14 +621,40 @@
     grid-gap: 8px;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(4, 1fr);
+    min-height: 40vh;
   }
 
   .keypad .btn {
     height: 100%;
+    min-height: 56px;
   }
 
   .keypad .btn-confirm {
-    grid-area: 1 / 4 / 5 / 4;
+    grid-area: 2 / 4 / 5 / 4;
+  }
+  .keypad .btn-plus {
+    grid-area: 1 / 4 / 2 / 4;
+  }
+
+  .itemCard {
+    height: 100% !important;
+    display: flex;
+  }
+
+  .responsive-img {
+    width: 100%;
+    height: auto;
+    max-height: 210px;
+    object-fit: scale-down;
+  }
+
+  .table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  .table td {
+    padding: 8px;
+    text-align: left;
   }
 </style>
 {% endblock %} {% block scripts %}
@@ -409,11 +664,13 @@
   new Vue({
     el: '#vue',
     mixins: [windowMixin],
+    delimiters: ['${', '}'],
     data: function () {
       return {
         tposId: '{{ tpos.id }}',
         currency: '{{ tpos.currency }}',
         withdrawamtposs: `{{ withdrawamtposs }}`,
+        atmPremium: Number('{{ tpos.withdrawpremium }}') / 100,
         tip_options: null,
         exchangeRate: null,
         stack: [],
@@ -446,19 +703,74 @@
           show: false
         },
         rounding: false,
-        isFullScreen: false
+        isFullScreen: false,
+        total: 0.0,
+        itemsTable: {
+          filter: '',
+          columns: [
+            {
+              name: 'delete',
+              align: 'left',
+              label: '',
+              field: ''
+            },
+            {
+              name: 'edit',
+              align: 'left',
+              label: '',
+              field: ''
+            },
+
+            {
+              name: 'id',
+              align: 'left',
+              label: 'ID',
+              field: 'id'
+            },
+            {
+              name: 'title',
+              align: 'left',
+              label: 'Title',
+              field: 'title'
+            },
+            {
+              name: 'price',
+              align: 'left',
+              label: 'Price',
+              field: 'price'
+            },
+            {
+              name: 'disabled',
+              align: 'left',
+              label: 'Disabled',
+              field: 'disabled'
+            }
+          ],
+          pagination: {
+            rowsPerPage: 10
+          }
+        },
+        monochrome: this.$q.localStorage.getItem('lnbits.tpos.color') || false,
+        showPoS: true,
+        cartDrawer: this.$q.screen.width > 1200,
+        searchTerm: '',
+        categoryFilter: '',
+        cart: new Map()
       }
     },
     computed: {
       amount: function () {
         if (!this.stack.length) return 0.0
-        return Number(this.stack.join('') / 100)
+        return this.stack.reduce((acc, dig) => acc * 10 + dig, 0) * 0.01
       },
       amountFormatted: function () {
         return LNbits.utils.formatCurrency(
           this.amount.toFixed(2),
           this.currency
         )
+      },
+      totalFormatted() {
+        return LNbits.utils.formatCurrency(this.total.toFixed(2), this.currency)
       },
       amountWithTipFormatted: function () {
         return LNbits.utils.formatCurrency(
@@ -470,6 +782,10 @@
         if (!this.exchangeRate) return 0
         return Math.ceil(this.amount * this.exchangeRate)
       },
+      totalSat: function () {
+        if (!this.exchangeRate) return 0
+        return Math.ceil(this.total * this.exchangeRate)
+      },
       tipAmountSat: function () {
         if (!this.exchangeRate) return 0
         return Math.ceil(this.tipAmount * this.exchangeRate)
@@ -479,6 +795,9 @@
       },
       fsat: function () {
         return LNbits.utils.formatSat(this.sat)
+      },
+      totalfsat: function () {
+        return LNbits.utils.formatSat(this.totalSat)
       },
       isRoundValid() {
         return this.tipRounding > this.amount
@@ -503,12 +822,77 @@
       },
       fullScreenIcon() {
         return this.isFullScreen ? 'fullscreen_exit' : 'fullscreen'
+      },
+      filteredItems() {
+        // filter out disabled items
+        let items = this.items.filter(item => !item.disabled)
+        // if searchTerm entered, filter out items that don't match
+        if (this.searchTerm) {
+          items = items.filter(item => {
+            return item.title
+              .toLowerCase()
+              .includes(this.searchTerm.toLowerCase())
+          })
+        }
+        // if categoryFilter entered, filter out items that don't match
+        if (this.categoryFilter) {
+          items = items.filter(item => {
+            return item.categories
+              .map(c => c.toLowerCase())
+              .includes(this.categoryFilter.toLowerCase())
+          })
+        }
+        return items
+      },
+      drawerWidth() {
+        return this.$q.screen.width < 500 ? 375 : 450
       }
     },
     methods: {
+      addAmount() {
+        this.total = +(this.total + this.amount).toFixed(2)
+        this.stack = []
+      },
+      cancelAddAmount() {
+        this.total = 0.0
+        this.stack = []
+      },
+      addToCart(item, quantity = 1) {
+        if (this.cart.has(item.id)) {
+          this.cart.set(item.id, {
+            ...this.cart.get(item.id),
+            quantity: this.cart.get(item.id).quantity + quantity
+          })
+        } else {
+          this.cart.set(item.id, {
+            ...item,
+            quantity: quantity
+          })
+        }
+        this.total = this.total + item.price * quantity
+      },
+      removeFromCart(item, quantity = 1) {
+        let item_quantity = this.cart.get(item.id).quantity
+        if (item_quantity == 1 || item_quantity == quantity) {
+          this.cart.delete(item.id)
+        } else {
+          this.cart.set(item.id, {
+            ...this.cart.get(item.id),
+            quantity: this.cart.get(item.id).quantity - quantity
+          })
+        }
+        this.total = this.total - item.price * quantity
+      },
+      clearCart() {
+        this.cart.clear()
+        this.total = 0.0
+      },
       atm() {
         if (this.withdrawamtposs > 0) {
           this.atmBox = true
+          if (this.atmPremium > 0) {
+            this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
+          }
         }
       },
       atmSubmit() {
@@ -538,6 +922,7 @@
             lnurl = res.data.lnurl
             dialog.data = {payment_request: lnurl}
             dialog.show = true
+            self.readNfcTag()
             dialog.dismissMsg = self.$q.notify({
               timeout: 0,
               message: 'Withdraw...'
@@ -567,8 +952,10 @@
                 self.atmToken = ''
                 self.complete.show = true
                 self.atmMode = false
+                this.connectionWithdraw.close()
               }
             }
+            this.getRates()
           })
           .catch(function (error) {
             LNbits.utils.notifyApiError(error)
@@ -612,6 +999,18 @@
         this.showInvoice()
       },
       submitForm: function () {
+        if (this.total != 0.0) {
+          this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
+        }
+        if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
+          this.$q.notify({
+            type: 'negative',
+            message:
+              'Exchange rate not available, or wrong value. Please try again later.'
+          })
+          return
+        }
+
         if (this.tip_options && this.tip_options.length) {
           this.rounding = false
           this.tipRounding = null
@@ -633,17 +1032,37 @@
           this.atmGetWithdraw()
         } else {
           var dialog = this.invoiceDialog
+          let params = {
+            amount: this.sat,
+            memo: this.amountFormatted,
+            tipAmount: this.tipAmountSat
+          }
+          if (this.cart.size) {
+            let details = [...this.cart.values()].map(item => {
+              return {
+                price: item.price,
+                formattedPrice: item.formattedPrice,
+                quantity: item.quantity,
+                title: item.title,
+                tax: item.tax
+              }
+            })
+
+            params.details = JSON.stringify({
+              currency: this.currency,
+              exchangeRate: this.exchangeRate,
+              items: details
+            })
+          }
+
           axios
             .post('/tpos/api/v1/tposs/' + this.tposId + '/invoices', null, {
-              params: {
-                amount: this.sat,
-                memo: this.amountFormatted,
-                tipAmount: this.tipAmountSat
-              }
+              params: {...params}
             })
             .then(function (response) {
               dialog.data = response.data
               dialog.show = true
+              self.readNfcTag()
 
               dialog.dismissMsg = self.$q.notify({
                 timeout: 0,
@@ -663,6 +1082,7 @@
                       clearInterval(dialog.paymentChecker)
                       dialog.dismissMsg()
                       dialog.show = false
+                      self.clearCart()
 
                       self.complete.show = true
                     }
@@ -679,11 +1099,8 @@
           const self = this
 
           if (typeof NDEFReader == 'undefined') {
-            throw {
-              toString: function () {
-                return 'NFC not supported on this device or browser.'
-              }
-            }
+            console.debug('NFC not supported on this device or browser.')
+            return
           }
 
           const ndef = new NDEFReader()
@@ -695,7 +1112,9 @@
 
           this.nfcTagReading = true
           this.$q.notify({
-            message: 'Tap your NFC tag to pay this invoice with LNURLw.'
+            message: this.atmMode
+              ? 'Tap your NFC tag to withdraw with LNURLp.'
+              : 'Tap your NFC tag to pay this invoice with LNURLw.'
           })
 
           return ndef.scan({signal: readerAbortController.signal}).then(() => {
@@ -723,7 +1142,15 @@
 
               //User feedback, show loader icon
               self.nfcTagReading = false
-              self.payInvoice(lnurl, readerAbortController)
+              if (self.atmMode) {
+                LNbits.api
+                  .request('GET', `${lnurl.replace('lnurlw://', 'https://')}`)
+                  .then(res => {
+                    self.makeWithdraw(res.data.payLink)
+                  })
+              } else {
+                self.payInvoice(lnurl, readerAbortController)
+              }
 
               this.$q.notify({
                 type: 'positive',
@@ -740,6 +1167,36 @@
               : 'An unexpected error has occurred.'
           })
         }
+      },
+      makeWithdraw(payLink, readerAbortController) {
+        if (!payLink) {
+          this.$q.notify({
+            type: 'negative',
+            message: 'LNURL not found in NFC tag.'
+          })
+          return
+        }
+        LNbits.api
+          .request(
+            'GET',
+            `/tpos/api/v1/atm/withdraw/${this.atmToken}/${this.sat}/pay?payLink=${payLink}`
+          )
+          .then(res => {
+            if (!res.data.success) {
+              this.$q.notify({
+                type: 'negative',
+                message: res.data.detail
+              })
+            } else {
+              this.stack = []
+              this.total = 0.0
+              this.$q.notify({
+                type: 'positive',
+                message: 'Topup successful!'
+              })
+            }
+            readerAbortController.abort()
+          })
       },
       payInvoice: function (lnurl, readerAbortController) {
         const self = this
@@ -803,7 +1260,31 @@
               this.isFullScreen = document.fullscreenElement
             })
           })
-          .catch(err => console.debug(err))
+          .catch(err => console.error(err))
+      },
+      handleColorScheme(val) {
+        this.$q.localStorage.set('lnbits.tpos.color', val)
+      },
+      extractCategories(items) {
+        let categories = new Set()
+        items
+          .map(item => {
+            item.categories &&
+              item.categories.forEach(category => categories.add(category))
+          })
+          .filter(Boolean)
+
+        if (categories.size) {
+          categories = ['All', ...categories]
+        }
+        return Array.from(categories)
+      },
+      handleCategoryBtn(category) {
+        if (this.categoryFilter == category) {
+          this.categoryFilter = ''
+        } else {
+          this.categoryFilter = category == 'All' ? '' : category
+        }
       }
     },
     created: function () {
@@ -817,6 +1298,60 @@
       if ('{{ tpos.tip_wallet }}') {
         this.tip_options.push('Round')
       }
+
+      this.items = JSON.parse(`{{ tpos.items | safe }}`)
+      this.items.forEach((item, id) => {
+        item.formattedPrice = LNbits.utils.formatCurrency(
+          item.price,
+          this.currency
+        )
+        item.id = id
+        return item
+      })
+      if (this.items.length > 0) {
+        this.showPoS = false
+        this.categories = this.extractCategories(this.items)
+      }
+
+      window.addEventListener('keyup', event => {
+        // do nothing if the event was already processed
+        if (event.defaultPrevented) return
+
+        // active only in the the PoS mode, not in the Cart mode or ATM pin
+        if (!this.showPoS || this.atmBox) return
+
+        const {key} = event
+        if (key >= '0' && key <= '9') {
+          // buttons 0 ... 9
+          this.stack.push(Number(key))
+        } else
+          switch (key) {
+            case 'Backspace': // button ⬅
+              this.stack.pop()
+              break
+            case 'Enter': // button OK
+              this.submitForm()
+              break
+            case 'c': // button C
+            case 'C':
+            case 'Escape':
+              if (this.total > 0.0) {
+                this.cancelAddAmount()
+              } else {
+                this.stack = []
+              }
+              break
+            case '+': // button +
+              this.addAmount()
+              break
+            default:
+              // return if we didn't handle anything
+              return
+          }
+
+        // cancel the default action to avoid it being handled twice
+        event.preventDefault()
+      })
 
       setInterval(function () {
         getRates()

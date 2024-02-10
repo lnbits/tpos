@@ -9,9 +9,8 @@ from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
 from lnbits.settings import settings
 
-from loguru import logger
 from . import tpos_ext, tpos_renderer
-from .crud import get_tpos, get_clean_tpos
+from .crud import get_clean_tpos
 
 templates = Jinja2Templates(directory="templates")
 
@@ -30,7 +29,6 @@ async def tpos(request: Request, tpos_id):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
-
     return tpos_renderer().TemplateResponse(
         "tpos/tpos.html",
         {

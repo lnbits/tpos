@@ -87,3 +87,22 @@ async def m005_initial(db):
         );
     """
     )
+
+
+async def m006_items(db):
+    """
+    Add items to tpos table for storing various items (JSON format)
+    See `Item` class in models.
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD items TEXT DEFAULT '[]';
+        """
+    )
+
+
+async def m007_atm_premium(db):
+    """
+    Add a premium % to ATM withdraws
+    """
+    await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawpremium FLOAT;")

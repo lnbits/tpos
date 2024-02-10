@@ -1,4 +1,5 @@
 from http import HTTPStatus
+import json
 
 import httpx
 from fastapi import Depends, Query, Request
@@ -12,7 +13,6 @@ from lnbits.core.services import create_invoice
 from lnbits.core.views.api import api_payment
 from lnbits.decorators import (
     WalletTypeInfo,
-    check_admin,
     get_key_type,
     require_admin_key,
 )
@@ -29,7 +29,7 @@ from .crud import (
     get_lnurlcharge,
     update_lnurlcharge,
 )
-from .models import CreateTposData, PayLnurlWData, LNURLCharge
+from .models import CreateTposData, PayLnurlWData, LNURLCharge, CreateUpdateItemData
 
 
 @tpos_ext.get("/api/v1/tposs", status_code=HTTPStatus.OK)
@@ -45,7 +45,7 @@ async def api_tposs(
 
 @tpos_ext.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
 async def api_tpos_create(
-    data: CreateTposData, wallet: WalletTypeInfo = Depends(get_key_type)
+    data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
 ):
     tpos = await create_tpos(wallet_id=wallet.wallet.id, data=data)
     return tpos.dict()
@@ -90,7 +90,11 @@ async def api_tpos_delete(
 
 @tpos_ext.post("/api/v1/tposs/{tpos_id}/invoices", status_code=HTTPStatus.CREATED)
 async def api_tpos_create_invoice(
-    tpos_id: str, amount: int = Query(..., ge=1), memo: str = "", tipAmount: int = 0
+    tpos_id: str,
+    amount: int = Query(..., ge=1),
+    memo: str = "",
+    tipAmount: int = 0,
+    details: str = Query(None),
 ) -> dict:
     tpos = await get_tpos(tpos_id)
 
@@ -112,6 +116,7 @@ async def api_tpos_create_invoice(
                 "tipAmount": tipAmount,
                 "tposId": tpos_id,
                 "amount": amount - tipAmount if tipAmount else False,
+                "details": details if details else None,
             },
         )
     except Exception as e:
@@ -233,9 +238,68 @@ async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
     if int(tpos.withdrawpin) != int(atmpin):
-        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wrong pin.")
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wrong PIN.")
     token = await start_lnurlcharge(tpos_id)
     return token
+
+
+@tpos_ext.get("/api/v1/atm/withdraw/{k1}/{amount}/pay", status_code=HTTPStatus.OK)
+async def api_tpos_atm_pay(
+    request: Request, k1: str, amount: int, payLink: str = Query(...)
+):
+    try:
+        # get the payment_request from the lnurl
+        payLink = payLink.replace("lnurlp://", "https://")
+        logger.debug(payLink)
+        async with httpx.AsyncClient() as client:
+            headers = {"user-agent": f"lnbits/tpos"}
+            r = await client.get(payLink, follow_redirects=True, headers=headers)
+            if r.is_error:
+                return {"success": False, "detail": "Error loading"}
+            resp = r.json()
+
+            amount = amount * 1000  # convert to msats
+
+            if resp["tag"] != "payRequest":
+                return {"success": False, "detail": "Wrong tag type"}
+
+            if amount < resp["minSendable"]:
+                return {"success": False, "detail": "Amount too low"}
+
+            if amount > resp["maxSendable"]:
+                return {"success": False, "detail": "Amount too high"}
+
+            cb_res = await client.get(
+                resp["callback"],
+                follow_redirects=True,
+                headers=headers,
+                params={"amount": amount},
+            )
+            cb_resp = cb_res.json()
+            if cb_res.is_error:
+                return {"success": False, "detail": "Error loading callback"}
+
+            # pay the invoice
+            lnurl_cb_url = str(request.url_for("tpos.tposlnurlcharge.callback"))
+            pay_invoice = await client.get(
+                lnurl_cb_url,
+                params={"pr": cb_resp["pr"], "k1": k1},
+            )
+            if pay_invoice.status_code != 200:
+                return {"success": False, "detail": "Error paying invoice"}
+            return {"success": True, "detail": "Payment successful"}
+
+    except AssertionError as ex:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail=str(ex),
+        )
+    except Exception as ex:
+        logger.warning(ex)
+        raise HTTPException(
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail="Cannot process atm withdraw",
+        )
 
 
 @tpos_ext.get(
@@ -270,3 +334,23 @@ async def api_check_fiat_rate(currency):
         rate = None
 
     return {"rate": rate}
+
+
+## ITEMS
+@tpos_ext.put("/api/v1/tposs/{tpos_id}/items", status_code=HTTPStatus.CREATED)
+async def api_tpos_create_items(
+    data: CreateUpdateItemData,
+    tpos_id: str,
+    wallet: WalletTypeInfo = Depends(require_admin_key),
+):
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+    if wallet.wallet.id != tpos.wallet:
+        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
+
+    items = json.dumps(data.dict()["items"])
+    tpos = await update_tpos(tpos_id=tpos_id, items=items)
+    return tpos.dict()

@@ -1,5 +1,5 @@
 from sqlite3 import Row
-from typing import Optional, Any
+from typing import Optional, Any, List
 
 from fastapi import Request
 from lnurl import Lnurl, LnurlWithdrawResponse
@@ -19,6 +19,7 @@ class CreateTposData(BaseModel):
     withdrawamt: int = Field(None, ge=0)
     withdrawtime: int = Field(0)
     withdrawbtwn: int = Field(10, ge=1)
+    withdrawpremium: float = Field(None)
 
 
 class TPoS(BaseModel):
@@ -33,6 +34,8 @@ class TPoS(BaseModel):
     withdrawamt: int
     withdrawtime: int
     withdrawbtwn: int
+    withdrawpremium: Optional[float]
+    items: Optional[str]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoS":
@@ -52,6 +55,8 @@ class TPoSClean(BaseModel):
     withdrawamt: int
     withdrawtime: int
     withdrawbtwn: int
+    withdrawpremium: Optional[float]
+    items: Optional[str]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoSClean":
@@ -102,3 +107,17 @@ class HashCheck(BaseModel):
 
 class PayLnurlWData(BaseModel):
     lnurl: str
+
+
+class Item(BaseModel):
+    image: Optional[str]
+    price: float
+    title: str
+    description: Optional[str]
+    tax: Optional[float] = 0.0
+    disabled: bool = False
+    categories: Optional[List[str]] = []
+
+
+class CreateUpdateItemData(BaseModel):
+    items: List[Item]
