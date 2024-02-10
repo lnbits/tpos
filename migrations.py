@@ -108,15 +108,10 @@ async def m007_atm_premium(db):
     await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawpremium FLOAT;")
 
 
-async def m008_atm_premium(db):
+    
+async def m008_atm_time_option_and_pin_toggle(db):
     """
-    Add a premium % to ATM withdraws
+    Add a time mins/sec and pin toggle
     """
     await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawtimeopt TEXT DEFAULT 'mins';")
-
-
-async def m009_atm_premium(db):
-    """
-    Add a premium % to ATM withdraws
-    """
-    await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawpindisabled BOOLEAN DEFAULT false;")
+    await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawpindisabled BOOLEAN NOT NULL DEFAULT false;")
