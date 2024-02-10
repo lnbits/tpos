@@ -238,7 +238,7 @@
                 label="Time between withdraws"></q-input>
             </div>
             <div class="col-4">
-              <q-option-group v-model="formDialog.data.withdrawtime" :options="withdrawoptions" color="primary"
+              <q-option-group v-model="formDialog.data.withdrawtimeopt" :options="withdrawoptions" color="primary"
                 inline></q-option-group>
             </div>
           </div>
@@ -543,7 +543,9 @@
               align: 'left',
               label: 'Currency',
               field: 'currency'
-            }
+            },
+            { name: 'withdrawtimeopt', align: 'left', label: 'mins/sec', field: 'withdrawtimeopt' },
+            { name: 'withdrawpindisabled', align: 'left', label: 'atm pin disabled', field: 'withdrawpindisabled' },
           ],
           pagination: {
             rowsPerPage: 10
@@ -565,8 +567,8 @@
             withdrawpin: null,
             tip_options: [],
             withdrawbtwn: 10,
-            withdrawbtime: '',
-            withdrawpindisabled: false,
+            withdrawtimeopt: '',
+            withdrawpindisabled: false
           },
           advanced: {
             tips: false,
