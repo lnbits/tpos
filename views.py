@@ -10,7 +10,7 @@ from lnbits.decorators import check_user_exists
 from lnbits.settings import settings
 
 from . import tpos_ext, tpos_renderer
-from .crud import get_clean_tpos
+from .crud import get_clean_tpos, get_tpos
 
 templates = Jinja2Templates(directory="templates")
 
@@ -29,11 +29,20 @@ async def tpos(request: Request, tpos_id):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
+    withdrawpinopen = 0
+    if tpos.withdrawpindisabled:
+        tposDirty = await get_tpos(tpos_id)
+        if not tposDirty:
+            raise HTTPException(
+                status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+            )
+        withdrawpinopen = tposDirty.withdrawpin
     return tpos_renderer().TemplateResponse(
         "tpos/tpos.html",
         {
             "request": request,
             "tpos": tpos,
+            "withdrawpinopen": withdrawpinopen,
             "withdrawamtposs": tpos.withdrawamtposs,
             "web_manifest": f"/tpos/manifest/{tpos_id}.webmanifest",
         },

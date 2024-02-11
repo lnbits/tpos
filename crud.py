@@ -21,8 +21,8 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
     tpos_id = urlsafe_short_hash()
     await db.execute(
         """
-        INSERT INTO tpos.pos (id, wallet, name, currency, tip_options, tip_wallet, withdrawlimit, withdrawpin, withdrawamt, withdrawtime, withdrawbtwn)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO tpos.pos (id, wallet, name, currency, tip_options, tip_wallet, withdrawlimit, withdrawpin, withdrawamt, withdrawtime, withdrawbtwn, withdrawtimeopt, withdrawpindisabled)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             tpos_id,
@@ -36,6 +36,8 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
             0,
             0,
             data.withdrawbtwn,
+            data.withdrawtimeopt,
+            data.withdrawpindisabled,
         ),
     )
     tpos = await get_tpos(tpos_id)
@@ -53,7 +55,9 @@ async def start_lnurlcharge(tpos_id: str):
     assert tpos, f"TPoS with {tpos_id} not found!"
 
     now = await get_current_timestamp()
-    withdraw_time_seconds = tpos.withdrawbtwn * 60
+    withdraw_time_seconds = (
+        tpos.withdrawbtwn * 60 if tpos.withdrawtimeopt != "secs" else tpos.withdrawbtwn
+    )
     assert (
         now - tpos.withdrawtime > withdraw_time_seconds
     ), f"Last withdraw was made too recently, please try again in {int(withdraw_time_seconds - (now - tpos.withdrawtime))} secs"
@@ -105,7 +109,9 @@ async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
     # Calculate the time between withdrawals in seconds
     now = await get_current_timestamp()
     time_elapsed = now - data.withdrawtime
-    withdraw_time_seconds = data.withdrawbtwn * 60
+    withdraw_time_seconds = (
+        data.withdrawbtwn * 60 if data.withdrawtimeopt != "secs" else data.withdrawbtwn
+    )
 
     logger.debug(f"Time between: {time_elapsed} seconds")
 
