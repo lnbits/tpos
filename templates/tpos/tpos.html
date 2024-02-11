@@ -25,10 +25,16 @@
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
           <h3 class="q-mb-md">${ amountFormatted }</h3>
-          <h5 class="q-mt-none q-mb-sm">${ fsat }<small> sat</small></h5>
+          <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
+            ${ fsat }<small> sat</small>
+          </h5>
           <div v-if="total > 0.0">
             <h5>
-              <i>Total: ${totalFormatted}<br />${totalfsat} sat</i>
+              <i
+                >Total: ${totalFormatted}<span v-if="!denomIsSats"
+                  ><br />${totalfsat} sat</span
+                ></i
+              >
             </h5>
           </div>
         </div>
@@ -220,7 +226,9 @@
         <div class="row full-width q-pa-md">
           <div class="col-12 text-center">
             <h3 class="q-mb-md">${totalFormatted}</h3>
-            <h5 class="q-mt-none q-mb-sm">${totalfsat}<small> sat</small></h5>
+            <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
+              ${totalfsat}<small> sat</small>
+            </h5>
           </div>
           <div class="col-12">
             <table class="table full-width">
@@ -756,28 +764,26 @@
         cartDrawer: this.$q.screen.width > 1200,
         searchTerm: '',
         categoryFilter: '',
-        cart: new Map()
+        cart: new Map(),
+        denomIsSats: '{{ tpos.currency }}' == 'sats'
       }
     },
     computed: {
       amount: function () {
         if (!this.stack.length) return 0.0
-        return this.stack.reduce((acc, dig) => acc * 10 + dig, 0) * 0.01
+        return (
+          this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
+          (this.currency == 'sats' ? 1 : 0.01)
+        )
       },
       amountFormatted: function () {
-        return LNbits.utils.formatCurrency(
-          this.amount.toFixed(2),
-          this.currency
-        )
+        return this.formatAmount(this.amount, this.currency)
       },
       totalFormatted() {
-        return LNbits.utils.formatCurrency(this.total.toFixed(2), this.currency)
+        return this.formatAmount(this.total, this.currency)
       },
       amountWithTipFormatted: function () {
-        return LNbits.utils.formatCurrency(
-          (this.amount + this.tipAmount).toFixed(2),
-          this.currency
-        )
+        return this.formatAmount(this.amount + this.tipAmount, this.currency)
       },
       sat: function () {
         if (!this.exchangeRate) return 0
@@ -1006,7 +1012,11 @@
       },
       submitForm: function () {
         if (this.total != 0.0) {
-          this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
+          if (this.currency == 'sats') {
+            this.stack = Array.from(String(Math.ceil(this.total), Number))
+          } else {
+            this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
+          }
         }
         if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
           this.$q.notify({
@@ -1235,12 +1245,16 @@
           })
       },
       getRates() {
-        LNbits.api
-          .request('GET', `/tpos/api/v1/rate/${this.currency}`)
-          .then(response => {
-            this.exchangeRate = response.data.rate
-          })
-          .catch(e => console.error(e))
+        if (this.currency == 'sats') {
+          this.exchangeRate = 1
+        } else {
+          LNbits.api
+            .request('GET', `/tpos/api/v1/rate/${this.currency}`)
+            .then(response => {
+              this.exchangeRate = response.data.rate
+            })
+            .catch(e => console.error(e))
+        }
       },
       getLastPayments() {
         return axios
@@ -1296,6 +1310,16 @@
         } else {
           this.categoryFilter = category == 'All' ? '' : category
         }
+      },
+      formatAmount: function (amount, currency) {
+        if (currency == 'sats') {
+          return LNbits.utils.formatSat(amount) + ' sat'
+        } else {
+          return LNbits.utils.formatCurrency(
+            Number(amount).toFixed(2),
+            currency
+          )
+        }
       }
     },
     created: function () {
@@ -1313,10 +1337,7 @@
 
       this.items = JSON.parse(`{{ tpos.items | safe }}`)
       this.items.forEach((item, id) => {
-        item.formattedPrice = LNbits.utils.formatCurrency(
-          item.price,
-          this.currency
-        )
+        item.formattedPrice = this.formatAmount(item.price, this.currency)
         item.id = id
         return item
       })

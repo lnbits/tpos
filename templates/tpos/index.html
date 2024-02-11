@@ -361,6 +361,7 @@
       return {
         tposs: [],
         currencyOptions: [
+          'sats',
           'USD',
           'EUR',
           'GBP',
@@ -938,10 +939,7 @@
           id: tpos.wallet
         })
         data.forEach(item => {
-          item.formattedPrice = LNbits.utils.formatCurrency(
-            Number(item.price).toFixed(2),
-            tpos.currency
-          )
+          item.formattedPrice = this.formatAmount(item.price, tpos.currency)
         })
         this.fileDataDialog.data = data
         this.fileDataDialog.count = data.length
@@ -958,6 +956,16 @@
       openUrlDialog(id) {
         this.urlDialog.data = _.findWhere(this.tposs, { id })
         this.urlDialog.show = true
+      },
+      formatAmount: function (amount, currency) {
+        if (currency == 'sats') {
+          return LNbits.utils.formatSat(amount) + ' sat'
+        } else {
+          return LNbits.utils.formatCurrency(
+            Number(amount).toFixed(2),
+            currency
+          )
+        }
       }
     },
     created: function () {
