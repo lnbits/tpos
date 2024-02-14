@@ -217,11 +217,11 @@
         </template>
         <template v-if="formDialog.advanced.otc">
           <q-input filled dense v-model.number="formDialog.data.withdrawlimit" type="number"
-            label="Max amount to be sold daily (sats)"></q-input>
+            label="Max amount to be sold daily (sats) *"></q-input>
 
           <div class="row">
             <div class="col-8">
-              <q-input filled dense v-model.number="formDialog.data.withdrawpin" type="number" label="Withdraw PIN"
+              <q-input filled dense v-model.number="formDialog.data.withdrawpin" type="number" label="Withdraw PIN *"
                 :disable="formDialog.data.withdrawpindisabled"></q-input>
             </div>
             <div class="col-4">
