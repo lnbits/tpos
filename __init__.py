@@ -5,7 +5,7 @@ from fastapi.routing import APIRoute
 
 from lnbits.db import Database
 from lnbits.helpers import template_renderer
-from lnbits.tasks import catch_everything_and_restart
+from lnbits.tasks import create_permanent_task
 from typing import Callable
 from fastapi.responses import JSONResponse
 
@@ -55,6 +55,12 @@ from .views import *  # noqa
 from .views_api import *  # noqa
 
 
+scheduled_tasks: list[asyncio.Task] = []
+
+def tpos_stop():
+    for task in scheduled_tasks:
+        task.cancel()
+
 def tpos_start():
-    loop = asyncio.get_event_loop()
-    loop.create_task(catch_everything_and_restart(wait_for_paid_invoices))
+    task = create_permanent_task(wait_for_paid_invoices)
+    scheduled_tasks.append(task)
