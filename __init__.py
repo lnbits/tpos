@@ -59,7 +59,10 @@ scheduled_tasks: list[asyncio.Task] = []
 
 def tpos_stop():
     for task in scheduled_tasks:
-        task.cancel()
+        try:
+            task.cancel()
+        except Exception as ex:
+            logger.warning(ex)
 
 def tpos_start():
     task = create_permanent_task(wait_for_paid_invoices)
