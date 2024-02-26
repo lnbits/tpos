@@ -957,7 +957,7 @@
                 self.atmToken
             }
             this.connectionWithdraw = new WebSocket(self.withdrawUrl)
-            this.connectionWithdraw.onmessage = function (e) {
+            this.connectionWithdraw.onmessage = (e) => {
               if (e.data == 'paid') {
                 dialog.show = false
                 self.atmPin = null
