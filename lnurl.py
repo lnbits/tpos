@@ -2,8 +2,7 @@ from http import HTTPStatus
 from fastapi import Request
 from typing import Optional
 from starlette.exceptions import HTTPException
-from lnbits.core.services import websocketUpdater
-from lnbits.core.views.api import pay_invoice
+from lnbits.core.services import websocketUpdater, pay_invoice
 
 from . import tpos_ext
 from .crud import get_tpos, get_lnurlcharge, update_lnurlcharge, update_tpos_withdraw
