@@ -12,8 +12,8 @@ class CreateTposData(BaseModel):
     wallet: Optional[str]
     name: Optional[str]
     currency: Optional[str]
-    tip_options: str = Field(None)
-    tip_wallet: str = Field(None)
+    tip_options: str = Field("[]")
+    tip_wallet: str = Field("")
     withdrawlimit: int = Field(None, ge=1)
     withdrawpin: int = Field(None, ge=1)
     withdrawamt: int = Field(None, ge=0)
