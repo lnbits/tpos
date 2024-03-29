@@ -806,9 +806,6 @@
       totalfsat: function () {
         return LNbits.utils.formatSat(this.totalSat)
       },
-      isRoundValid() {
-        return this.tipRounding > this.amount
-      },
       roundToSugestion() {
         switch (true) {
           case this.amount > 50:
