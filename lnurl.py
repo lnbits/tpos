@@ -2,7 +2,7 @@ from http import HTTPStatus
 from fastapi import Request
 from typing import Optional
 from starlette.exceptions import HTTPException
-from lnbits.core.services import websocketUpdater, pay_invoice
+from lnbits.core.services import websocket_updater, pay_invoice
 
 from . import tpos_ext
 from .crud import get_tpos, get_lnurlcharge, update_lnurlcharge, update_tpos_withdraw
@@ -106,7 +106,7 @@ async def lnurl_callback(
             max_sat=int(lnurlcharge.amount),
             extra={"tag": "TPoSWithdraw", "tpos_id": lnurlcharge.tpos_id},
         )
-        await websocketUpdater(k1, "paid")
+        await websocket_updater(k1, "paid")
     except Exception as e:
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST, detail=f"withdraw not working. {str(e)}"
