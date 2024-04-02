@@ -39,6 +39,15 @@
           </div>
         </div>
       </div>
+      <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
+        <q-btn
+          @click="() => {atmMode = false; getRates()}"
+          v-if="atmMode == true"
+          rounded
+          color="negative"
+          >EXIT ATM</div
+        >
+      </div>
     </q-page-sticky>
     <template v-if="showPoS">
       <q-page-sticky expand position="bottom">
@@ -197,7 +206,7 @@
       <q-page-sticky position="top-right" :offset="[18, 162]">
         <q-btn
           @click="atm"
-          v-if="withdrawamtposs > 0"
+          v-if="withdrawamtposs > 0 && !atmMode"
           fab
           icon="atm"
           color="primary"
@@ -412,13 +421,6 @@
         ></q-page-sticky
       >
     </template>
-    <q-btn
-      v-show="atmMode"
-      color="negative"
-      @click="() => {atmMode = false; getRates()}"
-      class="absolute-top-left"
-      >EXIT ATM MODE</q-btn
-    >
     <q-dialog
       v-model="invoiceDialog.show"
       position="top"
