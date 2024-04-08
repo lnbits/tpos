@@ -808,9 +808,6 @@
       totalfsat: function () {
         return LNbits.utils.formatSat(this.totalSat)
       },
-      isRoundValid() {
-        return this.tipRounding > this.amount
-      },
       roundToSugestion() {
         switch (true) {
           case this.amount > 50:
@@ -959,7 +956,7 @@
                 self.atmToken
             }
             this.connectionWithdraw = new WebSocket(self.withdrawUrl)
-            this.connectionWithdraw.onmessage = (e) => {
+            this.connectionWithdraw.onmessage = e => {
               if (e.data == 'paid') {
                 dialog.show = false
                 self.atmPin = null
@@ -1354,6 +1351,9 @@
 
         // active only in the the PoS mode, not in the Cart mode or ATM pin
         if (!this.showPoS || this.atmBox) return
+
+        // prevent weird behaviour when setting round tip
+        if (this.tipDialog.show) return
 
         const {key} = event
         if (key >= '0' && key <= '9') {
