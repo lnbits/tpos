@@ -288,7 +288,11 @@
                     </div>
                   </td>
                   <td>
-                    <span class="text-center">${item.formattedPrice}</span>
+                    <div class="text-center">
+                      <span v-if="item.tax && !taxInclusive">${item.formattedPrice} + <span style="font-size: 75%;">${item.tax}%</span></span>
+                      <span v-else>${item.formattedPrice}</span>
+                    </div>
+                    
                   </td>
                   <td>
                     <q-btn
@@ -369,7 +373,13 @@
 
             <q-card-section class="q-mt-auto">
               <div class="text-h6">${item.title}</div>
-              <div class="text-subtitle1">${item.formattedPrice}</div>
+              <div class="text-subtitle1">
+                ${item.formattedPrice}
+                <span v-if="item.tax" class="text-caption"
+                  > (tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax}%)
+                    </span
+                >
+              </div>
               <div
                 v-if="item.description"
                 class="text-caption ellipsis-2-lines q-py-sm"
@@ -875,7 +885,8 @@
             quantity: quantity
           })
         }
-        this.total = this.total + item.price * quantity
+        this.total = this.total + this.calculateItemPrice(item, quantity)
+        // this.total = this.total + item.price * quantity
       },
       removeFromCart(item, quantity = 1) {
         let item_quantity = this.cart.get(item.id).quantity
@@ -887,7 +898,14 @@
             quantity: this.cart.get(item.id).quantity - quantity
           })
         }
-        this.total = this.total - item.price * quantity
+        // this.total = this.total - item.price * quantity
+        this.total = this.total - this.calculateItemPrice(item, quantity)
+      },
+      calculateItemPrice(item, qty){        
+        if(!item.tax || this.taxInclusive) return item.price * qty
+
+        // add tax to price
+        return item.price * (1 + item.tax * 0.01) * qty
       },
       clearCart() {
         this.cart.clear()
@@ -1325,6 +1343,8 @@
       var getRates = this.getRates
       getRates()
       this.pinDisabled = JSON.parse('{{ tpos.withdrawpindisabled | tojson }}')
+      this.taxInclusive = JSON.parse('{{ tpos.tax_inclusive | tojson }}')
+      
       this.tip_options =
         '{{ tpos.tip_options | tojson }}' == 'null'
           ? null
