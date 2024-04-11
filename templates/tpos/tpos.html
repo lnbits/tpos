@@ -350,8 +350,8 @@
         <template v-for="category in Array.from(categories.values())">
           <q-btn
             color="secondary"
-            size="lg"
-            padding="lg"
+            :size="$q.screen.gt.sm ? 'lg' : 'md'"
+            :padding="$q.screen.gt.sm ? 'lg' : 'md'"
             :label="category"
             @click="handleCategoryBtn(category)"
             :outline="!(categoryFilter === category || (categoryFilter === '' && category === 'All'))"
@@ -360,7 +360,7 @@
       </div>
       <div class="row q-col-gutter-md q-pa-md">
         <div
-          class="col-12 col-sm-6 col-md-4 col-lg-3"
+          class="col-6 col-md-4 col-lg-3"
           v-for="item in filteredItems"
           :key="item.name"
         >
@@ -1084,7 +1084,8 @@
             params.details = JSON.stringify({
               currency: this.currency,
               exchangeRate: this.exchangeRate,
-              items: details
+              items: details,
+              taxIncluded: this.taxInclusive,
             })
           }
 
