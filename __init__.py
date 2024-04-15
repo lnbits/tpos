@@ -5,7 +5,7 @@ from fastapi.routing import APIRoute
 
 from lnbits.db import Database
 from lnbits.helpers import template_renderer
-from lnbits.tasks import create_permanent_task
+from lnbits.tasks import create_permanent_unique_task
 from typing import Callable
 from fastapi.responses import JSONResponse
 
@@ -65,5 +65,5 @@ def tpos_stop():
             logger.warning(ex)
 
 def tpos_start():
-    task = create_permanent_task(wait_for_paid_invoices)
+    task = create_permanent_unique_task("ext_tpos", wait_for_paid_invoices)
     scheduled_tasks.append(task)
