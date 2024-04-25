@@ -20,7 +20,20 @@
       "role": "Developer"
     }
   ],
-  "images": [],
+  "images": [
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/1.png"
+    },
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/2.png"
+    },
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/3.png"
+    },
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/4.png"
+    }
+  ],
   "description_md": "https://raw.githubusercontent.com/lnbits/tpos/main/description.md",
   "terms_and_conditions_md": "https://raw.githubusercontent.com/tpos/lnurldevice/main/toc.md",
   "license": "MIT"
