@@ -2,6 +2,44 @@
   "name": "TPoS",
   "short_description": "A shareable PoS terminal!",
   "tile": "/tpos/static/image/tpos.png",
-  "contributors": ["talvasconcelos", "arcbtc", "leesalminen"],
-  "min_lnbits_version": "0.12.6"
+  "min_lnbits_version": "0.12.6",
+  "contributors": [
+    {
+      "name": "Ben Arc",
+      "uri": "mailto:ben@lnbits.com",
+      "role": "Developer"
+    },
+    {
+      "name": "talvasconcelos",
+      "uri": "https://github.com/talvasconcelos",
+      "role": "Developer"
+    },
+    {
+      "name": "Yvette",
+      "uri": "https://github.com/arbadacarbaYK",
+      "role": "Contributor"
+    },
+    {
+      "name": "leesalminen",
+      "uri": "https://github.com/leesalminen",
+      "role": "Developer"
+    }
+  ],
+  "images": [
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/1.png"
+    },
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/2.png"
+    },
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/3.png"
+    },
+    {
+      "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/4.png"
+    }
+  ],
+  "description_md": "https://raw.githubusercontent.com/lnbits/tpos/main/description.md",
+  "terms_and_conditions_md": "https://raw.githubusercontent.com/lnbits/tpos/main/toc.md",
+  "license": "MIT"
 }
