@@ -465,14 +465,33 @@
                 Tax Exclusive means tax is applied on top of the unit price.
               </q-card-section>
               <q-card-section>
-                <q-toggle
-                  v-model="formDialog.data.tax_inclusive"
-                  :label="formDialog.data.tax_inclusive ? 
-                                'Tax Inclusive' :
-                                'Tax Exclusive'"
-                  ><q-tooltip>
-                    <span v-text="'Applies to all products'"></span> </q-tooltip
-                ></q-toggle>
+                <div class="row q-mt-lg">
+                  <div class="col-12 col-md-6">
+                    <q-toggle
+                      v-model="formDialog.data.tax_inclusive"
+                      :label="formDialog.data.tax_inclusive ? 
+                                  'Tax Inclusive' :
+                                  'Tax Exclusive'"
+                      ><q-tooltip>
+                        <span
+                          v-text="'Applies to all products'"
+                        ></span> </q-tooltip
+                    ></q-toggle>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <q-input
+                      filled
+                      dense
+                      v-model.number="formDialog.data.tax_default"
+                      type="number"
+                      label="Default tax rate"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      hint="Fallback tax rate if not set on product"
+                    ></q-input>
+                  </div>
+                </div>
               </q-card-section>
             </q-card>
           </q-expansion-item>
@@ -879,7 +898,8 @@
             tip_options: [],
             withdrawbtwn: 10,
             withdrawtimeopt: '',
-            withdrawpindisabled: false
+            withdrawpindisabled: false,
+            tax_inclusive: true
           },
           advanced: {
             tips: false,
@@ -995,6 +1015,7 @@
             self.tposs = response.data.map(function (obj) {
               return mapTPoS(obj)
             })
+            console.log(self.tposs)
           })
       },
       sendTPosData() {

@@ -45,7 +45,7 @@
           v-if="atmMode == true"
           rounded
           color="negative"
-          >EXIT ATM</div
+          >EXIT ATM</q-btn
         >
       </div>
     </q-page-sticky>
@@ -234,22 +234,17 @@
       >
         <div class="row full-width q-pa-md">
           <div class="absolute-top-right q-pa-md">
-            <q-btn
-            @click="cartDrawer = !cartDrawer"
-            icon="close"
-            flat
-            round
-            ><q-tooltip
-              >Hide Cart</q-tooltip
-            ></q-btn>
-          </div>          
+            <q-btn @click="cartDrawer = !cartDrawer" icon="close" flat round
+              ><q-tooltip>Hide Cart</q-tooltip></q-btn
+            >
+          </div>
           <div class="col-12 text-center">
             <h3 class="q-mb-md">${totalFormatted}</h3>
             <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
               ${totalfsat}<small> sat</small>
             </h5>
           </div>
-          <div class="col-12">
+          <div class="col-12" style="max-height: 60vh; overflow-y: auto">
             <table class="table full-width">
               <colgroup>
                 <col width="50%" />
@@ -299,10 +294,8 @@
                   </td>
                   <td>
                     <div class="text-center">
-                      <span v-if="item.tax && !taxInclusive">${item.formattedPrice} + <span style="font-size: 75%;">${item.tax}%</span></span>
-                      <span v-else>${item.formattedPrice}</span>
+                      <span>${item.formattedPrice}</span>
                     </div>
-                    
                   </td>
                   <td>
                     <q-btn
@@ -319,6 +312,25 @@
           </div>
         </div>
         <div class="row q-col-gutter-md q-pa-md absolute-bottom q-mb-lg">
+          <div v-if="total > 0" class="col-12">
+            <q-list dense padding class="rounded-borders">
+              <q-item>
+                <q-item-section> Subtotal </q-item-section>
+                <q-item-section side v-text="taxSubtotal"></q-item-section>
+              </q-item>
+              <q-item>
+                <q-item-section
+                  v-text="`Tax ${taxInclusive ? '(incl.)' : ''}`"
+                ></q-item-section>
+                <q-item-section side v-text="formattedCartTax"></q-item-section>
+              </q-item>
+              <q-separator></q-separator>
+              <q-item>
+                <q-item-section> Total </q-item-section>
+                <q-item-section side> ${totalFormatted} </q-item-section>
+              </q-item>
+            </q-list>
+          </div>
           <div class="col-12 col-sm-6">
             <q-btn
               class="full-width"
@@ -369,7 +381,6 @@
       </div>
       <div v-if="$q.screen.gt.sm" class="row q-col-gutter-md q-pa-md">
         <div
-          
           class="col-6 col-md-4 col-lg-3"
           v-for="item in filteredItems"
           :key="item.name"
@@ -385,10 +396,10 @@
               <div class="text-h6">${item.title}</div>
               <div class="text-subtitle1">
                 ${item.formattedPrice}
-                <span v-if="item.tax" class="text-caption"
-                  > (tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax}%)
-                    </span
-                >
+                <span v-if="item.tax || taxDefault" class="text-caption">
+                  (tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax ||
+                  taxDefault}%)
+                </span>
               </div>
               <div
                 v-if="item.description"
@@ -407,13 +418,13 @@
         </div>
       </div>
       <div v-else class="q-pa-md">
-        <item-list 
-          :items="filteredItems" 
-          :inclusive="taxInclusive" 
-          :format="formatAmount" 
+        <item-list
+          :items="filteredItems"
+          :inclusive="taxInclusive"
+          :format="formatAmount"
           :currency="currency"
           @add-product="addToCart"
-          >
+        >
         </item-list>
       </div>
       <q-page-sticky position="bottom-right" :offset="[18, 18]">
@@ -513,15 +524,18 @@
   tpos.withdrawpremium = Number('{{ tpos.withdrawpremium }}') / 100
   tpos.withdrawamtposs = Number('{{ tpos.withdrawamtposs }}')
   tpos.items = JSON.parse('{{ tpos.items | safe }}')
-  tpos.tip_options = '{{ tpos.tip_options | tojson }}' == 'null'
-          ? null
-          : JSON.parse('{{ tpos.tip_options }}')
+  tpos.tip_options =
+    '{{ tpos.tip_options | tojson }}' == 'null'
+      ? null
+      : JSON.parse('{{ tpos.tip_options }}')
   tpos.tip_wallet = '{{ tpos.tip_wallet }}'
-  tpos.withdrawpindisabled = JSON.parse('{{ tpos.withdrawpindisabled | tojson }}')
+  tpos.withdrawpindisabled = JSON.parse(
+    '{{ tpos.withdrawpindisabled | tojson }}'
+  )
   tpos.tax_inclusive = JSON.parse('{{ tpos.tax_inclusive | tojson }}')
-  
+  tpos.tax_default = Number('{{ tpos.tax_default }}')
+
   const withdrawpinopen = Number('{{ withdrawpinopen }}')
-  
 </script>
 
 <script src="{{ url_for('tpos_static', path='js/tpos.js') }}"></script>

@@ -127,3 +127,4 @@ async def m009_tax_inclusive(db):
     await db.execute(
         "ALTER TABLE tpos.pos ADD COLUMN tax_inclusive BOOL NOT NULL DEFAULT true;"
     )
+    await db.execute("ALTER TABLE tpos.pos ADD COLUMN tax_default FLOAT;")

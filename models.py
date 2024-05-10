@@ -23,6 +23,7 @@ class CreateTposData(BaseModel):
     withdrawpremium: float = Field(None)
     withdrawpindisabled: bool = Field(False)
     tax_inclusive: bool = Field(True)
+    tax_default: float = Field(None)
 
 
 class TPoSClean(BaseModel):
@@ -39,6 +40,7 @@ class TPoSClean(BaseModel):
     withdrawpindisabled: Optional[bool]
     items: Optional[str]
     tax_inclusive: bool
+    tax_default: Optional[float]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoSClean":

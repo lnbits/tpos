@@ -48,6 +48,7 @@ const tposJS = async () => {
         rounding: false,
         isFullScreen: false,
         total: 0.0,
+        cartTax: 0.0,
         itemsTable: {
           filter: '',
           columns: [
@@ -184,6 +185,14 @@ const tposJS = async () => {
       },
       drawerWidth() {
         return this.$q.screen.width < 500 ? 375 : 450
+      },
+      formattedCartTax(){
+        return this.formatAmount(this.cartTax, this.currency)
+      },
+      taxSubtotal(){
+        if (this.taxInclusive) return this.totalFormatted
+        return this.formatAmount(this.total - this.cartTax, this.currency)
+
       }
     },
     methods: {
@@ -208,7 +217,7 @@ const tposJS = async () => {
           })
         }
         this.total = this.total + this.calculateItemPrice(item, quantity)
-        // this.total = this.total + item.price * quantity
+        this.cartTaxTotal()
       },
       removeFromCart(item, quantity = 1) {
         let item_quantity = this.cart.get(item.id).quantity
@@ -222,6 +231,7 @@ const tposJS = async () => {
         }
         // this.total = this.total - item.price * quantity
         this.total = this.total - this.calculateItemPrice(item, quantity)
+        this.cartTaxTotal()
       },
       calculateItemPrice(item, qty) {
         if (!item.tax || this.taxInclusive) return item.price * qty
@@ -229,9 +239,22 @@ const tposJS = async () => {
         // add tax to price
         return item.price * (1 + item.tax * 0.01) * qty
       },
+      cartTaxTotal(){
+        if(!this.cart.size) return 0.0
+        let total = 0.0
+        for (let item of this.cart.values()) {
+          let tax = item.tax || this.taxDefault
+          
+          // extract tax value from price
+          let taxValue = (item.price * (tax * 0.01)) * item.quantity
+          total += taxValue
+        }
+        this.cartTax = total
+      },
       clearCart() {
         this.cart.clear()
         this.total = 0.0
+        this.cartTaxTotal()
       },
       atm() {
         if (this.atmPremium > 0) {
@@ -667,6 +690,7 @@ const tposJS = async () => {
       getRates()
       this.pinDisabled = tpos.withdrawpindisabled
       this.taxInclusive = tpos.tax_inclusive
+      this.taxDefault = tpos.tax_default
 
       this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
 
