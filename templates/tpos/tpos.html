@@ -24,7 +24,12 @@
     <q-page-sticky v-if="exchangeRate && showPoS" expand position="top">
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
-          <h3 class="q-mb-md">${ amountFormatted }</h3>
+          <h3 class="q-mb-md">
+            ${ amountFormatted }
+            <!-- <div class="text-caption" v-if="!taxInclusive">
+              <i>(tax excl.)</i>
+            </div> -->
+          </h3>
           <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
             ${ fsat }<small> sat</small>
           </h5>

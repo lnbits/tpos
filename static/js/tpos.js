@@ -191,7 +191,7 @@ const tposJS = async () => {
       },
       taxSubtotal(){
         if (this.taxInclusive) return this.totalFormatted
-        return this.formatAmount(this.total - this.cartTax, this.currency)
+        return this.formatAmount(Math.floor(this.total - this.cartTax), this.currency)
 
       }
     },
@@ -229,32 +229,29 @@ const tposJS = async () => {
             quantity: this.cart.get(item.id).quantity - quantity
           })
         }
-        // this.total = this.total - item.price * quantity
         this.total = this.total - this.calculateItemPrice(item, quantity)
         this.cartTaxTotal()
       },
       calculateItemPrice(item, qty) {
-        if (!item.tax || this.taxInclusive) return item.price * qty
+        let tax = item.tax || this.taxDefault
+        if (!tax || this.taxInclusive) return item.price * qty
 
         // add tax to price
-        return item.price * (1 + item.tax * 0.01) * qty
+        return item.price * (1 + tax * 0.01) * qty
       },
       cartTaxTotal(){
         if(!this.cart.size) return 0.0
         let total = 0.0
         for (let item of this.cart.values()) {
           let tax = item.tax || this.taxDefault
-          
-          // extract tax value from price
-          let taxValue = (item.price * (tax * 0.01)) * item.quantity
-          total += taxValue
+          total += item.price * item.quantity * (tax * 0.01)
         }
         this.cartTax = total
       },
       clearCart() {
         this.cart.clear()
+        this.cartTax = 0.0
         this.total = 0.0
-        this.cartTaxTotal()
       },
       atm() {
         if (this.atmPremium > 0) {
@@ -374,12 +371,16 @@ const tposJS = async () => {
       },
       submitForm: function () {
         if (this.total != 0.0) {
+          if(this.amount > 0.0){
+            this.total = this.total + this.amount
+          }
           if (this.currency == 'sats') {
             this.stack = Array.from(String(Math.ceil(this.total), Number))
           } else {
             this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
           }
-        }
+        } 
+        
         if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
           this.$q.notify({
             type: 'negative',
@@ -410,6 +411,7 @@ const tposJS = async () => {
           this.atmGetWithdraw()
         } else {
           var dialog = this.invoiceDialog
+          
           let params = {
             amount: this.sat,
             memo: this.amountFormatted,
