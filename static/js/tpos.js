@@ -424,7 +424,7 @@ const tposJS = async () => {
                 formattedPrice: item.formattedPrice,
                 quantity: item.quantity,
                 title: item.title,
-                tax: item.tax
+                tax: item.tax || this.taxDefault
               }
             })
 
@@ -432,7 +432,8 @@ const tposJS = async () => {
               currency: this.currency,
               exchangeRate: this.exchangeRate,
               items: details,
-              taxIncluded: this.taxInclusive
+              taxIncluded: this.taxInclusive,
+              taxValue: this.cartTax,
             })
           }
 
