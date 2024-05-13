@@ -37,7 +37,7 @@ async def tpos(request: Request, tpos_id):
                 status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
             )
         withdrawpinopen = tposDirty.withdrawpin
-    return tpos_renderer().TemplateResponse(
+    response = tpos_renderer().TemplateResponse(
         "tpos/tpos.html",
         {
             "request": request,
@@ -47,6 +47,10 @@ async def tpos(request: Request, tpos_id):
             "web_manifest": f"/tpos/manifest/{tpos_id}.webmanifest",
         },
     )
+    # This is just for hiding the user-account UI elements.
+    # It is not a security measure.
+    response.set_cookie("is_lnbits_user_authorized", "false", path=request.url.path)
+    return response
 
 
 @tpos_ext.get("/manifest/{tpos_id}.webmanifest")
