@@ -5,7 +5,7 @@ from fastapi import Request
 from lnurl import Lnurl, LnurlWithdrawResponse
 from lnurl import encode as lnurl_encode
 from lnurl.models import ClearnetUrl, MilliSatoshi
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 
 class CreateTposData(BaseModel):
@@ -104,9 +104,13 @@ class Item(BaseModel):
     price: float
     title: str
     description: Optional[str]
-    tax: Optional[float] = 0.0
+    tax: Optional[float] = Field(0, ge=0.0)
     disabled: bool = False
     categories: Optional[List[str]] = []
+
+    @validator('tax', pre=True, always=True)
+    def set_default_tax(cls, v):
+        return v or 0
 
 
 class CreateUpdateItemData(BaseModel):
