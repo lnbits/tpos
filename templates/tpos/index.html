@@ -484,7 +484,7 @@
                       dense
                       v-model.number="formDialog.data.tax_default"
                       type="number"
-                      label="Default tax rate"
+                      label="Default tax rate %"
                       step="0.01"
                       min="0"
                       max="100"
@@ -999,7 +999,8 @@
         this.formDialog.data = {
           withdrawpin: null,
           tip_options: [],
-          withdrawbtwn: 10
+          withdrawbtwn: 10,
+          tax_inclusive: true
         }
       },
       getTPoSs: function () {
@@ -1015,7 +1016,6 @@
             self.tposs = response.data.map(function (obj) {
               return mapTPoS(obj)
             })
-            console.log(self.tposs)
           })
       },
       sendTPosData() {
@@ -1222,7 +1222,6 @@
             this.tposs = _.reject(this.tposs, obj => {
               return obj.id == tposId
             })
-            console.log(response.data)
             this.tposs.push(mapTPoS(response.data))
             this.closeItemDialog()
           })
