@@ -27,6 +27,10 @@
   ],
   "images": [
     {
+      "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/1.jpg",
+      "link": "https://www.youtube.com/embed/-dg1BAzwSQw?si=U2QT9ncbIIuP5Jz1"
+    },
+    {
       "uri": "https://raw.githubusercontent.com/lnbits/tpos/main/static/image/1.png"
     },
     {
