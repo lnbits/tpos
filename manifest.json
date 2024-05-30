@@ -3,8 +3,7 @@
     {
       "id": "tpos",
       "organisation": "lnbits",
-      "repository": "tpos",
-      "config": "https://raw.githubusercontent.com/lnbits/tpos/main/config.json"
+      "repository": "tpos"
     }
   ]
 }
