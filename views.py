@@ -66,9 +66,11 @@ async def manifest(tpos_id: str):
         "name": tpos.name + " - " + settings.lnbits_site_title,
         "icons": [
             {
-                "src": settings.lnbits_custom_logo
-                if settings.lnbits_custom_logo
-                else "https://cdn.jsdelivr.net/gh/lnbits/lnbits@0.3.0/docs/logos/lnbits.png",
+                "src": (
+                    settings.lnbits_custom_logo
+                    if settings.lnbits_custom_logo
+                    else "https://cdn.jsdelivr.net/gh/lnbits/lnbits@0.3.0/docs/logos/lnbits.png"
+                ),
                 "type": "image/png",
                 "sizes": "900x900",
             }

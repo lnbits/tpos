@@ -1,10 +1,11 @@
 from typing import List, Optional, Union
 
+from loguru import logger
+
 from lnbits.helpers import urlsafe_short_hash
 
 from . import db
-from .models import CreateTposData, TPoS, TPoSClean, LNURLCharge
-from loguru import logger
+from .models import CreateTposData, LNURLCharge, TPoS, TPoSClean
 
 
 async def get_current_timestamp():

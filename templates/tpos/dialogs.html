@@ -1,0 +1,199 @@
+<template>
+  <q-dialog
+    v-model="invoiceDialog.show"
+    position="top"
+    @hide="closeInvoiceDialog"
+  >
+    <q-card
+      v-if="invoiceDialog.data"
+      class="q-pa-lg q-pt-xl lnbits__dialog-card"
+    >
+      <a
+        :href="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
+          <lnbits-qrcode
+            :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
+            :options="{width: 800}"
+            class="rounded-borders"
+          ></lnbits-qrcode>
+        </q-responsive>
+        <q-tooltip>Pay in wallet</q-tooltip>
+      </a>
+      <div class="text-center">
+        <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
+        <h5 class="q-mt-none q-mb-sm">
+          ${ fsat }
+          <small> sat</small>
+          <span v-show="tip_options" style="font-size: 0.75rem"
+            >( + ${ tipAmountFormatted } tip)</span
+          >
+        </h5>
+        <q-chip v-if="nfcTagReading" square>
+          <q-avatar icon="nfc" color="positive" text-color="white"></q-avatar>
+          NFC supported
+        </q-chip>
+        <span v-else class="text-caption text-grey">NFC not supported</span>
+      </div>
+      <div class="row q-mt-lg">
+        <q-btn
+          outline
+          color="grey"
+          @click="copyText(invoiceDialog.data.payment_request)"
+          >Copy invoice</q-btn
+        >
+        <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+      </div>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="tipDialog.show" position="top">
+    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
+      <div class="text-center q-mb-xl">
+        <b style="font-size: 24px">Would you like to leave a tip?</b>
+      </div>
+      <div class="text-center q-mb-xl">
+        <q-btn
+          style="padding: 10px; margin: 3px"
+          unelevated
+          @click="processTipSelection(tip)"
+          size="lg"
+          :outline="!($q.dark.isActive)"
+          rounded
+          color="primary"
+          v-for="tip in tip_options.filter(f => f != 'Round')"
+          :key="tip"
+          >${ tip }%</q-btn
+        >
+        <q-btn
+          style="padding: 10px; margin: 3px"
+          unelevated
+          @click="setRounding"
+          size="lg"
+          :outline="!($q.dark.isActive)"
+          rounded
+          color="primary"
+          label="Round to"
+        ></q-btn>
+        <div class="row q-my-lg" v-if="rounding">
+          <q-input
+            class="col"
+            ref="inputRounding"
+            v-model.number="tipRounding"
+            :placeholder="roundToSugestion"
+            type="number"
+            hint="Total amount including tip"
+            :prefix="currency"
+          >
+          </q-input>
+          <q-btn
+            class="q-ml-sm"
+            style="margin-bottom: 20px"
+            color="primary"
+            @click="calculatePercent"
+            >Ok</q-btn
+          >
+        </div>
+      </div>
+      <div class="row q-mt-lg">
+        <q-btn flat color="primary" @click="processTipSelection(0)"
+          >No, thanks</q-btn
+        >
+        <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+      </div>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="urlDialog.show" position="top">
+    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
+      <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
+        <lnbits-qrcode
+          value="{{ request.url }}"
+          :options="{width: 800}"
+          class="rounded-borders"
+        ></lnbits-qrcode>
+      </q-responsive>
+      <div class="text-center q-mb-xl">
+        <p style="word-break: break-all">
+          <strong>{{ tpos.name }}</strong><br />{{ request.url }}
+        </p>
+      </div>
+      <div class="row q-mt-lg">
+        <q-btn
+          outline
+          color="grey"
+          @click="copyText('{{ request.url }}', 'TPoS URL copied to clipboard!')"
+          >Copy URL</q-btn
+        >
+        <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+      </div>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="complete.show" position="top">
+    <q-icon
+      name="check"
+      transition-show="fade"
+      class="text-light-green"
+      style="font-size: min(90vw, 40em)"
+    ></q-icon>
+  </q-dialog>
+
+  <q-dialog v-model="lastPaymentsDialog.show" position="bottom">
+    <q-card class="lnbits__dialog-card">
+      <q-card-section class="row items-center q-pb-none">
+        <q-space />
+        <q-btn icon="close" flat round dense v-close-popup />
+      </q-card-section>
+      <q-list separator class="q-mb-lg">
+        <q-item v-if="!lastPaymentsDialog.data.length">
+          <q-item-section>
+            <q-item-label class="text-bold">No paid invoices</q-item-label>
+          </q-item-section>
+        </q-item>
+        <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
+          <q-item-section>
+            <q-item-label class="text-bold"
+              >${payment.amount / 1000} sats</q-item-label
+            >
+            <q-item-label caption lines="2"
+              >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
+            >
+          </q-item-section>
+          <q-item-section side top>
+            <q-item-label caption>${payment.dateFrom}</q-item-label>
+            <q-icon name="check" color="green" />
+          </q-item-section>
+        </q-item>
+      </q-list>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="atmBox" @hide="atmPin = null">
+    <q-card>
+      <q-card-section class="row items-center q-pb-none">
+        <div class="text-h6">Withdraw PIN</div>
+      </q-card-section>
+      <q-card-section>
+        <q-form autofocus @submit="atmSubmit" class="q-gutter-md">
+          <q-input
+            filled
+            :type="hidePin ? 'password' : 'number'"
+            v-model.number="atmPin"
+            ><template v-slot:append>
+              <q-icon
+                :name="hidePin ? 'visibility_off' : 'visibility'"
+                class="cursor-pointer"
+                @click="hidePin = !hidePin"
+              ></q-icon> </template
+          ></q-input>
+          <div>
+            <q-btn label="Submit" type="submit" color="primary"></q-btn>
+          </div>
+        </q-form>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
+</template>
