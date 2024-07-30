@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import Request
 from lnurl import Lnurl, LnurlWithdrawResponse
 from lnurl import encode as lnurl_encode
-from lnurl.models import ClearnetUrl, MilliSatoshi
+from lnurl.types import ClearnetUrl, MilliSatoshi
 from pydantic import BaseModel, Field, validator
 
 
@@ -108,7 +108,7 @@ class Item(BaseModel):
     disabled: bool = False
     categories: Optional[List[str]] = []
 
-    @validator('tax', pre=True, always=True)
+    @validator("tax", pre=True, always=True)
     def set_default_tax(cls, v):
         return v or 0
 
