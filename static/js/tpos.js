@@ -428,13 +428,13 @@ const tposJS = async () => {
               }
             })
 
-            params.details = JSON.stringify({
+            params.details = {
               currency: this.currency,
               exchangeRate: this.exchangeRate,
               items: details,
               taxIncluded: this.taxInclusive,
               taxValue: this.cartTax,
-            })
+            }
           }
 
           axios
