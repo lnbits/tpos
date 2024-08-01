@@ -76,6 +76,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 # needed for pydantic
 [tool.ruff.lint.pep8-naming]
 classmethod-decorators = [
+    "validator",
     "root_validator",
 ]
 

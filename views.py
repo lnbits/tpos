@@ -1,28 +1,34 @@
 from http import HTTPStatus
 
-from fastapi import Depends, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.templating import Jinja2Templates
+from lnbits.core.models import User
+from lnbits.decorators import check_user_exists
+from lnbits.helpers import template_renderer
+from lnbits.settings import settings
 from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse
 
-from lnbits.core.models import User
-from lnbits.decorators import check_user_exists
-from lnbits.settings import settings
-
-from . import tpos_ext, tpos_renderer
 from .crud import get_clean_tpos, get_tpos
+
+tpos_generic_router = APIRouter()
+
+
+def tpos_renderer():
+    return template_renderer(["tpos/templates"])
+
 
 templates = Jinja2Templates(directory="templates")
 
 
-@tpos_ext.get("/", response_class=HTMLResponse)
+@tpos_generic_router.get("/", response_class=HTMLResponse)
 async def index(request: Request, user: User = Depends(check_user_exists)):
     return tpos_renderer().TemplateResponse(
         "tpos/index.html", {"request": request, "user": user.dict()}
     )
 
 
-@tpos_ext.get("/{tpos_id}")
+@tpos_generic_router.get("/{tpos_id}")
 async def tpos(request: Request, tpos_id):
     tpos = await get_clean_tpos(tpos_id)
     if not tpos:
@@ -31,12 +37,12 @@ async def tpos(request: Request, tpos_id):
         )
     withdrawpinopen = 0
     if tpos.withdrawpindisabled:
-        tposDirty = await get_tpos(tpos_id)
-        if not tposDirty:
+        tpos_dirty = await get_tpos(tpos_id)
+        if not tpos_dirty:
             raise HTTPException(
                 status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
             )
-        withdrawpinopen = tposDirty.withdrawpin
+        withdrawpinopen = tpos_dirty.withdrawpin or 0
     response = tpos_renderer().TemplateResponse(
         "tpos/tpos.html",
         {
@@ -53,7 +59,7 @@ async def tpos(request: Request, tpos_id):
     return response
 
 
-@tpos_ext.get("/manifest/{tpos_id}.webmanifest")
+@tpos_generic_router.get("/manifest/{tpos_id}.webmanifest")
 async def manifest(tpos_id: str):
     tpos = await get_clean_tpos(tpos_id)
     if not tpos:

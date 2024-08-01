@@ -1,13 +1,12 @@
 import asyncio
 
-from loguru import logger
-
 from lnbits.core.models import Payment
 from lnbits.core.services import create_invoice, pay_invoice, websocket_updater
 from lnbits.helpers import get_current_extension_name
 from lnbits.tasks import register_invoice_listener
+from loguru import logger
 
-from .crud import get_tpos, update_lnurlcharge
+from .crud import get_tpos
 
 
 async def wait_for_paid_invoices():
@@ -23,9 +22,9 @@ async def on_invoice_paid(payment: Payment) -> None:
     if payment.extra.get("tag") != "tpos" or payment.extra.get("tipSplitted"):
         return
 
-    tipAmount = payment.extra.get("tipAmount")
+    tip_amount = payment.extra.get("tipAmount")
 
-    strippedPayment = {
+    stripped_payment = {
         "amount": payment.amount,
         "fee": payment.fee,
         "checking_id": payment.checking_id,
@@ -39,9 +38,9 @@ async def on_invoice_paid(payment: Payment) -> None:
     tpos = await get_tpos(tpos_id)
     assert tpos
 
-    await websocket_updater(tpos_id, str(strippedPayment))
+    await websocket_updater(tpos_id, str(stripped_payment))
 
-    if not tipAmount:
+    if not tip_amount:
         # no tip amount
         return
 
@@ -50,9 +49,9 @@ async def on_invoice_paid(payment: Payment) -> None:
 
     payment_hash, payment_request = await create_invoice(
         wallet_id=wallet_id,
-        amount=int(tipAmount),
+        amount=int(tip_amount),
         internal=True,
-        memo=f"tpos tip",
+        memo="tpos tip",
     )
     logger.debug(f"tpos: tip invoice created: {payment_hash}")
 

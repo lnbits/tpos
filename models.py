@@ -2,9 +2,8 @@ from sqlite3 import Row
 from typing import List, Optional
 
 from fastapi import Request
-from lnurl import Lnurl, LnurlWithdrawResponse
+from lnurl import Lnurl
 from lnurl import encode as lnurl_encode
-from lnurl.types import ClearnetUrl, MilliSatoshi
 from pydantic import BaseModel, Field, validator
 
 
@@ -77,17 +76,18 @@ class LNURLCharge(BaseModel):
         )
         return lnurl_encode(url)
 
-    def lnurl_response(self, req: Request) -> LnurlWithdrawResponse:
-        url = str(req.url_for("tpos.tposlnurlcharge.callback"))
-        assert self.amount
-        amount = int(self.amount)
-        return LnurlWithdrawResponse(
-            callback=ClearnetUrl(url, scheme="https"),
-            k1=self.k1,
-            minWithdrawable=MilliSatoshi(amount * 1000),
-            maxWithdrawable=MilliSatoshi(amount * 1000),
-            defaultDescription=self.title,
-        )
+
+#     def lnurl_response(self, req: Request) -> LnurlWithdrawResponse:
+#         url = str(req.url_for("tpos.tposlnurlcharge.callback"))
+#         assert self.amount
+#         amount = int(self.amount)
+#         return LnurlWithdrawResponse(
+#             callback=ClearnetUrl(url, scheme="https"),
+#             k1=self.k1,
+#             minWithdrawable=MilliSatoshi(amount * 1000),
+#             maxWithdrawable=MilliSatoshi(amount * 1000),
+#             defaultDescription=self.title,
+#         )
 
 
 class HashCheck(BaseModel):
