@@ -77,19 +77,6 @@ class LNURLCharge(BaseModel):
         return lnurl_encode(url)
 
 
-#     def lnurl_response(self, req: Request) -> LnurlWithdrawResponse:
-#         url = str(req.url_for("tpos.tposlnurlcharge.callback"))
-#         assert self.amount
-#         amount = int(self.amount)
-#         return LnurlWithdrawResponse(
-#             callback=ClearnetUrl(url, scheme="https"),
-#             k1=self.k1,
-#             minWithdrawable=MilliSatoshi(amount * 1000),
-#             maxWithdrawable=MilliSatoshi(amount * 1000),
-#             defaultDescription=self.title,
-#         )
-
-
 class HashCheck(BaseModel):
     hash: bool
     lnurl: bool
