@@ -57,12 +57,14 @@ from .views_api import *  # noqa
 
 scheduled_tasks: list[asyncio.Task] = []
 
+
 def tpos_stop():
     for task in scheduled_tasks:
         try:
             task.cancel()
         except Exception as ex:
             logger.warning(ex)
+
 
 def tpos_start():
     task = create_permanent_unique_task("ext_tpos", wait_for_paid_invoices)
