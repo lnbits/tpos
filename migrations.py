@@ -78,7 +78,7 @@ async def m005_initial(db):
     Initial withdraws table.
     """
     await db.execute(
-        f"""
+        """
         CREATE TABLE tpos.withdraws (
             id TEXT PRIMARY KEY,
             tpos_id TEXT NOT NULL,
@@ -108,10 +108,23 @@ async def m007_atm_premium(db):
     await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawpremium FLOAT;")
 
 
-    
 async def m008_atm_time_option_and_pin_toggle(db):
     """
     Add a time mins/sec and pin toggle
     """
-    await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawtimeopt TEXT DEFAULT 'mins';")
-    await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawpindisabled BOOL NOT NULL DEFAULT false;")
+    await db.execute(
+        "ALTER TABLE tpos.pos ADD COLUMN withdrawtimeopt TEXT DEFAULT 'mins';"
+    )
+    await db.execute(
+        "ALTER TABLE tpos.pos ADD COLUMN withdrawpindisabled BOOL NOT NULL DEFAULT false;"
+    )
+
+
+async def m009_tax_inclusive(db):
+    """
+    Add tax_inclusive column
+    """
+    await db.execute(
+        "ALTER TABLE tpos.pos ADD COLUMN tax_inclusive BOOL NOT NULL DEFAULT true;"
+    )
+    await db.execute("ALTER TABLE tpos.pos ADD COLUMN tax_default FLOAT DEFAULT 0;")

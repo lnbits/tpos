@@ -1,11 +1,11 @@
 from sqlite3 import Row
-from typing import Optional, Any, List
+from typing import List, Optional
 
 from fastapi import Request
 from lnurl import Lnurl, LnurlWithdrawResponse
 from lnurl import encode as lnurl_encode
-from lnurl.models import ClearnetUrl, MilliSatoshi
-from pydantic import BaseModel, Field
+from lnurl.types import ClearnetUrl, MilliSatoshi
+from pydantic import BaseModel, Field, validator
 
 
 class CreateTposData(BaseModel):
@@ -22,32 +22,8 @@ class CreateTposData(BaseModel):
     withdrawbtwn: int = Field(10, ge=1)
     withdrawpremium: float = Field(None)
     withdrawpindisabled: bool = Field(False)
-
-
-class TPoS(BaseModel):
-    id: str
-    wallet: str
-    name: str
-    currency: str
-    tip_options: Optional[str]
-    tip_wallet: Optional[str]
-    withdrawlimit: Optional[int]
-    withdrawpin: Optional[int]
-    withdrawamt: int
-    withdrawtime: int
-    withdrawtimeopt: Optional[str]
-    withdrawbtwn: int
-    withdrawpremium: Optional[float]
-    withdrawpindisabled: Optional[bool]
-    items: Optional[str]
-
-    @classmethod
-    def from_row(cls, row: Row) -> "TPoS":
-        return cls(**dict(row))
-
-    @property
-    def withdrawamtposs(self) -> int:
-        return self.withdrawlimit - self.withdrawamt if self.withdrawlimit else 0
+    tax_inclusive: bool = Field(True)
+    tax_default: float = Field(None)
 
 
 class TPoSClean(BaseModel):
@@ -63,6 +39,8 @@ class TPoSClean(BaseModel):
     withdrawpremium: Optional[float]
     withdrawpindisabled: Optional[bool]
     items: Optional[str]
+    tax_inclusive: bool
+    tax_default: Optional[float]
 
     @classmethod
     def from_row(cls, row: Row) -> "TPoSClean":
@@ -71,6 +49,12 @@ class TPoSClean(BaseModel):
     @property
     def withdrawamtposs(self) -> int:
         return self.withdrawlimit - self.withdrawamt if self.withdrawlimit else 0
+
+
+class TPoS(TPoSClean, BaseModel):
+    wallet: str
+    tip_wallet: Optional[str]
+    withdrawpin: Optional[int]
 
 
 class LNURLCharge(BaseModel):
@@ -120,9 +104,13 @@ class Item(BaseModel):
     price: float
     title: str
     description: Optional[str]
-    tax: Optional[float] = 0.0
+    tax: Optional[float] = Field(0, ge=0.0)
     disabled: bool = False
     categories: Optional[List[str]] = []
+
+    @validator("tax", pre=True, always=True)
+    def set_default_tax(cls, v):
+        return v or 0
 
 
 class CreateUpdateItemData(BaseModel):

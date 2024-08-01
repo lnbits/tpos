@@ -102,3 +102,12 @@ On the regular TPoS you can also add value to a total. Enter a value and click t
    ![atm withdraw](https://i.imgur.com/rYXtn93.png)
 6. After successful withdraw, the green check will show and TPOS exists ATM mode\
    ![atm success](https://i.imgur.com/FaHltvW.png)
+
+## Tax settings
+
+For tax settings, by default tax is included in the price. You'll need to set a default tax rate in percentage (ex: 13). If items have a tax value, as some products may have different tax (VAT usually), it overides the default value.
+
+- **Tax Exclusive means tax is applied on top of the unit price.**
+- **Tax Inclusive means the unit price includes tax.**
+
+When using the normal keypad PoS, the default tax value is used, and tax value is always included in the value.

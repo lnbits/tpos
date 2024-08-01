@@ -229,7 +229,6 @@
                               </q-btn-dropdown>
                             </div>
                           </div>
-
                           <div class="row items-center no-wrap q-mb-md">
                             <div class="col-12">
                               <q-table
@@ -240,6 +239,17 @@
                                 :columns="itemsTable.columns"
                                 :pagination.sync="itemsTable.pagination"
                               >
+                                <template v-slot:header="props">
+                                  <q-tr :props="props">
+                                    <q-th
+                                      v-for="col in props.cols"
+                                      :key="col.name"
+                                      :props="props"
+                                    >
+                                      ${ col.label }
+                                    </q-th>
+                                  </q-tr>
+                                </template>
                                 <template v-slot:body="props">
                                   <q-tr :props="props">
                                     <q-td auto-width>
@@ -270,6 +280,9 @@
                                     <q-td key="price" :props="props">
                                       ${itemFormatPrice(props.row.price,
                                       props.row.id)}
+                                    </q-td>
+                                    <q-td key="tax" :props="props">
+                                      ${props.row.tax}%
                                     </q-td>
                                     <q-td key="disabled" :props="props">
                                       ${props.row.disabled}
@@ -437,7 +450,51 @@
             min="0"
           ></q-input>
         </template>
-
+        <q-list>
+          <q-expansion-item
+            expand-separator
+            icon="inventory"
+            label="Tax settings"
+            caption="Only applicable when using items/products"
+          >
+            <q-card>
+              <q-card-section>
+                Tax Inclusive means the unit price includes tax. (default)
+                <br />
+                Tax Exclusive means tax is applied on top of the unit price.
+              </q-card-section>
+              <q-card-section>
+                <div class="row q-mt-lg">
+                  <div class="col-12 col-md-6">
+                    <q-toggle
+                      v-model="formDialog.data.tax_inclusive"
+                      :label="formDialog.data.tax_inclusive ? 
+                                  'Tax Inclusive' :
+                                  'Tax Exclusive'"
+                      ><q-tooltip>
+                        <span
+                          v-text="'Applies to all products'"
+                        ></span> </q-tooltip
+                    ></q-toggle>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <q-input
+                      filled
+                      dense
+                      v-model.number="formDialog.data.tax_default"
+                      type="number"
+                      label="Default tax rate %"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      hint="Fallback tax rate if not set on product"
+                    ></q-input>
+                  </div>
+                </div>
+              </q-card-section>
+            </q-card>
+          </q-expansion-item>
+        </q-list>
         <div class="row q-mt-lg">
           <q-btn
             v-if="formDialog.data.id"
@@ -507,6 +564,7 @@
           dense
           v-model.number="itemDialog.data.tax"
           label="Tax %"
+          :hint="`${itemDialog.taxInclusive ? 'Tax is included on unit price' : 'Tax is added on top of unit price'}. You can change behaviour on TPoS settings.`"
         ></q-input>
         <q-checkbox
           v-model="itemDialog.data.disabled"
@@ -839,7 +897,8 @@
             tip_options: [],
             withdrawbtwn: 10,
             withdrawtimeopt: '',
-            withdrawpindisabled: false
+            withdrawpindisabled: false,
+            tax_inclusive: true
           },
           advanced: {
             tips: false,
@@ -891,6 +950,12 @@
               field: 'price'
             },
             {
+              name: 'tax',
+              align: 'left',
+              label: 'Tax',
+              field: 'tax'
+            },
+            {
               name: 'disabled',
               align: 'left',
               label: 'Disabled',
@@ -933,7 +998,8 @@
         this.formDialog.data = {
           withdrawpin: null,
           tip_options: [],
-          withdrawbtwn: 10
+          withdrawbtwn: 10,
+          tax_inclusive: true
         }
       },
       getTPoSs: function () {
@@ -1069,6 +1135,7 @@
       openItemDialog(id) {
         const [tposId, itemId] = id.split(':')
         const tpos = _.findWhere(this.tposs, {id: tposId})
+
         if (itemId) {
           const item = tpos.itemsMap.get(id)
           this.itemDialog.data = {
@@ -1078,6 +1145,7 @@
         } else {
           this.itemDialog.data.tpos = tposId
         }
+        this.itemDialog.taxInclusive = tpos.tax_inclusive
         this.itemDialog.data.currency = tpos.currency
         this.itemDialog.show = true
       },
@@ -1138,6 +1206,10 @@
           })
       },
       updateTposItems(tposId, wallet, data) {
+        const tpos = _.findWhere(this.tposs, {id: tposId})
+        if (tpos.tax_inclusive != this.taxInclusive) {
+          data.tax_inclusive = this.taxInclusive
+        }
         LNbits.api
           .request(
             'PUT',
