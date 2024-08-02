@@ -100,7 +100,7 @@ const tposJS = async () => {
         searchTerm: '',
         categoryFilter: '',
         cart: new Map(),
-        denomIsSats: tpos.currency == 'sats',
+        denomIsSats: tpos.currency == 'sats'
       }
     },
     computed: {
