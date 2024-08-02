@@ -1,41 +1,18 @@
 import asyncio
 
-from fastapi import APIRouter, Request, Response
-from fastapi.routing import APIRoute
+from fastapi import APIRouter
+from loguru import logger
 
-from lnbits.db import Database
-from lnbits.helpers import template_renderer
-from lnbits.tasks import create_permanent_unique_task
-from typing import Callable
-from fastapi.responses import JSONResponse
+from .crud import db
+from .tasks import wait_for_paid_invoices
+from .views import tpos_generic_router
+from .views_api import tpos_api_router
+from .views_lnurl import tpos_lnurl_router
 
-db = Database("ext_tpos")
-
-
-class LNURLErrorResponseHandler(APIRoute):
-    def get_route_handler(self) -> Callable:
-        original_route_handler = super().get_route_handler()
-
-        async def custom_route_handler(request: Request) -> Response:
-            try:
-                response = await original_route_handler(request)
-            except HTTPException as exc:
-                logger.debug(f"HTTPException: {exc}")
-                response = JSONResponse(
-                    status_code=exc.status_code,
-                    content={"status": "ERROR", "reason": f"{exc.detail}"},
-                )
-            except Exception as exc:
-                raise exc
-
-            return response
-
-        return custom_route_handler
-
-
-tpos_ext: APIRouter = APIRouter(
-    prefix="/tpos", tags=["TPoS"], route_class=LNURLErrorResponseHandler
-)
+tpos_ext = APIRouter(prefix="/tpos", tags=["TPoS"])
+tpos_ext.include_router(tpos_generic_router)
+tpos_ext.include_router(tpos_lnurl_router)
+tpos_ext.include_router(tpos_api_router)
 
 tpos_static_files = [
     {
@@ -44,18 +21,8 @@ tpos_static_files = [
     }
 ]
 
-
-def tpos_renderer():
-    return template_renderer(["tpos/templates"])
-
-
-from .lnurl import *  # noqa: F401,F403
-from .tasks import wait_for_paid_invoices
-from .views import *  # noqa
-from .views_api import *  # noqa
-
-
 scheduled_tasks: list[asyncio.Task] = []
+
 
 def tpos_stop():
     for task in scheduled_tasks:
@@ -64,6 +31,18 @@ def tpos_stop():
         except Exception as ex:
             logger.warning(ex)
 
+
 def tpos_start():
+    from lnbits.tasks import create_permanent_unique_task
+
     task = create_permanent_unique_task("ext_tpos", wait_for_paid_invoices)
     scheduled_tasks.append(task)
+
+
+__all__ = [
+    "db",
+    "tpos_ext",
+    "tpos_static_files",
+    "tpos_start",
+    "tpos_stop",
+]

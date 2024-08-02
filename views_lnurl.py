@@ -1,16 +1,42 @@
 from http import HTTPStatus
-from fastapi import Request
-from typing import Optional
-from starlette.exceptions import HTTPException
-from lnbits.core.services import websocket_updater, pay_invoice
+from typing import Callable, Optional
 
-from . import tpos_ext
-from .crud import get_tpos, get_lnurlcharge, update_lnurlcharge, update_tpos_withdraw
-from .models import LNURLCharge
+from fastapi import APIRouter, Request, Response
+from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
+from lnbits.core.services import pay_invoice, websocket_updater
 from loguru import logger
+from starlette.exceptions import HTTPException
+
+from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos_withdraw
+from .models import LNURLCharge
 
 
-@tpos_ext.get(
+class LNURLErrorResponseHandler(APIRoute):
+    def get_route_handler(self) -> Callable:
+        original_route_handler = super().get_route_handler()
+
+        async def custom_route_handler(request: Request) -> Response:
+            try:
+                response = await original_route_handler(request)
+            except HTTPException as exc:
+                logger.debug(f"HTTPException: {exc}")
+                response = JSONResponse(
+                    status_code=exc.status_code,
+                    content={"status": "ERROR", "reason": f"{exc.detail}"},
+                )
+            except Exception as exc:
+                raise exc
+
+            return response
+
+        return custom_route_handler
+
+
+tpos_lnurl_router = APIRouter(route_class=LNURLErrorResponseHandler)
+
+
+@tpos_lnurl_router.get(
     "/api/v1/lnurl/{lnurlcharge_id}/{amount}",
     status_code=HTTPStatus.OK,
     name="tpos.tposlnurlcharge",
@@ -37,7 +63,10 @@ async def lnurl_params(
     if amount > tpos.withdrawamtposs:
         return {
             "status": "ERROR",
-            "reason": f"Amount requested {amount} is too high, maximum withdrawable is {tpos.withdrawamtposs}",
+            "reason": (
+                f"Amount requested {amount} is too high, "
+                f"maximum withdrawable is {tpos.withdrawamtposs}"
+            ),
         }
 
     logger.debug(f"Amount to withdraw: {amount}")
@@ -51,7 +80,7 @@ async def lnurl_params(
     }
 
 
-@tpos_ext.get(
+@tpos_lnurl_router.get(
     "/api/v1/lnurl/cb",
     status_code=HTTPStatus.OK,
     name="tpos.tposlnurlcharge.callback",
@@ -83,7 +112,10 @@ async def lnurl_callback(
 
     assert (
         lnurlcharge.amount < tpos.withdrawamtposs
-    ), f"Amount requested {lnurlcharge.amount} is too high, maximum withdrawable is {tpos.withdrawamtposs}"
+    ), f"""
+    Amount requested {lnurlcharge.amount} is too high,
+    maximum withdrawable is {tpos.withdrawamtposs}
+    """
 
     await update_lnurlcharge(
         LNURLCharge(
@@ -107,8 +139,8 @@ async def lnurl_callback(
             extra={"tag": "TPoSWithdraw", "tpos_id": lnurlcharge.tpos_id},
         )
         await websocket_updater(k1, "paid")
-    except Exception as e:
+    except Exception as exc:
         raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST, detail=f"withdraw not working. {str(e)}"
-        )
+            status_code=HTTPStatus.BAD_REQUEST, detail=f"withdraw not working. {exc!s}"
+        ) from exc
     return {"status": "OK"}

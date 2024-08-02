@@ -186,13 +186,15 @@ const tposJS = async () => {
       drawerWidth() {
         return this.$q.screen.width < 500 ? 375 : 450
       },
-      formattedCartTax(){
+      formattedCartTax() {
         return this.formatAmount(this.cartTax, this.currency)
       },
-      taxSubtotal(){
+      taxSubtotal() {
         if (this.taxInclusive) return this.totalFormatted
-        return this.formatAmount(Math.floor(this.total - this.cartTax), this.currency)
-
+        return this.formatAmount(
+          Math.floor(this.total - this.cartTax),
+          this.currency
+        )
       }
     },
     methods: {
@@ -239,8 +241,8 @@ const tposJS = async () => {
         // add tax to price
         return item.price * (1 + tax * 0.01) * qty
       },
-      cartTaxTotal(){
-        if(!this.cart.size) return 0.0
+      cartTaxTotal() {
+        if (!this.cart.size) return 0.0
         let total = 0.0
         for (let item of this.cart.values()) {
           let tax = item.tax || this.taxDefault
@@ -371,7 +373,7 @@ const tposJS = async () => {
       },
       submitForm: function () {
         if (this.total != 0.0) {
-          if(this.amount > 0.0){
+          if (this.amount > 0.0) {
             this.total = this.total + this.amount
           }
           if (this.currency == 'sats') {
@@ -379,8 +381,8 @@ const tposJS = async () => {
           } else {
             this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
           }
-        } 
-        
+        }
+
         if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
           this.$q.notify({
             type: 'negative',
@@ -411,7 +413,7 @@ const tposJS = async () => {
           this.atmGetWithdraw()
         } else {
           var dialog = this.invoiceDialog
-          
+
           let params = {
             amount: this.sat,
             memo: this.amountFormatted,
@@ -433,7 +435,7 @@ const tposJS = async () => {
               exchangeRate: this.exchangeRate,
               items: details,
               taxIncluded: this.taxInclusive,
-              taxValue: this.cartTax,
+              taxValue: this.cartTax
             }
           }
 

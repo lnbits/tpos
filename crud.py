@@ -1,19 +1,19 @@
 from typing import List, Optional, Union
 
+from lnbits.db import Database
+from lnbits.helpers import urlsafe_short_hash
 from loguru import logger
 
-from lnbits.helpers import urlsafe_short_hash
-
-from . import db
 from .models import CreateTposData, LNURLCharge, TPoS, TPoSClean
+
+db = Database("ext_tpos")
 
 
 async def get_current_timestamp():
     # Get current DB timestamp
+    timestamp_query = f"SELECT {db.timestamp_now}"
     if db.type in {"POSTGRES", "COCKROACH"}:
         timestamp_query = f"SELECT EXTRACT(EPOCH FROM {db.timestamp_now})"
-    elif db.type == "SQLITE":
-        timestamp_query = f"SELECT {db.timestamp_now}"
     current_timestamp = (await db.fetchone(timestamp_query))[0]
     return int(current_timestamp)
 
@@ -22,7 +22,12 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
     tpos_id = urlsafe_short_hash()
     await db.execute(
         """
-        INSERT INTO tpos.pos (id, wallet, name, currency, tip_options, tip_wallet, withdrawlimit, withdrawpin, withdrawamt, withdrawtime, withdrawbtwn, withdrawtimeopt, withdrawpindisabled, withdrawpremium)
+        INSERT INTO tpos.pos
+        (
+            id, wallet, name, currency, tip_options, tip_wallet, withdrawlimit,
+            withdrawpin, withdrawamt, withdrawtime, withdrawbtwn, withdrawtimeopt,
+            withdrawpindisabled, withdrawpremium
+        )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
@@ -62,7 +67,10 @@ async def start_lnurlcharge(tpos_id: str):
     )
     assert (
         now - tpos.withdrawtime > withdraw_time_seconds
-    ), f"Last withdraw was made too recently, please try again in {int(withdraw_time_seconds - (now - tpos.withdrawtime))} secs"
+    ), f"""
+    Last withdraw was made too recently, please try again in
+    {int(withdraw_time_seconds - (now - tpos.withdrawtime))} secs
+    """
 
     token = urlsafe_short_hash()
     await db.execute(
@@ -120,7 +128,10 @@ async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
     # Check if the time between withdrawals is less than withdrawbtwn
     assert (
         time_elapsed > withdraw_time_seconds
-    ), f"Last withdraw was made too recently, please try again in {int(withdraw_time_seconds - (time_elapsed))} secs"
+    ), f"""
+    Last withdraw was made too recently, please try again in
+    {int(withdraw_time_seconds - (time_elapsed))} secs"
+    """
 
     # Update the withdraw time in the database
     await db.execute(
