@@ -61,6 +61,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >1</q-btn
               >
               <q-btn
@@ -70,6 +71,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >2</q-btn
               >
               <q-btn
@@ -79,6 +81,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >3</q-btn
               >
               <q-btn
@@ -88,6 +91,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >4</q-btn
               >
               <q-btn
@@ -97,6 +101,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >5</q-btn
               >
               <q-btn
@@ -106,6 +111,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >6</q-btn
               >
               <q-btn
@@ -115,6 +121,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >7</q-btn
               >
               <q-btn
@@ -124,6 +131,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >8</q-btn
               >
               <q-btn
@@ -133,6 +141,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >9</q-btn
               >
               <q-btn
@@ -142,6 +151,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 :color="monochrome ? 'secondary' : 'negative'"
+                :disable="keypadDisabled"
                 >C</q-btn
               >
               <q-btn
@@ -151,6 +161,7 @@
                 :outline="!($q.dark.isActive)"
                 rounded
                 color="primary"
+                :disable="keypadDisabled"
                 >0</q-btn
               >
               <q-btn
@@ -161,6 +172,7 @@
                 rounded
                 :color="monochrome ? 'secondary' : 'warning'"
                 class="btn-cancel"
+                :disable="keypadDisabled"
                 >⬅</q-btn
               >
               <q-btn
@@ -171,6 +183,7 @@
                 rounded
                 color="primary"
                 class="btn-plus"
+                :disable="keypadDisabled"
                 >+</q-btn
               >
               <q-btn
@@ -181,6 +194,7 @@
                 rounded
                 :color="monochrome ? 'secondary' : 'positive'"
                 class="btn-confirm"
+                :disable="keypadDisabled"
                 >Ok</q-btn
               >
             </div>
