@@ -195,6 +195,10 @@ const tposJS = async () => {
           Math.floor(this.total - this.cartTax),
           this.currency
         )
+      },
+      keypadDisabled() {
+        console.log(!this.exchangeRate || this.exchangeRate == 0)
+        return !this.exchangeRate || this.exchangeRate == 0
       }
     },
     methods: {
