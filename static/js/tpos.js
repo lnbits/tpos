@@ -100,7 +100,8 @@ const tposJS = async () => {
         searchTerm: '',
         categoryFilter: '',
         cart: new Map(),
-        denomIsSats: tpos.currency == 'sats'
+        denomIsSats: tpos.currency == 'sats',
+        customMemo: ''
       }
     },
     computed: {
@@ -391,14 +392,28 @@ const tposJS = async () => {
           })
           return
         }
-
-        if (this.tip_options && this.tip_options.length) {
-          this.rounding = false
-          this.tipRounding = null
-          this.showTipModal()
-        } else {
-          this.showInvoice()
-        }
+        this.$q
+          .dialog({
+            title: 'Prompt',
+            message: 'Add a memo to the invoice?',
+            prompt: {
+              model: '',
+              isValid: val => val.length > 2,
+              type: 'text'
+            },
+            cancel: true,
+            persistent: false
+          })
+          .onDismiss(data => {
+            this.customMemo = data.trim()
+            if (this.tip_options && this.tip_options.length) {
+              this.rounding = false
+              this.tipRounding = null
+              this.showTipModal()
+            } else {
+              this.showInvoice()
+            }
+          })
       },
       showTipModal: function () {
         if (!this.atmMode) {
@@ -418,6 +433,10 @@ const tposJS = async () => {
             amount: this.sat,
             memo: this.amountFormatted,
             tipAmount: this.tipAmountSat
+          }
+
+          if (this.customMemo && this.customMemo.length > 2) {
+            params.memo = this.customMemo
           }
           if (this.cart.size) {
             let details = [...this.cart.values()].map(item => {
