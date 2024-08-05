@@ -286,6 +286,13 @@ const tposJS = async () => {
       atmGetWithdraw: function () {
         self = this
         var dialog = this.invoiceDialog
+        if (this.sat > this.withdrawamtposs) {
+          this.$q.notify({
+            type: 'negative',
+            message: 'Amount exceeds the maximum withdrawal limit.'
+          })
+          return
+        }
         LNbits.api
           .request(
             'GET',
