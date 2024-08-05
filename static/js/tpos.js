@@ -299,6 +299,13 @@ const tposJS = async () => {
             `/tpos/api/v1/atm/withdraw/` + this.atmToken + `/` + this.sat
           )
           .then(function (res) {
+            if (res.data.status == 'ERROR') {
+              self.$q.notify({
+                type: 'negative',
+                message: res.data.reason
+              })
+              return
+            }
             lnurl = res.data.lnurl
             dialog.data = {payment_request: lnurl}
             dialog.show = true
@@ -335,7 +342,7 @@ const tposJS = async () => {
                 this.connectionWithdraw.close()
               }
             }
-            this.getRates()
+            self.getRates()
           })
           .catch(function (error) {
             LNbits.utils.notifyApiError(error)
