@@ -289,12 +289,26 @@ const tposJS = async () => {
       atmGetWithdraw: function () {
         self = this
         var dialog = this.invoiceDialog
+        if (this.sat > this.withdrawamtposs) {
+          this.$q.notify({
+            type: 'negative',
+            message: 'Amount exceeds the maximum withdrawal limit.'
+          })
+          return
+        }
         LNbits.api
           .request(
             'GET',
             `/tpos/api/v1/atm/withdraw/` + this.atmToken + `/` + this.sat
           )
           .then(function (res) {
+            if (res.data.status == 'ERROR') {
+              self.$q.notify({
+                type: 'negative',
+                message: res.data.reason
+              })
+              return
+            }
             lnurl = res.data.lnurl
             dialog.data = {payment_request: lnurl}
             dialog.show = true
@@ -331,7 +345,7 @@ const tposJS = async () => {
                 this.connectionWithdraw.close()
               }
             }
-            this.getRates()
+            self.getRates()
           })
           .catch(function (error) {
             LNbits.utils.notifyApiError(error)

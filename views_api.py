@@ -7,6 +7,7 @@ from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
     get_user,
+    get_wallet,
 )
 from lnbits.core.models import Payment, WalletTypeInfo
 from lnbits.core.services import create_invoice
@@ -333,6 +334,16 @@ async def api_tpos_create_withdraw(
             "status": "ERROR",
             "reason": f"TPoS {lnurlcharge.tpos_id} not found on this server",
         }
+
+    wallet = await get_wallet(tpos.wallet)
+    assert wallet
+    balance = int(wallet.balance_msat / 1000)
+    if balance < int(amount):
+        return {
+            "status": "ERROR",
+            "reason": f"Insufficient balance. Your balance is {balance} sats",
+        }
+
     lnurlcharge = await update_lnurlcharge(
         LNURLCharge(
             id=withdraw_token,
