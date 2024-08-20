@@ -604,30 +604,66 @@ const tposJS = async () => {
             readerAbortController.abort()
           })
       },
-      payInvoice: function (lnurl, readerAbortController) {
-        const self = this
-
-        return axios
-          .post(
-            '/tpos/api/v1/tposs/' +
-              self.tposId +
-              '/invoices/' +
-              self.invoiceDialog.data.payment_request +
-              '/pay',
-            {
-              lnurl: lnurl
-            }
-          )
-          .then(response => {
-            if (!response.data.success) {
+      async pinCallback(callback) {
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${this.invoiceDialog.data.payment_request}/pay?cb=${callback}`
+        )
+        if (!data.success) {
+          this.$q.notify({
+            type: 'negative',
+            message: data.detail
+          })
+        }
+      },
+      async payInvoice(lnurl, readerAbortController) {
+        const {data} = await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${this.invoiceDialog.data.payment_request}/pay`,
+          {lnurl}
+        )
+        if (!data.success) {
+          this.$q.notify({
+            type: 'negative',
+            message: data.detail
+          })
+        }
+        if (data.success && data.detail.includes('PIN') && data.callback) {
+          this.$q.notify({
+            type: 'warning',
+            message: data.detail
+          })
+          this.$q
+            .dialog({
+              title: 'Prompt',
+              message: 'Enter PIN',
+              prompt: {
+                model: '',
+                isValid: val => val.length == 4,
+                type: 'integer'
+              },
+              cancel: true,
+              persistent: true
+            })
+            .onOk(pin => {
+              const callback = new URL(data.callback)
+              callback.searchParams.set('k1', data.k1)
+              callback.searchParams.set(
+                'pr',
+                this.invoiceDialog.data.payment_request
+              )
+              callback.searchParams.set('pin', pin)
+              this.pinCallback(callback.toString())
+            })
+            .onCancel(() => {
               this.$q.notify({
                 type: 'negative',
-                message: response.data.detail
+                message: 'Payment canceled'
               })
-            }
+            })
+        }
 
-            readerAbortController.abort()
-          })
+        readerAbortController.abort()
       },
       getRates() {
         if (this.currency == 'sats') {
