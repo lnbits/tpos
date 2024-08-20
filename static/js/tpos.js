@@ -197,8 +197,7 @@ const tposJS = async () => {
         )
       },
       keypadDisabled() {
-        console.log(!this.exchangeRate || this.exchangeRate == 0)
-        return !this.exchangeRate || this.exchangeRate == 0
+        return !this.exchangeRate
       }
     },
     methods: {
