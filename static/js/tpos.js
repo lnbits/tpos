@@ -605,8 +605,7 @@ const tposJS = async () => {
           })
       },
       async pinCallback(callback) {
-        const {data} = await LNbits.api.request(
-          'GET',
+        const {data} = await axios.get(
           `/tpos/api/v1/tposs/${this.tposId}/invoices/${this.invoiceDialog.data.payment_request}/pay?cb=${callback}`
         )
         if (!data.success) {
@@ -617,8 +616,7 @@ const tposJS = async () => {
         }
       },
       async payInvoice(lnurl, readerAbortController) {
-        const {data} = await LNbits.api.request(
-          'POST',
+        const {data} = await axios.post(
           `/tpos/api/v1/tposs/${this.tposId}/invoices/${this.invoiceDialog.data.payment_request}/pay`,
           {lnurl}
         )
@@ -630,7 +628,7 @@ const tposJS = async () => {
         }
         if (data.success && data.detail.includes('PIN') && data.callback) {
           this.$q.notify({
-            type: 'warning',
+            type: 'negative',
             message: data.detail
           })
           this.$q
