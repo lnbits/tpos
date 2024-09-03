@@ -234,7 +234,7 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
-    payment = await get_standalone_payment(payment_hash)
+    payment = await get_standalone_payment(payment_hash, incoming=True)
     if not payment:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
