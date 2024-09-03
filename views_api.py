@@ -239,8 +239,8 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
         )
-    status = await payment.check_status()
-    return {"paid": status.success}
+    # TODO: remove this when v0.12.11 is released
+    return {"paid": payment.success}  # type: ignore
 
 
 @tpos_api_router.get("/api/v1/atm/{tpos_id}/{atmpin}", status_code=HTTPStatus.CREATED)
