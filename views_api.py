@@ -56,7 +56,7 @@ async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
 ):
     tpos = await create_tpos(wallet_id=wallet.wallet.id, data=data)
-    return tpos.dict()
+    return tpos
 
 
 @tpos_api_router.put("/api/v1/tposs/{tpos_id}")
@@ -65,17 +65,17 @@ async def api_tpos_update(
     tpos_id: str,
     wallet: WalletTypeInfo = Depends(require_admin_key),
 ):
-    if not tpos_id:
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
-    tpos = await get_tpos(tpos_id)
-    assert tpos, "TPoS couldn't be retrieved"
-
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
-    tpos = await update_tpos(tpos_id=tpos_id, **data.dict(exclude_unset=True))
-    return tpos.dict()
+    for field, value in data.dict().items():
+        setattr(tpos, field, value)
+    tpos = await update_tpos(tpos)
+    return tpos
 
 
 @tpos_api_router.delete("/api/v1/tposs/{tpos_id}")
@@ -379,6 +379,6 @@ async def api_tpos_create_items(
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
 
-    items = json.dumps(data.dict()["items"])
-    tpos = await update_tpos(tpos_id=tpos_id, items=items)
-    return tpos.dict()
+    tpos.items = json.dumps(data.dict()["items"])
+    tpos = await update_tpos(tpos)
+    return tpos

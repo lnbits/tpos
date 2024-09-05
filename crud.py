@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 
 from lnbits.db import Database
-from lnbits.helpers import urlsafe_short_hash
+from lnbits.helpers import update_query, urlsafe_short_hash
 from loguru import logger
 
 from .models import CreateTposData, LNURLCharge, TPoS, TPoSClean
@@ -28,24 +28,28 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
             withdrawpin, withdrawamt, withdrawtime, withdrawbtwn, withdrawtimeopt,
             withdrawpindisabled, withdrawpremium
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (
+            :id, :wallet, :name, :currency, :tip_options, :tip_wallet, :withdrawlimit,
+            :withdrawpin, :withdrawamt, :withdrawtime, :withdrawbtwn, :withdrawtimeopt,
+            :withdrawpindisabled, :withdrawpremium
+        )
         """,
-        (
-            tpos_id,
-            wallet_id,
-            data.name,
-            data.currency,
-            data.tip_options,
-            data.tip_wallet,
-            data.withdrawlimit,
-            data.withdrawpin,
-            0,
-            0,
-            data.withdrawbtwn,
-            data.withdrawtimeopt,
-            data.withdrawpindisabled,
-            data.withdrawpremium,
-        ),
+        {
+            "id": tpos_id,
+            "wallet": wallet_id,
+            "name": data.name,
+            "currency": data.currency,
+            "tip_options": data.tip_options,
+            "tip_wallet": data.tip_wallet,
+            "withdrawlimit": data.withdrawlimit,
+            "withdrawpin": data.withdrawpin,
+            "withdrawamt": 0,
+            "withdrawtime": 0,
+            "withdrawbtwn": data.withdrawbtwn,
+            "withdrawtimeopt": data.withdrawtimeopt,
+            "withdrawpindisabled": data.withdrawpindisabled,
+            "withdrawpremium": data.withdrawpremium,
+        },
     )
     tpos = await get_tpos(tpos_id)
     assert tpos, "Newly created tpos couldn't be retrieved"
@@ -53,7 +57,7 @@ async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
 
 
 async def get_tpos(tpos_id: str) -> Optional[TPoS]:
-    row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = ?", (tpos_id,))
+    row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id})
     return TPoS(**row) if row else None
 
 
@@ -76,9 +80,9 @@ async def start_lnurlcharge(tpos_id: str):
     await db.execute(
         """
         INSERT INTO tpos.withdraws (id, tpos_id)
-        VALUES (?, ?)
+        VALUES (:id, :tpos_id)
         """,
-        (token, tpos_id),
+        {"id": token, "tpos_id": tpos_id},
     )
     lnurlcharge = await get_lnurlcharge(token)
     return lnurlcharge
@@ -86,22 +90,15 @@ async def start_lnurlcharge(tpos_id: str):
 
 async def get_lnurlcharge(lnurlcharge_id: str) -> Optional[LNURLCharge]:
     row = await db.fetchone(
-        "SELECT * FROM tpos.withdraws WHERE id = ?", (lnurlcharge_id,)
+        "SELECT * FROM tpos.withdraws WHERE id = :id", {"id": lnurlcharge_id}
     )
     return LNURLCharge(**row) if row else None
 
 
 async def update_lnurlcharge(data: LNURLCharge) -> LNURLCharge:
-    # Construct the SET clause for the SQL query
-    set_clause = ", ".join([f"{field[0]} = ?" for field in data.dict().items()])
-
-    # Get the values for the SET clause
-    set_values = list(data.dict().values())
-    set_values.append(data.id)  # Add the ID for the WHERE clause
-
-    # Execute the UPDATE statement
     await db.execute(
-        f"UPDATE tpos.withdraws SET {set_clause} WHERE id = ?", tuple(set_values)
+        update_query("tpos.withdraws", data),
+        **data.dict(),
     )
 
     lnurlcharge = await get_lnurlcharge(data.id)
@@ -111,7 +108,7 @@ async def update_lnurlcharge(data: LNURLCharge) -> LNURLCharge:
 
 
 async def get_clean_tpos(tpos_id: str) -> Optional[TPoSClean]:
-    row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = ?", (tpos_id,))
+    row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id})
     return TPoSClean(**row) if row else None
 
 
@@ -135,7 +132,8 @@ async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
 
     # Update the withdraw time in the database
     await db.execute(
-        "UPDATE tpos.pos SET withdrawtime = ? WHERE id = ?", (now, tpos_id)
+        "UPDATE tpos.pos SET withdrawtime = :time WHERE id = :id",
+        {"time": now, "id": tpos_id},
     )
 
     tpos = await get_tpos(tpos_id)
@@ -143,26 +141,21 @@ async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
     return tpos
 
 
-async def update_tpos(tpos_id: str, **kwargs) -> TPoS:
-    q = ", ".join([f"{field[0]} = ?" for field in kwargs.items()])
+async def update_tpos(tpos: TPoS) -> TPoS:
     await db.execute(
-        f"UPDATE tpos.pos SET {q} WHERE id = ?", (*kwargs.values(), tpos_id)
+        update_query("tpos.pos", tpos),
+        tpos.dict(),
     )
-    tpos = await get_tpos(tpos_id)
-    assert tpos, "Newly updated tpos couldn't be retrieved"
     return tpos
 
 
 async def get_tposs(wallet_ids: Union[str, List[str]]) -> List[TPoS]:
     if isinstance(wallet_ids, str):
         wallet_ids = [wallet_ids]
-
-    q = ",".join(["?"] * len(wallet_ids))
-    rows = await db.fetchall(
-        f"SELECT * FROM tpos.pos WHERE wallet IN ({q})", (*wallet_ids,)
-    )
+    q = ",".join([f"'{wallet_id}'" for wallet_id in wallet_ids])
+    rows = await db.fetchall(f"SELECT * FROM tpos.pos WHERE wallet IN ({q})")
     return [TPoS(**row) for row in rows]
 
 
 async def delete_tpos(tpos_id: str) -> None:
-    await db.execute("DELETE FROM tpos.pos WHERE id = ?", (tpos_id,))
+    await db.execute("DELETE FROM tpos.pos WHERE id = :id", {"id": tpos_id})
