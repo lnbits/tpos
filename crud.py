@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 
 from lnbits.db import Database
-from lnbits.helpers import update_query, urlsafe_short_hash
+from lnbits.helpers import insert_query, update_query, urlsafe_short_hash
 from loguru import logger
 
 from .models import CreateTposData, LNURLCharge, TPoS, TPoSClean
@@ -18,41 +18,13 @@ async def get_current_timestamp():
     return int(current_timestamp)
 
 
-async def create_tpos(wallet_id: str, data: CreateTposData) -> TPoS:
+async def create_tpos(data: CreateTposData) -> TPoS:
     tpos_id = urlsafe_short_hash()
+    tpos = TPoS(id=tpos_id, **data.dict())
     await db.execute(
-        """
-        INSERT INTO tpos.pos
-        (
-            id, wallet, name, currency, tip_options, tip_wallet, withdrawlimit,
-            withdrawpin, withdrawamt, withdrawtime, withdrawbtwn, withdrawtimeopt,
-            withdrawpindisabled, withdrawpremium
-        )
-        VALUES (
-            :id, :wallet, :name, :currency, :tip_options, :tip_wallet, :withdrawlimit,
-            :withdrawpin, :withdrawamt, :withdrawtime, :withdrawbtwn, :withdrawtimeopt,
-            :withdrawpindisabled, :withdrawpremium
-        )
-        """,
-        {
-            "id": tpos_id,
-            "wallet": wallet_id,
-            "name": data.name,
-            "currency": data.currency,
-            "tip_options": data.tip_options,
-            "tip_wallet": data.tip_wallet,
-            "withdrawlimit": data.withdrawlimit,
-            "withdrawpin": data.withdrawpin,
-            "withdrawamt": 0,
-            "withdrawtime": 0,
-            "withdrawbtwn": data.withdrawbtwn,
-            "withdrawtimeopt": data.withdrawtimeopt,
-            "withdrawpindisabled": data.withdrawpindisabled,
-            "withdrawpremium": data.withdrawpremium,
-        },
+        insert_query("tpos.pos", data),
+        data.dict(),
     )
-    tpos = await get_tpos(tpos_id)
-    assert tpos, "Newly created tpos couldn't be retrieved"
     return tpos
 
 
