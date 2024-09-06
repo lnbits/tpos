@@ -655,19 +655,32 @@
       new Date(obj.time * 1000),
       'YYYY-MM-DD HH:mm'
     )
-    obj.tpos = ['/tpos/', obj.id].join('')
-    obj.shareUrl = [
-      window.location.protocol,
-      '//',
-      window.location.host,
-      obj.tpos
-    ].join('')
+    obj.tpos = `/tpos/${obj.id}`
+    obj.shareUrl = `${window.location.protocol}//${window.location.host}${obj.tpos}`
+
     obj.items = JSON.parse(obj.items)
-    obj.itemsMap = new Map()
-    obj.items.forEach((item, idx) => {
-      let id = `${obj.id}:${idx + 1}`
-      obj.itemsMap.set(id, {...item, id})
-    })
+    obj.itemsMap = new Map(
+      obj.items.map((item, idx) => {
+        const id = `${obj.id}:${idx + 1}`
+        return [id, {...item, id}]
+      })
+    )
+
+    // Retrieve theme, dark mode, and gradient settings from localStorage.
+    const getSetting = key =>
+      localStorage.getItem(`lnbits.${key}`)?.split('|')[1] || null
+    const theme = getSetting('theme')
+    const dark = getSetting('darkMode')
+    const gradient = getSetting('gradientBg')
+
+    // Append the theme, dark, and gradient settings as query parameters to the share URL.
+    const url = new URL(obj.shareUrl)
+    theme && url.searchParams.append('theme', theme)
+    dark && url.searchParams.append('dark', dark)
+    gradient && url.searchParams.append('gradient', gradient)
+
+    // Update the share URL in the object.
+    obj.shareUrl = url.toString()
     return obj
   }
 
