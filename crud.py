@@ -1,10 +1,10 @@
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from lnbits.db import Database
 from lnbits.helpers import insert_query, update_query, urlsafe_short_hash
 from loguru import logger
 
-from .models import CreateTposData, LNURLCharge, TPoS, TPoSClean
+from .models import CreateTposData, LnurlCharge, Tpos, TposClean
 
 db = Database("ext_tpos")
 
@@ -18,9 +18,9 @@ async def get_current_timestamp():
     return int(current_timestamp)
 
 
-async def create_tpos(data: CreateTposData) -> TPoS:
+async def create_tpos(data: CreateTposData) -> Tpos:
     tpos_id = urlsafe_short_hash()
-    tpos = TPoS(id=tpos_id, **data.dict())
+    tpos = Tpos(id=tpos_id, **data.dict())
     await db.execute(
         insert_query("tpos.pos", data),
         data.dict(),
@@ -28,9 +28,9 @@ async def create_tpos(data: CreateTposData) -> TPoS:
     return tpos
 
 
-async def get_tpos(tpos_id: str) -> Optional[TPoS]:
+async def get_tpos(tpos_id: str) -> Optional[Tpos]:
     row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id})
-    return TPoS(**row) if row else None
+    return Tpos(**row) if row else None
 
 
 async def start_lnurlcharge(tpos_id: str):
@@ -60,17 +60,17 @@ async def start_lnurlcharge(tpos_id: str):
     return lnurlcharge
 
 
-async def get_lnurlcharge(lnurlcharge_id: str) -> Optional[LNURLCharge]:
+async def get_lnurlcharge(lnurlcharge_id: str) -> Optional[LnurlCharge]:
     row = await db.fetchone(
         "SELECT * FROM tpos.withdraws WHERE id = :id", {"id": lnurlcharge_id}
     )
-    return LNURLCharge(**row) if row else None
+    return LnurlCharge(**row) if row else None
 
 
-async def update_lnurlcharge(data: LNURLCharge) -> LNURLCharge:
+async def update_lnurlcharge(data: LnurlCharge) -> LnurlCharge:
     await db.execute(
         update_query("tpos.withdraws", data),
-        **data.dict(),
+        data.dict(),
     )
 
     lnurlcharge = await get_lnurlcharge(data.id)
@@ -79,12 +79,12 @@ async def update_lnurlcharge(data: LNURLCharge) -> LNURLCharge:
     return lnurlcharge
 
 
-async def get_clean_tpos(tpos_id: str) -> Optional[TPoSClean]:
+async def get_clean_tpos(tpos_id: str) -> Optional[TposClean]:
     row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id})
-    return TPoSClean(**row) if row else None
+    return TposClean(**row) if row else None
 
 
-async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
+async def update_tpos_withdraw(data: Tpos, tpos_id: str) -> Tpos:
     # Calculate the time between withdrawals in seconds
     now = await get_current_timestamp()
     time_elapsed = now - data.withdrawtime
@@ -113,7 +113,7 @@ async def update_tpos_withdraw(data: TPoS, tpos_id: str) -> TPoS:
     return tpos
 
 
-async def update_tpos(tpos: TPoS) -> TPoS:
+async def update_tpos(tpos: Tpos) -> Tpos:
     await db.execute(
         update_query("tpos.pos", tpos),
         tpos.dict(),
@@ -121,12 +121,12 @@ async def update_tpos(tpos: TPoS) -> TPoS:
     return tpos
 
 
-async def get_tposs(wallet_ids: Union[str, List[str]]) -> List[TPoS]:
+async def get_tposs(wallet_ids: Union[str, list[str]]) -> list[Tpos]:
     if isinstance(wallet_ids, str):
         wallet_ids = [wallet_ids]
     q = ",".join([f"'{wallet_id}'" for wallet_id in wallet_ids])
     rows = await db.fetchall(f"SELECT * FROM tpos.pos WHERE wallet IN ({q})")
-    return [TPoS(**row) for row in rows]
+    return [Tpos(**row) for row in rows]
 
 
 async def delete_tpos(tpos_id: str) -> None:

@@ -1,5 +1,4 @@
-from sqlite3 import Row
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import Request
 from lnurl import Lnurl
@@ -25,7 +24,7 @@ class CreateTposData(BaseModel):
     tax_default: float = Field(None)
 
 
-class TPoSClean(BaseModel):
+class TposClean(BaseModel):
     id: str
     name: str
     currency: str
@@ -41,30 +40,22 @@ class TPoSClean(BaseModel):
     tax_inclusive: bool
     tax_default: Optional[float]
 
-    @classmethod
-    def from_row(cls, row: Row) -> "TPoSClean":
-        return cls(**dict(row))
-
     @property
     def withdrawamtposs(self) -> int:
         return self.withdrawlimit - self.withdrawamt if self.withdrawlimit else 0
 
 
-class TPoS(TPoSClean, BaseModel):
+class Tpos(TposClean, BaseModel):
     wallet: str
     tip_wallet: Optional[str]
     withdrawpin: Optional[int]
 
 
-class LNURLCharge(BaseModel):
+class LnurlCharge(BaseModel):
     id: str
     tpos_id: str
     amount: int = Field(None)
     claimed: bool = Field(False)
-
-    @classmethod
-    def from_row(cls, row: Row) -> "LNURLCharge":
-        return cls(**dict(row))
 
     def lnurl(self, req: Request) -> Lnurl:
         url = str(
@@ -93,7 +84,7 @@ class Item(BaseModel):
     description: Optional[str]
     tax: Optional[float] = Field(0, ge=0.0)
     disabled: bool = False
-    categories: Optional[List[str]] = []
+    categories: Optional[list[str]] = []
 
     @validator("tax", pre=True, always=True)
     def set_default_tax(cls, v):
@@ -101,4 +92,4 @@ class Item(BaseModel):
 
 
 class CreateUpdateItemData(BaseModel):
-    items: List[Item]
+    items: list[Item]

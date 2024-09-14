@@ -12,8 +12,8 @@ from lnbits.core.crud import (
 from lnbits.core.models import Payment, WalletTypeInfo
 from lnbits.core.services import create_invoice
 from lnbits.decorators import (
-    get_key_type,
     require_admin_key,
+    require_invoice_key,
 )
 from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 from lnurl import decode as decode_lnurl
@@ -33,8 +33,9 @@ from .crud import (
 from .models import (
     CreateTposData,
     CreateUpdateItemData,
-    LNURLCharge,
+    LnurlCharge,
     PayLnurlWData,
+    Tpos,
 )
 
 tpos_api_router = APIRouter()
@@ -42,13 +43,14 @@ tpos_api_router = APIRouter()
 
 @tpos_api_router.get("/api/v1/tposs", status_code=HTTPStatus.OK)
 async def api_tposs(
-    all_wallets: bool = Query(False), wallet: WalletTypeInfo = Depends(get_key_type)
-):
-    wallet_ids = [wallet.wallet.id]
+    all_wallets: bool = Query(False),
+    key_info: WalletTypeInfo = Depends(require_invoice_key),
+) -> list[Tpos]:
+    wallet_ids = [key_info.wallet.id]
     if all_wallets:
-        user = await get_user(wallet.wallet.user)
+        user = await get_user(key_info.wallet.user)
         wallet_ids = user.wallet_ids if user else []
-    return [tpos.dict() for tpos in await get_tposs(wallet_ids)]
+    return await get_tposs(wallet_ids)
 
 
 @tpos_api_router.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
@@ -346,7 +348,7 @@ async def api_tpos_create_withdraw(
         }
 
     lnurlcharge = await update_lnurlcharge(
-        LNURLCharge(
+        LnurlCharge(
             id=withdraw_token,
             tpos_id=lnurlcharge.tpos_id,
             amount=int(amount),

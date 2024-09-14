@@ -9,7 +9,7 @@ from loguru import logger
 from starlette.exceptions import HTTPException
 
 from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos_withdraw
-from .models import LNURLCharge
+from .models import LnurlCharge
 
 
 class LNURLErrorResponseHandler(APIRoute):
@@ -99,12 +99,12 @@ async def lnurl_callback(
             "reason": f"lnurlcharge {k1} not found on this server",
         }
 
-    assert lnurlcharge.amount, f"LNURLCharge {k1} has no amount"
+    assert lnurlcharge.amount, f"LnurlCharge {k1} has no amount"
 
     if lnurlcharge.claimed:
         return {
             "status": "ERROR",
-            "reason": f"LNURLCharge {k1} has already been claimed",
+            "reason": f"LnurlCharge {k1} has already been claimed",
         }
 
     tpos = await get_tpos(lnurlcharge.tpos_id)
@@ -118,7 +118,7 @@ async def lnurl_callback(
     """
 
     await update_lnurlcharge(
-        LNURLCharge(
+        LnurlCharge(
             id=k1,
             tpos_id=lnurlcharge.tpos_id,
             amount=int(lnurlcharge.amount),
