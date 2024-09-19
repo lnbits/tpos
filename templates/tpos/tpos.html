@@ -220,7 +220,7 @@
       <q-page-sticky position="top-right" :offset="[18, 162]">
         <q-btn
           @click="atm"
-          v-if="withdrawamtposs > 0 && !atmMode"
+          v-if="withdraw_maximum > 0 && !atmMode"
           fab
           icon="atm"
           color="primary"
@@ -535,21 +535,21 @@
   const tpos = {}
   tpos.id = '{{ tpos.id }}'
   tpos.currency = '{{ tpos.currency }}'
-  tpos.withdrawpremium = Number('{{ tpos.withdrawpremium }}') / 100
-  tpos.withdrawamtposs = Number('{{ tpos.withdrawamtposs }}')
+  tpos.withdraw_premium = Number('{{ tpos.withdraw_premium }}') / 100
+  withdraw_maximum = Number('{{ withdraw_maximum }}')
   tpos.items = JSON.parse('{{ tpos.items | safe }}')
   tpos.tip_options =
     '{{ tpos.tip_options | tojson }}' == 'null'
       ? null
       : JSON.parse('{{ tpos.tip_options }}')
   tpos.tip_wallet = '{{ tpos.tip_wallet }}'
-  tpos.withdrawpindisabled = JSON.parse(
-    '{{ tpos.withdrawpindisabled | tojson }}'
+  tpos.withdraw_pin_disabled = JSON.parse(
+    '{{ tpos.withdraw_pin_disabled | tojson }}'
   )
   tpos.tax_inclusive = JSON.parse('{{ tpos.tax_inclusive | tojson }}')
   tpos.tax_default = Number('{{ tpos.tax_default }}')
 
-  const withdrawpinopen = Number('{{ withdrawpinopen }}')
+  const withdraw_pin_open = Number('{{ withdraw_pin_open }}')
 </script>
 
 <script src="{{ url_for('tpos_static', path='js/tpos.js') }}"></script>

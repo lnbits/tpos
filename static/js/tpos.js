@@ -11,9 +11,9 @@ const tposJS = async () => {
       return {
         tposId: tpos.id,
         currency: tpos.currency,
-        withdrawamtposs: tpos.withdrawamtposs,
-        atmPremium: tpos.withdrawpremium / 100,
-        withdrawpinopen: withdrawpinopen,
+        atmPremium: tpos.withdraw_premium / 100,
+        withdraw_maximum: withdraw_maximum,
+        withdraw_pin_open: withdraw_pin_open,
         tip_options: null,
         exchangeRate: null,
         stack: [],
@@ -262,12 +262,12 @@ const tposJS = async () => {
         if (this.atmPremium > 0) {
           this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
         }
-        if (this.withdrawpinopen != 0) {
-          this.atmPin = this.withdrawpinopen
+        if (this.withdraw_pin_open != 0) {
+          this.atmPin = this.withdraw_pin_open
           this.atmSubmit()
           return
         }
-        if (this.withdrawamtposs > 0) {
+        if (this.withdraw_maximum > 0) {
           this.atmBox = true
         }
       },
@@ -289,7 +289,7 @@ const tposJS = async () => {
       atmGetWithdraw: function () {
         self = this
         var dialog = this.invoiceDialog
-        if (this.sat > this.withdrawamtposs) {
+        if (this.sat > this.withdraw_maximum) {
           this.$q.notify({
             type: 'negative',
             message: 'Amount exceeds the maximum withdrawal limit.'
@@ -710,7 +710,7 @@ const tposJS = async () => {
     created: function () {
       var getRates = this.getRates
       getRates()
-      this.pinDisabled = tpos.withdrawpindisabled
+      this.pinDisabled = tpos.withdraw_pin_disabled
       this.taxInclusive = tpos.tax_inclusive
       this.taxDefault = tpos.tax_default
 

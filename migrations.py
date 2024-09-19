@@ -129,3 +129,28 @@ async def m009_tax_inclusive(db):
         "ALTER TABLE tpos.pos ADD COLUMN tax_inclusive BOOL NOT NULL DEFAULT true;"
     )
     await db.execute("ALTER TABLE tpos.pos ADD COLUMN tax_default FLOAT DEFAULT 0;")
+
+
+async def m010_rename_tpos_withdraw_columns(db):
+    """
+    Add rename tpos withdraw columns
+    """
+    await db.execute(
+        """
+        CREATE TABLE tpos.pos_backup AS
+        SELECT
+        id, name, currency, items, wallet, tax_inclusive,
+        tax_default, tip_wallet, tip_options,
+        withdrawtime AS withdraw_time,
+        withdrawbtwn AS withdraw_between,
+        withdrawlimit AS withdraw_limit,
+        withdrawamt AS withdraw_amount,
+        withdrawtimeopt AS withdraw_time_option,
+        withdrawpremium AS withdraw_premium,
+        withdrawpindisabled AS withdraw_pin_disabled,
+        withdrawpin AS withdraw_pin
+        FROM tpos.pos
+        """
+    )
+    await db.execute("DROP TABLE tpos.pos")
+    await db.execute("ALTER TABLE tpos.pos_backup RENAME TO pos")

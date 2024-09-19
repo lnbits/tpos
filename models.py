@@ -10,45 +10,47 @@ class CreateTposData(BaseModel):
     wallet: Optional[str]
     name: Optional[str]
     currency: Optional[str]
-    tip_options: str = Field("[]")
-    tip_wallet: str = Field("")
-    withdrawlimit: int = Field(None, ge=1)
-    withdrawpin: int = Field(None, ge=1)
-    withdrawamt: int = Field(None, ge=0)
-    withdrawtime: int = Field(0)
-    withdrawtimeopt: Optional[str]
-    withdrawbtwn: int = Field(10, ge=1)
-    withdrawpremium: float = Field(None)
-    withdrawpindisabled: bool = Field(False)
     tax_inclusive: bool = Field(True)
     tax_default: float = Field(None)
+    tip_options: str = Field("[]")
+    tip_wallet: str = Field("")
+    withdraw_time: int = Field(0)
+    withdraw_between: int = Field(10, ge=1)
+    withdraw_limit: Optional[int] = Field(None, ge=1)
+    withdraw_pin: Optional[int] = Field(None, ge=1)
+    withdraw_amount: Optional[int] = Field(None, ge=0)
+    withdraw_time_option: Optional[str] = Field(None)
+    withdraw_premium: Optional[float] = Field(None)
+    withdraw_pin_disabled: bool = Field(False)
 
 
 class TposClean(BaseModel):
     id: str
     name: str
     currency: str
-    tip_options: Optional[str]
-    withdrawlimit: Optional[int]
-    withdrawamt: int
-    withdrawtime: int
-    withdrawtimeopt: Optional[str]
-    withdrawbtwn: int
-    withdrawpremium: Optional[float]
-    withdrawpindisabled: Optional[bool]
-    items: Optional[str]
     tax_inclusive: bool
-    tax_default: Optional[float]
+    tax_default: Optional[float] = None
+    withdraw_time: int
+    withdraw_between: int
+    withdraw_limit: Optional[int] = None
+    withdraw_amount: Optional[int] = None
+    withdraw_time_option: Optional[str] = None
+    withdraw_premium: Optional[float] = None
+    withdraw_pin_disabled: Optional[bool] = None
+    items: Optional[str] = None
+    tip_options: Optional[str] = None
 
     @property
-    def withdrawamtposs(self) -> int:
-        return self.withdrawlimit - self.withdrawamt if self.withdrawlimit else 0
+    def withdraw_maximum(self) -> int:
+        if not self.withdraw_amount or not self.withdraw_limit:
+            return 0
+        return self.withdraw_limit - self.withdraw_amount
 
 
 class Tpos(TposClean, BaseModel):
     wallet: str
-    tip_wallet: Optional[str]
-    withdrawpin: Optional[int]
+    tip_wallet: Optional[str] = None
+    withdraw_pin: Optional[int] = None
 
 
 class LnurlCharge(BaseModel):

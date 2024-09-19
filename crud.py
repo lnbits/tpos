@@ -22,14 +22,15 @@ async def create_tpos(data: CreateTposData) -> Tpos:
     tpos_id = urlsafe_short_hash()
     tpos = Tpos(id=tpos_id, **data.dict())
     await db.execute(
-        insert_query("tpos.pos", data),
-        data.dict(),
+        insert_query("tpos.pos", tpos),
+        tpos.dict(),
     )
     return tpos
 
 
 async def get_tpos(tpos_id: str) -> Optional[Tpos]:
     row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id})
+    print(row)
     return Tpos(**row) if row else None
 
 
@@ -39,13 +40,15 @@ async def start_lnurlcharge(tpos_id: str):
 
     now = await get_current_timestamp()
     withdraw_time_seconds = (
-        tpos.withdrawbtwn * 60 if tpos.withdrawtimeopt != "secs" else tpos.withdrawbtwn
+        tpos.withdraw_between * 60
+        if tpos.withdraw_time_option != "secs"
+        else tpos.withdraw_between
     )
     assert (
-        now - tpos.withdrawtime > withdraw_time_seconds
+        now - tpos.withdraw_time > withdraw_time_seconds
     ), f"""
     Last withdraw was made too recently, please try again in
-    {int(withdraw_time_seconds - (now - tpos.withdrawtime))} secs
+    {int(withdraw_time_seconds - (now - tpos.withdraw_time))} secs
     """
 
     token = urlsafe_short_hash()
@@ -87,9 +90,11 @@ async def get_clean_tpos(tpos_id: str) -> Optional[TposClean]:
 async def update_tpos_withdraw(data: Tpos, tpos_id: str) -> Tpos:
     # Calculate the time between withdrawals in seconds
     now = await get_current_timestamp()
-    time_elapsed = now - data.withdrawtime
+    time_elapsed = now - data.withdraw_time
     withdraw_time_seconds = (
-        data.withdrawbtwn * 60 if data.withdrawtimeopt != "secs" else data.withdrawbtwn
+        data.withdraw_between * 60
+        if data.withdraw_time_option != "secs"
+        else data.withdraw_between
     )
 
     logger.debug(f"Time between: {time_elapsed} seconds")

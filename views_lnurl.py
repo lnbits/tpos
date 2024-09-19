@@ -60,12 +60,12 @@ async def lnurl_params(
             "reason": f"TPoS {lnurlcharge.tpos_id} not found on this server",
         }
 
-    if amount > tpos.withdrawamtposs:
+    if amount > tpos.withdraw_maximum:
         return {
             "status": "ERROR",
             "reason": (
                 f"Amount requested {amount} is too high, "
-                f"maximum withdrawable is {tpos.withdrawamtposs}"
+                f"maximum withdrawable is {tpos.withdraw_maximum}"
             ),
         }
 
@@ -111,10 +111,10 @@ async def lnurl_callback(
     assert tpos, f"TPoS with ID {lnurlcharge.tpos_id} not found"
 
     assert (
-        lnurlcharge.amount < tpos.withdrawamtposs
+        lnurlcharge.amount < tpos.withdraw_maximum
     ), f"""
     Amount requested {lnurlcharge.amount} is too high,
-    maximum withdrawable is {tpos.withdrawamtposs}
+    maximum withdrawable is {tpos.withdraw_maximum}
     """
 
     await update_lnurlcharge(
@@ -126,7 +126,8 @@ async def lnurl_callback(
         )
     )
 
-    tpos.withdrawamt = int(tpos.withdrawamt) + int(lnurlcharge.amount)
+    assert tpos.withdraw_amount, f"TPoS {lnurlcharge.tpos_id} has no withdraw_amount"
+    tpos.withdraw_amount = int(tpos.withdraw_amount) + int(lnurlcharge.amount)
     logger.debug(f"Payment request: {pr}")
     await update_tpos_withdraw(data=tpos, tpos_id=lnurlcharge.tpos_id)
     logger.debug(f"Amount to withdraw: {int(lnurlcharge.amount)}")

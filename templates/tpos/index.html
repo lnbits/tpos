@@ -7,7 +7,7 @@
         <q-btn
           unelevated
           color="primary"
-          @click="formDialog.show = true; formDialog.data.withdrawpin = generatePIN()"
+          @click="formDialog.show = true; formDialog.data.withdraw_pin = generatePIN()"
           >New TPoS</q-btn
         >
       </q-card-section>
@@ -123,16 +123,16 @@
                 ${props.row.tip_options}
               </q-td>
               <q-td v-else auto-width>N/A </q-td>
-              <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
-                ${props.row.withdrawpin}
+              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
+                ${props.row.withdraw_pin}
               </q-td>
               <q-td v-else auto-width> N/A </q-td>
-              <q-td v-if="props.row.withdrawlimit >= 1" auto-width>
-                ${props.row.withdrawlimit}
+              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
+                ${props.row.withdraw_limit}
               </q-td>
               <q-td v-else auto-width> N/A </q-td>
-              <q-td v-if="props.row.withdrawpremium > 0" auto-width>
-                ${props.row.withdrawpremium}%
+              <q-td v-if="props.row.withdraw_premium > 0" auto-width>
+                ${props.row.withdraw_premium}%
               </q-td>
               <q-td v-else auto-width> 0 </q-td>
               <q-td auto-width>
@@ -140,7 +140,7 @@
                   flat
                   dense
                   size="xs"
-                  @click="updateTPosForm(props.row.id)"
+                  @click="updateTposForm(props.row.id)"
                   icon="edit"
                   color="blue"
                 ></q-btn>
@@ -150,7 +150,7 @@
                   flat
                   dense
                   size="xs"
-                  @click="deleteTPoS(props.row.id)"
+                  @click="deleteTpos(props.row.id)"
                   icon="cancel"
                   color="pink"
                 ></q-btn>
@@ -323,7 +323,7 @@
 
   <q-dialog v-model="formDialog.show" position="top" @hide="closeFormDialog">
     <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
-      <q-form @submit="sendTPosData" class="q-gutter-md">
+      <q-form @submit="sendTposData" class="q-gutter-md">
         <q-input
           filled
           dense
@@ -394,7 +394,7 @@
           <q-input
             filled
             dense
-            v-model.number="formDialog.data.withdrawlimit"
+            v-model.number="formDialog.data.withdraw_limit"
             type="number"
             label="Max amount to be sold daily (sats)"
           ></q-input>
@@ -404,15 +404,15 @@
               <q-input
                 filled
                 dense
-                v-model.number="formDialog.data.withdrawpin"
+                v-model.number="formDialog.data.withdraw_pin"
                 type="number"
                 label="Withdraw PIN"
-                :disable="formDialog.data.withdrawpindisabled"
+                :disable="formDialog.data.withdraw_pin_disabled"
               ></q-input>
             </div>
             <div class="col-4">
               <q-toggle
-                v-model="formDialog.data.withdrawpindisabled"
+                v-model="formDialog.data.withdraw_pin_disabled"
                 color="primary"
                 label="disable"
               ></q-toggle>
@@ -424,7 +424,7 @@
               <q-input
                 filled
                 dense
-                v-model.number="formDialog.data.withdrawbtwn"
+                v-model.number="formDialog.data.withdraw_between"
                 type="number"
                 min="0"
                 label="Time between withdraws"
@@ -432,8 +432,8 @@
             </div>
             <div class="col-4">
               <q-option-group
-                v-model="formDialog.data.withdrawtimeopt"
-                :options="withdrawoptions"
+                v-model="formDialog.data.withdraw_time_option"
+                :options="withdraw_options"
                 color="primary"
                 inline
               ></q-option-group>
@@ -443,7 +443,7 @@
           <q-input
             filled
             dense
-            v-model.number="formDialog.data.withdrawpremium"
+            v-model.number="formDialog.data.withdraw_premium"
             type="number"
             label="Withdraw premium %"
             step="0.01"
@@ -468,7 +468,7 @@
                   <div class="col-12 col-md-6">
                     <q-toggle
                       v-model="formDialog.data.tax_inclusive"
-                      :label="formDialog.data.tax_inclusive ? 
+                      :label="formDialog.data.tax_inclusive ?
                                   'Tax Inclusive' :
                                   'Tax Exclusive'"
                       ><q-tooltip>
@@ -650,7 +650,7 @@
 </div>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
 <script>
-  const mapTPoS = obj => {
+  const mapTpos = obj => {
     obj.date = Quasar.utils.date.formatDate(
       new Date(obj.time * 1000),
       'YYYY-MM-DD HH:mm'
@@ -662,7 +662,7 @@
       window.location.host,
       obj.tpos
     ].join('')
-    obj.items = JSON.parse(obj.items)
+    obj.items = obj.items ? JSON.parse(obj.items) : []
     obj.itemsMap = new Map()
     obj.items.forEach((item, idx) => {
       let id = `${obj.id}:${idx + 1}`
@@ -864,23 +864,23 @@
               field: 'currency'
             },
             {
-              name: 'withdrawtimeopt',
+              name: 'withdraw_time_option',
               align: 'left',
               label: 'mins/sec',
-              field: 'withdrawtimeopt'
+              field: 'withdraw_time_option'
             },
             {
-              name: 'withdrawpindisabled',
+              name: 'withdraw_pin_disabled',
               align: 'left',
               label: 'atm pin disabled',
-              field: 'withdrawpindisabled'
+              field: 'withdraw_pin_disabled'
             }
           ],
           pagination: {
             rowsPerPage: 10
           }
         },
-        withdrawoptions: [
+        withdraw_options: [
           {
             label: 'Mins',
             value: 'mins'
@@ -893,11 +893,11 @@
         formDialog: {
           show: false,
           data: {
-            withdrawpin: null,
+            withdraw_pin: null,
             tip_options: [],
-            withdrawbtwn: 10,
-            withdrawtimeopt: '',
-            withdrawpindisabled: false,
+            withdraw_between: 10,
+            withdraw_time_option: '',
+            withdraw_pin_disabled: false,
             tax_inclusive: true
           },
           advanced: {
@@ -996,13 +996,13 @@
       closeFormDialog() {
         this.formDialog.show = false
         this.formDialog.data = {
-          withdrawpin: null,
+          withdraw_pin: null,
           tip_options: [],
-          withdrawbtwn: 10,
+          withdraw_between: 10,
           tax_inclusive: true
         }
       },
-      getTPoSs: function () {
+      getTposs: function () {
         var self = this
 
         LNbits.api
@@ -1013,11 +1013,11 @@
           )
           .then(function (response) {
             self.tposs = response.data.map(function (obj) {
-              return mapTPoS(obj)
+              return mapTpos(obj)
             })
           })
       },
-      sendTPosData() {
+      sendTposData() {
         const data = {
           ...this.formDialog.data,
           tip_options:
@@ -1032,25 +1032,25 @@
             '',
           items: JSON.stringify(this.formDialog.data.items)
         }
-        // delete withdrawbtwn if value is empty string, defaults to 10 minutes
-        if (this.formDialog.data.withdrawbtwn == '') {
-          delete data.withdrawbtwn
+        // delete withdraw_between if value is empty string, defaults to 10 minutes
+        if (this.formDialog.data.withdraw_between == '') {
+          delete data.withdraw_between
         }
         if (!this.formDialog.advanced.otc) {
-          data.withdrawlimit = null
-          data.withdrawpin = null
-          data.withdrawpremium = null
+          data.withdraw_limit = null
+          data.withdraw_pin = null
+          data.withdraw_premium = null
         }
         const wallet = _.findWhere(this.g.user.wallets, {
           id: this.formDialog.data.wallet
         })
         if (data.id) {
-          this.updateTPos(wallet, data)
+          this.updateTpos(wallet, data)
         } else {
-          this.createTPoS(wallet, data)
+          this.createTpos(wallet, data)
         }
       },
-      updateTPosForm(tposId) {
+      updateTposForm(tposId) {
         const tpos = _.findWhere(this.tposs, {id: tposId})
         this.formDialog.data = {
           ...tpos,
@@ -1059,26 +1059,26 @@
         if (this.formDialog.data.tip_wallet != '') {
           this.formDialog.advanced.tips = true
         }
-        if (this.formDialog.data.withdrawlimit >= 1) {
+        if (this.formDialog.data.withdraw_limit >= 1) {
           this.formDialog.advanced.otc = true
         }
-        if (!this.formDialog.data.withdrawpin) {
-          this.formDialog.data.withdrawpin = this.generatePIN()
+        if (!this.formDialog.data.withdraw_pin) {
+          this.formDialog.data.withdraw_pin = this.generatePIN()
         }
         this.formDialog.show = true
       },
-      createTPoS(wallet, data) {
+      createTpos(wallet, data) {
         LNbits.api
           .request('POST', '/tpos/api/v1/tposs', wallet.adminkey, data)
           .then(response => {
-            this.tposs.push(mapTPoS(response.data))
+            this.tposs.push(mapTpos(response.data))
             this.closeFormDialog()
           })
           .catch(error => {
             LNbits.utils.notifyApiError(error)
           })
       },
-      updateTPos(wallet, data) {
+      updateTpos(wallet, data) {
         LNbits.api
           .request(
             'PUT',
@@ -1090,19 +1090,19 @@
             this.tposs = _.reject(this.tposs, obj => {
               return obj.id == data.id
             })
-            this.tposs.push(mapTPoS(response.data))
+            this.tposs.push(mapTpos(response.data))
             this.closeFormDialog()
           })
           .catch(error => {
             LNbits.utils.notifyApiError(error)
           })
       },
-      deleteTPoS: function (tposId) {
+      deleteTpos: function (tposId) {
         var self = this
         var tpos = _.findWhere(this.tposs, {id: tposId})
 
         LNbits.utils
-          .confirmDialog('Are you sure you want to delete this TPoS?')
+          .confirmDialog('Are you sure you want to delete this Tpos?')
           .onOk(function () {
             LNbits.api
               .request(
@@ -1130,7 +1130,14 @@
       itemFormatPrice(price, id) {
         const tpos = id.split(':')[0]
         const currency = _.findWhere(this.tposs, {id: tpos}).currency
-        return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
+        if (currency == 'sats') {
+          return LNbits.utils.formatSat(price) + ' sat'
+        } else {
+          return LNbits.utils.formatCurrency(
+            Number(amount).toFixed(2),
+            currency
+          )
+        }
       },
       openItemDialog(id) {
         const [tposId, itemId] = id.split(':')
@@ -1221,7 +1228,7 @@
             this.tposs = _.reject(this.tposs, obj => {
               return obj.id == tposId
             })
-            this.tposs.push(mapTPoS(response.data))
+            this.tposs.push(mapTpos(response.data))
             this.closeItemDialog()
           })
           .catch(error => {
@@ -1312,7 +1319,7 @@
     },
     created: function () {
       if (this.g.user.wallets.length) {
-        this.getTPoSs()
+        this.getTposs()
       }
     }
   })
