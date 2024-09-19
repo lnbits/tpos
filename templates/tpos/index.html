@@ -35,16 +35,14 @@
             <q-tr :props="props">
               <q-th auto-width></q-th>
               <q-th auto-width></q-th>
+              <q-th auto-width></q-th>
+              <q-th auto-width></q-th>
               <q-th v-for="col in props.cols" :key="col.name" :props="props">
                 ${ col.label }
               </q-th>
-              <q-th auto-width>Tip Wallet</q-th>
-              <q-th auto-width>Tip Options %</q-th>
               <q-th auto-width>Withdraw PIN</q-th>
               <q-th auto-width>Withdraw Limit</q-th>
               <q-th auto-width>Withdraw Premium</q-th>
-              <q-th auto-width></q-th>
-              <q-th auto-width></q-th>
             </q-tr>
           </template>
 
@@ -93,49 +91,6 @@
                   ><q-tooltip>Click to copy</q-tooltip
                   >${props.row.id.substring(0,6)}...</q-btn
                 >
-              </q-td>
-
-              <q-td
-                v-for="col in props.cols"
-                v-if="col.name != 'id'"
-                :key="col.name"
-                :props="props"
-              >
-                ${ (col.name == 'tip_options' && col.value ?
-                JSON.parse(col.value).join(", ") : col.value) }
-              </q-td>
-              <q-td
-                v-if="props.row.tip_wallet && props.row.tip_wallet != ''"
-                auto-width
-              >
-                <q-btn
-                  unelevated
-                  dense
-                  size="md"
-                  copy="copy"
-                  @click="copyText(props.row.tip_wallet)"
-                  ><q-tooltip>Click to copy</q-tooltip
-                  >${props.row.tip_wallet.substring(0,6)}...</q-btn
-                >
-              </q-td>
-              <q-td v-else auto-width> N/A </q-td>
-              <q-td v-if="props.row.tip_wallet != ''" auto-width>
-                ${props.row.tip_options}
-              </q-td>
-              <q-td v-else auto-width>N/A </q-td>
-              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
-                ${props.row.withdraw_pin}
-              </q-td>
-              <q-td v-else auto-width> N/A </q-td>
-              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
-                ${props.row.withdraw_limit}
-              </q-td>
-              <q-td v-else auto-width> N/A </q-td>
-              <q-td v-if="props.row.withdraw_premium > 0" auto-width>
-                ${props.row.withdraw_premium}%
-              </q-td>
-              <q-td v-else auto-width> 0 </q-td>
-              <q-td auto-width>
                 <q-btn
                   flat
                   dense
@@ -155,6 +110,29 @@
                   color="pink"
                 ></q-btn>
               </q-td>
+
+              <q-td
+                v-for="col in props.cols"
+                v-if="col.name != 'id'"
+                :key="col.name"
+                :props="props"
+              >
+                ${ (col.name == 'tip_options' && col.value ?
+                JSON.parse(col.value).join(", ") : col.value) }
+              </q-td>
+              <q-td v-else auto-width>N/A </q-td>
+              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
+                ${props.row.withdraw_pin}
+              </q-td>
+              <q-td v-else auto-width> N/A </q-td>
+              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
+                ${props.row.withdraw_limit}
+              </q-td>
+              <q-td v-else auto-width> N/A </q-td>
+              <q-td v-if="props.row.withdraw_premium > 0" auto-width>
+                ${props.row.withdraw_premium}%
+              </q-td>
+              <q-td v-else auto-width> 0 </q-td>
             </q-tr>
             <q-tr v-show="props.expand" :props="props">
               <q-td colspan="100%">
