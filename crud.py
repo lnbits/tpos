@@ -30,7 +30,6 @@ async def create_tpos(data: CreateTposData) -> Tpos:
 
 async def get_tpos(tpos_id: str) -> Optional[Tpos]:
     row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id})
-    print(row)
     return Tpos(**row) if row else None
 
 
