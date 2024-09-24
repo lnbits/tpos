@@ -702,7 +702,6 @@ window.app = Vue.createApp({
   created: function () {
     var getRates = this.getRates
     getRates()
-    console.log(tpos)
     this.pinDisabled = tpos.withdraw_pin_disabled
     this.taxInclusive = tpos.tax_inclusive
     this.taxDefault = tpos.tax_default
