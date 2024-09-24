@@ -399,7 +399,7 @@ window.app = Vue.createApp({
       const json = JSON.stringify(data, null, 2)
       let status = Quasar.exportFile(filename, json)
       if (status !== true) {
-        this.$q.notify({
+        Quasar.Notify.create({
           message: 'Browser denied file download...',
           color: 'negative'
         })
@@ -424,7 +424,7 @@ window.app = Vue.createApp({
               }
               this.openFileDataDialog(tposId, data)
             } catch (error) {
-              this.$q.notify({
+              Quasar.Notify.create({
                 message: `Error importing file. ${error.message}`,
                 color: 'negative'
               })
@@ -433,7 +433,7 @@ window.app = Vue.createApp({
           }
         }
       } catch (error) {
-        this.$q.notify({
+        Quasar.Notify.create({
           message: 'Error importing file',
           color: 'negative'
         })
@@ -478,7 +478,7 @@ window.app = Vue.createApp({
     LNbits.api
       .request('GET', '/api/v1/currencies')
       .then(response => {
-        this.currencyOptions = ['satoshis', ...response.data]
+        this.currencyOptions = ['sats', ...response.data]
       })
       .catch(err => {
         LNbits.utils.notifyApiError(err)

@@ -4,11 +4,11 @@ window.app = Vue.createApp({
   delimiters: ['${', '}'],
   data: function () {
     return {
-      tposId: tpos.id,
-      currency: tpos.currency,
+      tposId: null,
+      currency: null,
       atmPremium: tpos.withdraw_premium / 100,
-      withdraw_maximum: withdraw_maximum,
-      withdraw_pin_open: withdraw_pin_open,
+      withdrawMaximum: 0,
+      withdrawPinOpen: null,
       tip_options: null,
       exchangeRate: null,
       stack: [],
@@ -257,35 +257,33 @@ window.app = Vue.createApp({
       if (this.atmPremium > 0) {
         this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
       }
-      if (this.withdraw_pin_open != 0) {
-        this.atmPin = this.withdraw_pin_open
+      if (this.withdrawPinOpen != 0) {
+        this.atmPin = this.withdrawPinOpen
         this.atmSubmit()
         return
       }
-      if (this.withdraw_maximum > 0) {
+      if (this.withdrawMaximum > 0) {
         this.atmBox = true
       }
     },
     atmSubmit() {
-      self = this
       LNbits.api
         .request('GET', `/tpos/api/v1/atm/` + this.tposId + `/` + this.atmPin)
-        .then(function (res) {
-          self.atmToken = res.data.id
+        .then(res => {
+          this.atmToken = res.data.id
           if (res.data.claimed == false) {
-            self.atmBox = false
-            self.atmMode = true
+            this.atmBox = false
+            this.atmMode = true
           }
         })
         .catch(function (error) {
           LNbits.utils.notifyApiError(error)
         })
     },
-    atmGetWithdraw: function () {
-      self = this
+    atmGetWithdraw() {
       var dialog = this.invoiceDialog
-      if (this.sat > this.withdraw_maximum) {
-        this.$q.notify({
+      if (this.sat > this.withdrawMaximum) {
+        Quasar.Notify.create({
           type: 'negative',
           message: 'Amount exceeds the maximum withdrawal limit.'
         })
@@ -296,9 +294,9 @@ window.app = Vue.createApp({
           'GET',
           `/tpos/api/v1/atm/withdraw/` + this.atmToken + `/` + this.sat
         )
-        .then(function (res) {
+        .then(res => {
           if (res.data.status == 'ERROR') {
-            self.$q.notify({
+            Quasar.Notify.create({
               type: 'negative',
               message: res.data.reason
             })
@@ -307,40 +305,40 @@ window.app = Vue.createApp({
           lnurl = res.data.lnurl
           dialog.data = {payment_request: lnurl}
           dialog.show = true
-          self.readNfcTag()
-          dialog.dismissMsg = self.$q.notify({
+          this.readNfcTag()
+          dialog.dismissMsg = Quasar.Notify.create({
             timeout: 0,
             message: 'Withdraw...'
           })
           if (location.protocol !== 'http:') {
-            self.withdrawUrl =
+            this.withdrawUrl =
               'wss://' +
               document.domain +
               ':' +
               location.port +
               '/api/v1/ws/' +
-              self.atmToken
+              this.atmToken
           } else {
-            self.withdrawUrl =
+            this.withdrawUrl =
               'ws://' +
               document.domain +
               ':' +
               location.port +
               '/api/v1/ws/' +
-              self.atmToken
+              this.atmToken
           }
-          this.connectionWithdraw = new WebSocket(self.withdrawUrl)
+          this.connectionWithdraw = new WebSocket(this.withdrawUrl)
           this.connectionWithdraw.onmessage = e => {
             if (e.data == 'paid') {
               dialog.show = false
-              self.atmPin = null
-              self.atmToken = ''
-              self.complete.show = true
-              self.atmMode = false
+              this.atmPin = null
+              this.atmToken = ''
+              this.complete.show = true
+              this.atmMode = false
               this.connectionWithdraw.close()
             }
           }
-          self.getRates()
+          this.getRates()
         })
         .catch(function (error) {
           LNbits.utils.notifyApiError(error)
@@ -354,7 +352,7 @@ window.app = Vue.createApp({
     calculatePercent() {
       let change = ((this.tipRounding - this.amount) / this.amount) * 100
       if (change < 0) {
-        this.$q.notify({
+        Quasar.Notify.create({
           type: 'warning',
           message: 'Amount with tip must be greater than initial amount.'
         })
@@ -396,7 +394,7 @@ window.app = Vue.createApp({
       }
 
       if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
-        this.$q.notify({
+        Quasar.Notify.create({
           type: 'negative',
           message:
             'Exchange rate not available, or wrong value. Please try again later.'
@@ -419,9 +417,8 @@ window.app = Vue.createApp({
         this.showInvoice()
       }
     },
-    showInvoice: function () {
-      var self = this
-      if (self.atmMode) {
+    showInvoice() {
+      if (this.atmMode) {
         this.atmGetWithdraw()
       } else {
         var dialog = this.invoiceDialog
@@ -455,32 +452,32 @@ window.app = Vue.createApp({
           .post('/tpos/api/v1/tposs/' + this.tposId + '/invoices', null, {
             params: {...params}
           })
-          .then(function (response) {
+          .then(response => {
             dialog.data = response.data
             dialog.show = true
-            self.readNfcTag()
+            this.readNfcTag()
 
-            dialog.dismissMsg = self.$q.notify({
+            dialog.dismissMsg = Quasar.Notify.create({
               timeout: 0,
               message: 'Waiting for payment...'
             })
 
-            dialog.paymentChecker = setInterval(function () {
+            dialog.paymentChecker = setInterval(() => {
               axios
                 .get(
                   '/tpos/api/v1/tposs/' +
-                    self.tposId +
+                    this.tposId +
                     '/invoices/' +
                     response.data.payment_hash
                 )
-                .then(function (res) {
+                .then(res => {
                   if (res.data.paid) {
                     clearInterval(dialog.paymentChecker)
                     dialog.dismissMsg()
                     dialog.show = false
-                    self.clearCart()
+                    this.clearCart()
 
-                    self.complete.show = true
+                    this.complete.show = true
                   }
                 })
             }, 3000)
@@ -492,8 +489,6 @@ window.app = Vue.createApp({
     },
     readNfcTag: function () {
       try {
-        const self = this
-
         if (typeof NDEFReader == 'undefined') {
           console.debug('NFC not supported on this device or browser.')
           return
@@ -507,7 +502,7 @@ window.app = Vue.createApp({
         }
 
         this.nfcTagReading = true
-        this.$q.notify({
+        Quasar.Notify.create({
           message: this.atmMode
             ? 'Tap your NFC tag to withdraw with LNURLp.'
             : 'Tap your NFC tag to pay this invoice with LNURLw.'
@@ -515,9 +510,9 @@ window.app = Vue.createApp({
 
         return ndef.scan({signal: readerAbortController.signal}).then(() => {
           ndef.onreadingerror = () => {
-            self.nfcTagReading = false
+            this.nfcTagReading = false
 
-            this.$q.notify({
+            Quasar.Notify.create({
               type: 'negative',
               message: 'There was an error reading this NFC tag.'
             })
@@ -537,19 +532,19 @@ window.app = Vue.createApp({
             const lnurl = textDecoder.decode(record.data)
 
             //User feedback, show loader icon
-            self.nfcTagReading = false
-            if (self.atmMode) {
+            this.nfcTagReading = false
+            if (this.atmMode) {
               const URL = lnurl.replace('lnurlp://', 'https://')
               LNbits.api
                 .request('GET', `${lnurl.replace('lnurlw://', 'https://')}`)
                 .then(res => {
-                  self.makeWithdraw(res.data.payLink, readerAbortController)
+                  this.makeWithdraw(res.data.payLink, readerAbortController)
                 })
             } else {
-              self.payInvoice(lnurl, readerAbortController)
+              this.payInvoice(lnurl, readerAbortController)
             }
 
-            this.$q.notify({
+            Quasar.Notify.create({
               type: 'positive',
               message: 'NFC tag read successfully.'
             })
@@ -557,7 +552,7 @@ window.app = Vue.createApp({
         })
       } catch (error) {
         this.nfcTagReading = false
-        this.$q.notify({
+        Quasar.Notify.create({
           type: 'negative',
           message: error
             ? error.toString()
@@ -567,7 +562,7 @@ window.app = Vue.createApp({
     },
     makeWithdraw(payLink, readerAbortController) {
       if (!payLink) {
-        this.$q.notify({
+        Quasar.Notify.create({
           type: 'negative',
           message: 'LNURL not found in NFC tag.'
         })
@@ -580,14 +575,14 @@ window.app = Vue.createApp({
         )
         .then(res => {
           if (!res.data.success) {
-            this.$q.notify({
+            Quasar.Notify.create({
               type: 'negative',
               message: res.data.detail
             })
           } else {
             this.stack = []
             this.total = 0.0
-            this.$q.notify({
+            Quasar.Notify.create({
               type: 'positive',
               message: 'Topup successful!'
             })
@@ -599,15 +594,13 @@ window.app = Vue.createApp({
           readerAbortController.abort()
         })
     },
-    payInvoice: function (lnurl, readerAbortController) {
-      const self = this
-
+    payInvoice(lnurl, readerAbortController) {
       return axios
         .post(
           '/tpos/api/v1/tposs/' +
-            self.tposId +
+            this.tposId +
             '/invoices/' +
-            self.invoiceDialog.data.payment_request +
+            this.invoiceDialog.data.payment_request +
             '/pay',
           {
             lnurl: lnurl
@@ -615,7 +608,7 @@ window.app = Vue.createApp({
         )
         .then(response => {
           if (!response.data.success) {
-            this.$q.notify({
+            Quasar.Notify.create({
               type: 'negative',
               message: response.data.detail
             })
@@ -699,9 +692,16 @@ window.app = Vue.createApp({
       }
     }
   },
-  created: function () {
-    var getRates = this.getRates
-    getRates()
+  created() {
+    this.tposId = tpos.id
+    this.currency = tpos.currency
+    this.atmPremium = tpos.withdraw_premium / 100
+    this.withdrawMaximum = withdraw_maximum
+    this.withdrawPinOpen = withdraw_pin_open
+    this.getRates()
+    setInterval(() => {
+      this.getRates()
+    }, 120000)
     this.pinDisabled = tpos.withdraw_pin_disabled
     this.taxInclusive = tpos.tax_inclusive
     this.taxDefault = tpos.tax_default
@@ -765,9 +765,5 @@ window.app = Vue.createApp({
       // cancel the default action to avoid it being handled twice
       event.preventDefault()
     })
-
-    setInterval(function () {
-      getRates()
-    }, 120000)
   }
 })

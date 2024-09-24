@@ -220,7 +220,7 @@
       <q-page-sticky position="top-right" :offset="[18, 162]">
         <q-btn
           @click="atm"
-          v-if="withdraw_maximum > 0 && !atmMode"
+          v-if="withdrawMaximum > 0 && !atmMode"
           fab
           icon="atm"
           color="primary"
@@ -528,24 +528,19 @@
 </style>
 {% endblock %} {% block scripts %}
 <script>
-  // pass Jinja variables to JS
   const tpos = {}
   tpos.id = '{{ tpos.id }}'
   tpos.currency = '{{ tpos.currency }}'
   tpos.withdraw_premium = Number('{{ tpos.withdraw_premium }}') / 100
   withdraw_maximum = Number('{{ withdraw_maximum }}')
-  tpos.items = JSON.parse('{{ tpos.items | safe }}')
-  tpos.tip_options =
-    '{{ tpos.tip_options | tojson }}' == 'null'
-      ? null
-      : JSON.parse('{{ tpos.tip_options }}')
+  const items = '{{ items | safe }}'
+  tpos.items = items ? JSON.parse(items) : []
+  const options = '{{ tpos.tip_options | safe }}'
+  tpos.tip_options = options ? JSON.parse(options) : []
   tpos.tip_wallet = '{{ tpos.tip_wallet }}'
-  tpos.withdraw_pin_disabled = JSON.parse(
-    '{{ tpos.withdraw_pin_disabled | tojson }}'
-  )
-  tpos.tax_inclusive = JSON.parse('{{ tpos.tax_inclusive | tojson }}')
+  tpos.withdraw_pin_disabled = '{{ tpos.withdraw_pin_disabled }}'
+  tpos.tax_inclusive = '{{ tpos.tax_inclusive }}'
   tpos.tax_default = Number('{{ tpos.tax_default }}')
-
   const withdraw_pin_open = Number('{{ withdraw_pin_open }}')
 </script>
 
