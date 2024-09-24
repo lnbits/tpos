@@ -108,7 +108,7 @@ async def update_tpos_withdraw(data: Tpos, tpos_id: str) -> Tpos:
 
     # Update the withdraw time in the database
     await db.execute(
-        "UPDATE tpos.pos SET withdrawtime = :time WHERE id = :id",
+        "UPDATE tpos.pos SET withdraw_time = :time WHERE id = :id",
         {"time": now, "id": tpos_id},
     )
 
