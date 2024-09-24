@@ -1,4 +1,23 @@
-<template>
+window.app.component('item-list', {
+  name: 'item-list',
+  props: ['items', 'inclusive', 'format', 'currency', 'add-product'],
+  data: function () {
+    return {}
+  },
+  computed: {
+  },
+  methods: {
+    taxString(item) {
+        return `tax ${this.inclusive ? 'incl.' : 'excl.'} ${item.tax ? item.tax + '%' : ''}`
+    },
+    formatPrice(item) {
+        return `Price w/ tax: ${this.format(item.price * (1 + item.tax * 0.01), this.currency)}`
+    },
+    addToCart(item) {
+      this.$emit('add-product', item)
+    }
+  },
+  template: `
   <div style="margin-bottom: 200px">
     <q-separator></q-separator>
     <q-list separator padding>
@@ -32,13 +51,13 @@
           <q-item-label caption lines="1">
             <i
               ><span
-                v-text="`tax ${inclusive ? 'incl.' : 'excl.'} ${item.tax ? item.tax + '%' : ''}`"
+                v-text="taxString(item)"
               ></span
             ></i>
           </q-item-label>
           <q-item-label v-if="!inclusive" lines="1" class="q-mt-xs">
             <span
-              v-text="`Price w/ tax: ${format(item.price * (1 + item.tax * 0.01), currency)}`"
+              v-text="formatPrice(item)"
             ></span>
           </q-item-label>
         </q-item-section>
@@ -52,20 +71,5 @@
     </q-list>
     <q-separator></q-separator>
   </div>
-</template>
-
-<script setup>
-    window.app.component('item-list', {
-      name: 'item-list',
-      props: ['items', 'inclusive', 'format', 'currency', 'add-product'],
-      data: function () {
-        return {}
-      },
-      computed: {},
-      methods: {
-        addToCart(item) {
-          this.$emit('add-product', item)
-        }
-      }
-    })
-</script>
+  `
+})

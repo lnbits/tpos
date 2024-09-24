@@ -527,9 +527,6 @@
   }
 </style>
 {% endblock %} {% block scripts %}
-<script src="{{ url_for('tpos_static', path='js/utils.js') }}"></script>
-<script src="{{ url_for('tpos_static', path='components/item-list/item-list.js') }}"></script>
-
 <script>
   // pass Jinja variables to JS
   const tpos = {}
@@ -552,7 +549,7 @@
   const withdraw_pin_open = Number('{{ withdraw_pin_open }}')
 </script>
 
-<script src="{{ url_for('tpos_static', path='js/tpos.js') }}"></script>
+<script src="{{ static_url_for('tpos/static', path='js/tpos.js') }}"></script>
 
 <style scoped>
   input::-webkit-outer-spin-button,
