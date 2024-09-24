@@ -4,14 +4,13 @@ window.app.component('item-list', {
   data: function () {
     return {}
   },
-  computed: {
-  },
+  computed: {},
   methods: {
     taxString(item) {
-        return `tax ${this.inclusive ? 'incl.' : 'excl.'} ${item.tax ? item.tax + '%' : ''}`
+      return `tax ${this.inclusive ? 'incl.' : 'excl.'} ${item.tax ? item.tax + '%' : ''}`
     },
     formatPrice(item) {
-        return `Price w/ tax: ${this.format(item.price * (1 + item.tax * 0.01), this.currency)}`
+      return `Price w/ tax: ${this.format(item.price * (1 + item.tax * 0.01), this.currency)}`
     },
     addToCart(item) {
       this.$emit('add-product', item)
