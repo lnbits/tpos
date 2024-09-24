@@ -18,7 +18,6 @@ class CreateTposData(BaseModel):
     withdraw_between: int = Field(10, ge=1)
     withdraw_limit: Optional[int] = Field(None, ge=1)
     withdraw_pin: Optional[int] = Field(None, ge=1)
-    withdraw_amount: Optional[int] = Field(None, ge=0)
     withdraw_time_option: Optional[str] = Field(None)
     withdraw_premium: Optional[float] = Field(None)
     withdraw_pin_disabled: bool = Field(False)
@@ -33,18 +32,18 @@ class TposClean(BaseModel):
     withdraw_time: int
     withdraw_between: int
     withdraw_limit: Optional[int] = None
-    withdraw_amount: Optional[int] = None
     withdraw_time_option: Optional[str] = None
     withdraw_premium: Optional[float] = None
     withdraw_pin_disabled: Optional[bool] = None
+    withdrawn_amount: int = 0
     items: Optional[str] = None
     tip_options: Optional[str] = None
 
     @property
     def withdraw_maximum(self) -> int:
-        if not self.withdraw_amount or not self.withdraw_limit:
+        if not self.withdraw_limit:
             return 0
-        return self.withdraw_limit - self.withdraw_amount
+        return self.withdraw_limit - self.withdrawn_amount
 
 
 class Tpos(TposClean, BaseModel):

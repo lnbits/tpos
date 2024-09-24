@@ -8,7 +8,7 @@ from lnbits.core.services import pay_invoice, websocket_updater
 from loguru import logger
 from starlette.exceptions import HTTPException
 
-from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos_withdraw
+from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos
 from .models import LnurlCharge
 
 
@@ -126,11 +126,8 @@ async def lnurl_callback(
         )
     )
 
-    assert tpos.withdraw_amount, f"TPoS {lnurlcharge.tpos_id} has no withdraw_amount"
-    tpos.withdraw_amount = int(tpos.withdraw_amount) + int(lnurlcharge.amount)
-    logger.debug(f"Payment request: {pr}")
-    await update_tpos_withdraw(data=tpos, tpos_id=lnurlcharge.tpos_id)
-    logger.debug(f"Amount to withdraw: {int(lnurlcharge.amount)}")
+    tpos.withdrawn_amount = int(tpos.withdrawn_amount or 0) + int(lnurlcharge.amount)
+    await update_tpos(tpos)
 
     try:
         await pay_invoice(

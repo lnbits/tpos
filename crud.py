@@ -1,21 +1,12 @@
+from time import time
 from typing import Optional, Union
 
 from lnbits.db import Database
 from lnbits.helpers import insert_query, update_query, urlsafe_short_hash
-from loguru import logger
 
 from .models import CreateTposData, LnurlCharge, Tpos, TposClean
 
 db = Database("ext_tpos")
-
-
-async def get_current_timestamp():
-    # Get current DB timestamp
-    timestamp_query = f"SELECT {db.timestamp_now}"
-    if db.type in {"POSTGRES", "COCKROACH"}:
-        timestamp_query = f"SELECT EXTRACT(EPOCH FROM {db.timestamp_now})"
-    current_timestamp = (await db.fetchone(timestamp_query))[0]
-    return int(current_timestamp)
 
 
 async def create_tpos(data: CreateTposData) -> Tpos:
@@ -33,32 +24,31 @@ async def get_tpos(tpos_id: str) -> Optional[Tpos]:
     return Tpos(**row) if row else None
 
 
-async def start_lnurlcharge(tpos_id: str):
-    tpos = await get_tpos(tpos_id)
-    assert tpos, f"TPoS with {tpos_id} not found!"
-
-    now = await get_current_timestamp()
-    withdraw_time_seconds = (
+async def start_lnurlcharge(tpos: Tpos) -> LnurlCharge:
+    now = int(time())
+    seconds = (
         tpos.withdraw_between * 60
         if tpos.withdraw_time_option != "secs"
         else tpos.withdraw_between
     )
+    last_withdraw = tpos.withdraw_time - now
     assert (
-        now - tpos.withdraw_time > withdraw_time_seconds
+        last_withdraw < seconds
     ), f"""
-    Last withdraw was made too recently, please try again in
-    {int(withdraw_time_seconds - (now - tpos.withdraw_time))} secs
+        Last withdraw was made too recently, please try again in
+        {int(seconds - (last_withdraw))} secs
     """
 
     token = urlsafe_short_hash()
     await db.execute(
         """
-        INSERT INTO tpos.withdraws (id, tpos_id)
+        INSERT INTO tpos.withdraws (id, tpos_id, amount)
         VALUES (:id, :tpos_id)
         """,
-        {"id": token, "tpos_id": tpos_id},
+        {"id": token, "tpos_id": tpos.id},
     )
     lnurlcharge = await get_lnurlcharge(token)
+    assert lnurlcharge, "Newly created lnurlcharge couldn't be retrieved"
     return lnurlcharge
 
 
@@ -84,37 +74,6 @@ async def update_lnurlcharge(data: LnurlCharge) -> LnurlCharge:
 async def get_clean_tpos(tpos_id: str) -> Optional[TposClean]:
     row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id})
     return TposClean(**row) if row else None
-
-
-async def update_tpos_withdraw(data: Tpos, tpos_id: str) -> Tpos:
-    # Calculate the time between withdrawals in seconds
-    now = await get_current_timestamp()
-    time_elapsed = now - data.withdraw_time
-    withdraw_time_seconds = (
-        data.withdraw_between * 60
-        if data.withdraw_time_option != "secs"
-        else data.withdraw_between
-    )
-
-    logger.debug(f"Time between: {time_elapsed} seconds")
-
-    # Check if the time between withdrawals is less than withdrawbtwn
-    assert (
-        time_elapsed > withdraw_time_seconds
-    ), f"""
-    Last withdraw was made too recently, please try again in
-    {int(withdraw_time_seconds - (time_elapsed))} secs"
-    """
-
-    # Update the withdraw time in the database
-    await db.execute(
-        "UPDATE tpos.pos SET withdraw_time = :time WHERE id = :id",
-        {"time": now, "id": tpos_id},
-    )
-
-    tpos = await get_tpos(tpos_id)
-    assert tpos, "Newly updated tpos couldn't be retrieved"
-    return tpos
 
 
 async def update_tpos(tpos: Tpos) -> Tpos:

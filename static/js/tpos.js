@@ -268,7 +268,7 @@ window.app = Vue.createApp({
     },
     atmSubmit() {
       LNbits.api
-        .request('GET', `/tpos/api/v1/atm/` + this.tposId + `/` + this.atmPin)
+        .request('GET', `/tpos/api/v1/atm/${this.tposId}/${this.atmPin}`)
         .then(res => {
           this.atmToken = res.data.id
           if (res.data.claimed == false) {

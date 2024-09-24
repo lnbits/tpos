@@ -141,10 +141,10 @@ async def m010_rename_tpos_withdraw_columns(db):
         SELECT
         id, name, currency, items, wallet, tax_inclusive,
         tax_default, tip_wallet, tip_options,
+        withdrawamt AS withdrawn_amount,
         withdrawtime AS withdraw_time,
         withdrawbtwn AS withdraw_between,
         withdrawlimit AS withdraw_limit,
-        withdrawamt AS withdraw_amount,
         withdrawtimeopt AS withdraw_time_option,
         withdrawpremium AS withdraw_premium,
         withdrawpindisabled AS withdraw_pin_disabled,

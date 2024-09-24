@@ -242,12 +242,11 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
         )
-    # TODO: remove this when v0.12.11 is released
-    return {"paid": payment.success}  # type: ignore
+    return {"paid": payment.success}
 
 
 @tpos_api_router.get("/api/v1/atm/{tpos_id}/{atmpin}", status_code=HTTPStatus.CREATED)
-async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
+async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int) -> LnurlCharge:
     tpos = await get_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
@@ -255,7 +254,7 @@ async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int):
         )
     if int(tpos.withdraw_pin or 0) != int(atmpin):
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wrong PIN.")
-    token = await start_lnurlcharge(tpos_id)
+    token = await start_lnurlcharge(tpos)
     return token
 
 
