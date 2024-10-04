@@ -2,7 +2,7 @@ from time import time
 from typing import Optional, Union
 
 from lnbits.db import Database
-from lnbits.helpers import insert_query, update_query, urlsafe_short_hash
+from lnbits.helpers import urlsafe_short_hash
 
 from .models import CreateTposData, LnurlCharge, Tpos, TposClean
 
@@ -12,10 +12,7 @@ db = Database("ext_tpos")
 async def create_tpos(data: CreateTposData) -> Tpos:
     tpos_id = urlsafe_short_hash()
     tpos = Tpos(id=tpos_id, **data.dict())
-    await db.execute(
-        insert_query("tpos.pos", tpos),
-        tpos.dict(),
-    )
+    await db.insert("tpos.pos", tpos)
     return tpos
 
 
@@ -42,7 +39,7 @@ async def start_lnurlcharge(tpos: Tpos) -> LnurlCharge:
     token = urlsafe_short_hash()
     await db.execute(
         """
-        INSERT INTO tpos.withdraws (id, tpos_id, amount)
+        INSERT INTO tpos.withdraws (id, tpos_id)
         VALUES (:id, :tpos_id)
         """,
         {"id": token, "tpos_id": tpos.id},
@@ -60,10 +57,7 @@ async def get_lnurlcharge(lnurlcharge_id: str) -> Optional[LnurlCharge]:
 
 
 async def update_lnurlcharge(data: LnurlCharge) -> LnurlCharge:
-    await db.execute(
-        update_query("tpos.withdraws", data),
-        data.dict(),
-    )
+    await db.update("tpos.withdraws", data)
 
     lnurlcharge = await get_lnurlcharge(data.id)
     assert lnurlcharge, "Withdraw couldn't be retrieved"
@@ -77,10 +71,7 @@ async def get_clean_tpos(tpos_id: str) -> Optional[TposClean]:
 
 
 async def update_tpos(tpos: Tpos) -> Tpos:
-    await db.execute(
-        update_query("tpos.pos", tpos),
-        tpos.dict(),
-    )
+    await db.update("tpos.pos", tpos)
     return tpos
 
 

@@ -20,7 +20,7 @@ def tpos_renderer():
 @tpos_generic_router.get("/", response_class=HTMLResponse)
 async def index(request: Request, user: User = Depends(check_user_exists)):
     return tpos_renderer().TemplateResponse(
-        "tpos/index.html", {"request": request, "user": user.dict()}
+        "tpos/index.html", {"request": request, "user": user.json()}
     )
 
 

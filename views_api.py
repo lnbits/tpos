@@ -249,11 +249,9 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
 async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int) -> LnurlCharge:
     tpos = await get_tpos(tpos_id)
     if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
+        raise HTTPException(HTTPStatus.NOT_FOUND, "TPoS does not exist.")
     if int(tpos.withdraw_pin or 0) != int(atmpin):
-        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Wrong PIN.")
+        raise HTTPException(HTTPStatus.NOT_FOUND, "Wrong PIN.")
     token = await start_lnurlcharge(tpos)
     return token
 
