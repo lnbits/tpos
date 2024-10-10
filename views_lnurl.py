@@ -8,8 +8,8 @@ from lnbits.core.services import pay_invoice, websocket_updater
 from loguru import logger
 from starlette.exceptions import HTTPException
 
-from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos_withdraw
-from .models import LNURLCharge
+from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos
+from .models import LnurlCharge
 
 
 class LNURLErrorResponseHandler(APIRoute):
@@ -60,12 +60,12 @@ async def lnurl_params(
             "reason": f"TPoS {lnurlcharge.tpos_id} not found on this server",
         }
 
-    if amount > tpos.withdrawamtposs:
+    if amount > tpos.withdraw_maximum:
         return {
             "status": "ERROR",
             "reason": (
                 f"Amount requested {amount} is too high, "
-                f"maximum withdrawable is {tpos.withdrawamtposs}"
+                f"maximum withdrawable is {tpos.withdraw_maximum}"
             ),
         }
 
@@ -99,26 +99,26 @@ async def lnurl_callback(
             "reason": f"lnurlcharge {k1} not found on this server",
         }
 
-    assert lnurlcharge.amount, f"LNURLCharge {k1} has no amount"
+    assert lnurlcharge.amount, f"LnurlCharge {k1} has no amount"
 
     if lnurlcharge.claimed:
         return {
             "status": "ERROR",
-            "reason": f"LNURLCharge {k1} has already been claimed",
+            "reason": f"LnurlCharge {k1} has already been claimed",
         }
 
     tpos = await get_tpos(lnurlcharge.tpos_id)
     assert tpos, f"TPoS with ID {lnurlcharge.tpos_id} not found"
 
     assert (
-        lnurlcharge.amount < tpos.withdrawamtposs
+        lnurlcharge.amount < tpos.withdraw_maximum
     ), f"""
     Amount requested {lnurlcharge.amount} is too high,
-    maximum withdrawable is {tpos.withdrawamtposs}
+    maximum withdrawable is {tpos.withdraw_maximum}
     """
 
     await update_lnurlcharge(
-        LNURLCharge(
+        LnurlCharge(
             id=k1,
             tpos_id=lnurlcharge.tpos_id,
             amount=int(lnurlcharge.amount),
@@ -126,10 +126,8 @@ async def lnurl_callback(
         )
     )
 
-    tpos.withdrawamt = int(tpos.withdrawamt) + int(lnurlcharge.amount)
-    logger.debug(f"Payment request: {pr}")
-    await update_tpos_withdraw(data=tpos, tpos_id=lnurlcharge.tpos_id)
-    logger.debug(f"Amount to withdraw: {int(lnurlcharge.amount)}")
+    tpos.withdrawn_amount = int(tpos.withdrawn_amount or 0) + int(lnurlcharge.amount)
+    await update_tpos(tpos)
 
     try:
         await pay_invoice(

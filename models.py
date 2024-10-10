@@ -1,5 +1,4 @@
-from sqlite3 import Row
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import Request
 from lnurl import Lnurl
@@ -11,60 +10,53 @@ class CreateTposData(BaseModel):
     wallet: Optional[str]
     name: Optional[str]
     currency: Optional[str]
-    tip_options: str = Field("[]")
-    tip_wallet: str = Field("")
-    withdrawlimit: int = Field(None, ge=1)
-    withdrawpin: int = Field(None, ge=1)
-    withdrawamt: int = Field(None, ge=0)
-    withdrawtime: int = Field(0)
-    withdrawtimeopt: Optional[str]
-    withdrawbtwn: int = Field(10, ge=1)
-    withdrawpremium: float = Field(None)
-    withdrawpindisabled: bool = Field(False)
     tax_inclusive: bool = Field(True)
     tax_default: float = Field(None)
+    tip_options: str = Field("[]")
+    tip_wallet: str = Field("")
+    withdraw_time: int = Field(0)
+    withdraw_between: int = Field(10, ge=1)
+    withdraw_limit: Optional[int] = Field(None, ge=1)
+    withdraw_pin: Optional[int] = Field(None, ge=1)
+    withdraw_time_option: Optional[str] = Field(None)
+    withdraw_premium: Optional[float] = Field(None)
+    withdraw_pin_disabled: bool = Field(False)
 
 
-class TPoSClean(BaseModel):
+class TposClean(BaseModel):
     id: str
     name: str
     currency: str
-    tip_options: Optional[str]
-    withdrawlimit: Optional[int]
-    withdrawamt: int
-    withdrawtime: int
-    withdrawtimeopt: Optional[str]
-    withdrawbtwn: int
-    withdrawpremium: Optional[float]
-    withdrawpindisabled: Optional[bool]
-    items: Optional[str]
     tax_inclusive: bool
-    tax_default: Optional[float]
-
-    @classmethod
-    def from_row(cls, row: Row) -> "TPoSClean":
-        return cls(**dict(row))
+    tax_default: Optional[float] = None
+    withdraw_time: int
+    withdraw_between: int
+    withdraw_limit: Optional[int] = None
+    withdraw_time_option: Optional[str] = None
+    withdraw_premium: Optional[float] = None
+    withdraw_pin_disabled: Optional[bool] = None
+    withdrawn_amount: int = 0
+    items: Optional[str] = None
+    tip_options: Optional[str] = None
 
     @property
-    def withdrawamtposs(self) -> int:
-        return self.withdrawlimit - self.withdrawamt if self.withdrawlimit else 0
+    def withdraw_maximum(self) -> int:
+        if not self.withdraw_limit:
+            return 0
+        return self.withdraw_limit - self.withdrawn_amount
 
 
-class TPoS(TPoSClean, BaseModel):
+class Tpos(TposClean, BaseModel):
     wallet: str
-    tip_wallet: Optional[str]
-    withdrawpin: Optional[int]
+    tip_wallet: Optional[str] = None
+    withdraw_pin: Optional[int] = None
 
 
-class LNURLCharge(BaseModel):
+class LnurlCharge(BaseModel):
     id: str
     tpos_id: str
     amount: int = Field(None)
     claimed: bool = Field(False)
-
-    @classmethod
-    def from_row(cls, row: Row) -> "LNURLCharge":
-        return cls(**dict(row))
 
     def lnurl(self, req: Request) -> Lnurl:
         url = str(
@@ -93,7 +85,7 @@ class Item(BaseModel):
     description: Optional[str]
     tax: Optional[float] = Field(0, ge=0.0)
     disabled: bool = False
-    categories: Optional[List[str]] = []
+    categories: Optional[list[str]] = []
 
     @validator("tax", pre=True, always=True)
     def set_default_tax(cls, v):
@@ -101,4 +93,4 @@ class Item(BaseModel):
 
 
 class CreateUpdateItemData(BaseModel):
-    items: List[Item]
+    items: list[Item]

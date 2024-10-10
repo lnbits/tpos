@@ -1,4 +1,7 @@
-async def m001_initial(db):
+from lnbits.db import Database
+
+
+async def m001_initial(db: Database):
     """
     Initial tposs table.
     """
@@ -14,7 +17,7 @@ async def m001_initial(db):
     )
 
 
-async def m002_addtip_wallet(db):
+async def m002_addtip_wallet(db: Database):
     """
     Add tips to tposs table
     """
@@ -25,7 +28,7 @@ async def m002_addtip_wallet(db):
     )
 
 
-async def m003_addtip_options(db):
+async def m003_addtip_options(db: Database):
     """
     Add tips to tposs table
     """
@@ -36,8 +39,7 @@ async def m003_addtip_options(db):
     )
 
 
-async def m004_addwithdrawlimit(db):
-    rows = [list(row) for row in await db.fetchall("SELECT * FROM tpos.tposs")]
+async def m004_addwithdrawlimit(db: Database):
     await db.execute(
         """
         CREATE TABLE tpos.pos (
@@ -55,6 +57,8 @@ async def m004_addwithdrawlimit(db):
         );
     """
     )
+    result = await db.execute("SELECT * FROM tpos.tposs")
+    rows = result.mappings().all()
     for row in rows:
         await db.execute(
             """
@@ -66,14 +70,21 @@ async def m004_addwithdrawlimit(db):
                 tip_wallet,
                 tip_options
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (:id, :wallet, :name, :currency, :tip_wallet, :tip_options)
             """,
-            (row[0], row[1], row[2], row[3], row[4], row[5]),
+            {
+                "id": row["id"],
+                "wallet": row["wallet"],
+                "name": row["name"],
+                "currency": row["currency"],
+                "tip_wallet": row["tip_wallet"],
+                "tip_options": row["tip_options"],
+            },
         )
     await db.execute("DROP TABLE tpos.tposs")
 
 
-async def m005_initial(db):
+async def m005_initial(db: Database):
     """
     Initial withdraws table.
     """
@@ -89,7 +100,7 @@ async def m005_initial(db):
     )
 
 
-async def m006_items(db):
+async def m006_items(db: Database):
     """
     Add items to tpos table for storing various items (JSON format)
     See `Item` class in models.
@@ -101,14 +112,14 @@ async def m006_items(db):
     )
 
 
-async def m007_atm_premium(db):
+async def m007_atm_premium(db: Database):
     """
     Add a premium % to ATM withdraws
     """
     await db.execute("ALTER TABLE tpos.pos ADD COLUMN withdrawpremium FLOAT;")
 
 
-async def m008_atm_time_option_and_pin_toggle(db):
+async def m008_atm_time_option_and_pin_toggle(db: Database):
     """
     Add a time mins/sec and pin toggle
     """
@@ -121,7 +132,7 @@ async def m008_atm_time_option_and_pin_toggle(db):
     )
 
 
-async def m009_tax_inclusive(db):
+async def m009_tax_inclusive(db: Database):
     """
     Add tax_inclusive column
     """
@@ -129,3 +140,28 @@ async def m009_tax_inclusive(db):
         "ALTER TABLE tpos.pos ADD COLUMN tax_inclusive BOOL NOT NULL DEFAULT true;"
     )
     await db.execute("ALTER TABLE tpos.pos ADD COLUMN tax_default FLOAT DEFAULT 0;")
+
+
+async def m010_rename_tpos_withdraw_columns(db: Database):
+    """
+    Add rename tpos withdraw columns
+    """
+    await db.execute(
+        """
+        CREATE TABLE tpos.pos_backup AS
+        SELECT
+        id, name, currency, items, wallet, tax_inclusive,
+        tax_default, tip_wallet, tip_options,
+        withdrawamt AS withdrawn_amount,
+        withdrawtime AS withdraw_time,
+        withdrawbtwn AS withdraw_between,
+        withdrawlimit AS withdraw_limit,
+        withdrawtimeopt AS withdraw_time_option,
+        withdrawpremium AS withdraw_premium,
+        withdrawpindisabled AS withdraw_pin_disabled,
+        withdrawpin AS withdraw_pin
+        FROM tpos.pos
+        """
+    )
+    await db.execute("DROP TABLE tpos.pos")
+    await db.execute("ALTER TABLE tpos.pos_backup RENAME TO pos")

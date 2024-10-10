@@ -1,15 +1,14 @@
 from http import HTTPStatus
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, Depends, HTTPException, Request
 from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
 from lnbits.helpers import template_renderer
 from lnbits.settings import settings
-from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse
 
 from .crud import get_clean_tpos, get_tpos
+from .models import TposClean
 
 tpos_generic_router = APIRouter()
 
@@ -18,38 +17,29 @@ def tpos_renderer():
     return template_renderer(["tpos/templates"])
 
 
-templates = Jinja2Templates(directory="templates")
-
-
 @tpos_generic_router.get("/", response_class=HTMLResponse)
 async def index(request: Request, user: User = Depends(check_user_exists)):
     return tpos_renderer().TemplateResponse(
-        "tpos/index.html", {"request": request, "user": user.dict()}
+        "tpos/index.html", {"request": request, "user": user.json()}
     )
 
 
 @tpos_generic_router.get("/{tpos_id}")
 async def tpos(request: Request, tpos_id):
-    tpos = await get_clean_tpos(tpos_id)
+    tpos = await get_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
-    withdrawpinopen = 0
-    if tpos.withdrawpindisabled:
-        tpos_dirty = await get_tpos(tpos_id)
-        if not tpos_dirty:
-            raise HTTPException(
-                status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-            )
-        withdrawpinopen = tpos_dirty.withdrawpin or 0
+    withdraw_pin_open = tpos.withdraw_pin or 0
+    tpos_clean = TposClean(**tpos.dict())
     response = tpos_renderer().TemplateResponse(
         "tpos/tpos.html",
         {
             "request": request,
-            "tpos": tpos,
-            "withdrawpinopen": withdrawpinopen,
-            "withdrawamtposs": tpos.withdrawamtposs,
+            "tpos": tpos_clean,
+            "withdraw_pin_open": withdraw_pin_open,
+            "withdraw_maximum": tpos.withdraw_maximum,
             "web_manifest": f"/tpos/manifest/{tpos_id}.webmanifest",
         },
     )
