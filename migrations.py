@@ -57,7 +57,8 @@ async def m004_addwithdrawlimit(db: Database):
         );
     """
     )
-    rows = await db.fetchall("SELECT * FROM tpos.tposs")
+    result = await db.execute("SELECT * FROM tpos.tposs")
+    rows = result.mappings().all()
     for row in rows:
         await db.execute(
             """

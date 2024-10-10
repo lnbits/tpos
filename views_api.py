@@ -2,14 +2,14 @@ import json
 from http import HTTPStatus
 
 import httpx
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
     get_user,
     get_wallet,
 )
-from lnbits.core.models import Payment, WalletTypeInfo
+from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import create_invoice
 from lnbits.decorators import (
     require_admin_key,
@@ -18,7 +18,6 @@ from lnbits.decorators import (
 from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 from lnurl import decode as decode_lnurl
 from loguru import logger
-from starlette.exceptions import HTTPException
 
 from .crud import (
     create_tpos,
@@ -142,18 +141,7 @@ async def api_tpos_create_invoice(
 
 @tpos_api_router.get("/api/v1/tposs/{tpos_id}/invoices")
 async def api_tpos_get_latest_invoices(tpos_id: str):
-    try:
-        payments = [
-            Payment.from_row(row)
-            for row in await get_latest_payments_by_extension(
-                ext_name="tpos", ext_id=tpos_id
-            )
-        ]
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
-        ) from exc
+    payments = await get_latest_payments_by_extension(ext_name="tpos", ext_id=tpos_id)
 
     return [
         {

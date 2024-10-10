@@ -17,8 +17,9 @@ async def create_tpos(data: CreateTposData) -> Tpos:
 
 
 async def get_tpos(tpos_id: str) -> Optional[Tpos]:
-    row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id})
-    return Tpos(**row) if row else None
+    return await db.fetchone(
+        "SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id}, Tpos
+    )
 
 
 async def start_lnurlcharge(tpos: Tpos) -> LnurlCharge:
@@ -50,24 +51,22 @@ async def start_lnurlcharge(tpos: Tpos) -> LnurlCharge:
 
 
 async def get_lnurlcharge(lnurlcharge_id: str) -> Optional[LnurlCharge]:
-    row = await db.fetchone(
-        "SELECT * FROM tpos.withdraws WHERE id = :id", {"id": lnurlcharge_id}
+    return await db.fetchone(
+        "SELECT * FROM tpos.withdraws WHERE id = :id",
+        {"id": lnurlcharge_id},
+        LnurlCharge,
     )
-    return LnurlCharge(**row) if row else None
 
 
-async def update_lnurlcharge(data: LnurlCharge) -> LnurlCharge:
-    await db.update("tpos.withdraws", data)
-
-    lnurlcharge = await get_lnurlcharge(data.id)
-    assert lnurlcharge, "Withdraw couldn't be retrieved"
-
-    return lnurlcharge
+async def update_lnurlcharge(charge: LnurlCharge) -> LnurlCharge:
+    await db.update("tpos.withdraws", charge)
+    return charge
 
 
 async def get_clean_tpos(tpos_id: str) -> Optional[TposClean]:
-    row = await db.fetchone("SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id})
-    return TposClean(**row) if row else None
+    return await db.fetchone(
+        "SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id}, TposClean
+    )
 
 
 async def update_tpos(tpos: Tpos) -> Tpos:
@@ -79,8 +78,9 @@ async def get_tposs(wallet_ids: Union[str, list[str]]) -> list[Tpos]:
     if isinstance(wallet_ids, str):
         wallet_ids = [wallet_ids]
     q = ",".join([f"'{wallet_id}'" for wallet_id in wallet_ids])
-    rows = await db.fetchall(f"SELECT * FROM tpos.pos WHERE wallet IN ({q})")
-    return [Tpos(**row) for row in rows]
+    return await db.fetchall(
+        f"SELECT * FROM tpos.pos WHERE wallet IN ({q})", model=Tpos
+    )
 
 
 async def delete_tpos(tpos_id: str) -> None:
