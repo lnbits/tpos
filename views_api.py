@@ -119,7 +119,7 @@ async def api_tpos_create_invoice(
         amount += tip_amount
 
     try:
-        payment_hash, payment_request = await create_invoice(
+        payment = await create_invoice(
             wallet_id=tpos.wallet,
             amount=amount,
             memo=f"{memo} to {tpos.name}" if memo else f"{tpos.name}",
@@ -136,7 +136,7 @@ async def api_tpos_create_invoice(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
         ) from exc
 
-    return {"payment_hash": payment_hash, "payment_request": payment_request}
+    return {"payment_hash": payment.payment_hash, "payment_request": payment.bolt11}
 
 
 @tpos_api_router.get("/api/v1/tposs/{tpos_id}/invoices")

@@ -58,9 +58,9 @@ async def on_invoice_paid(payment: Payment) -> None:
     )
     logger.debug(f"tpos: tip invoice created: {payment.payment_hash}")
 
-    checking_id = await pay_invoice(
+    payment = await pay_invoice(
         payment_request=payment.bolt11,
         wallet_id=payment.wallet_id,
         extra={**payment.extra, "tipSplitted": True},
     )
-    logger.debug(f"tpos: tip invoice paid: {checking_id}")
+    logger.debug(f"tpos: tip invoice paid: {payment.checking_id}")
