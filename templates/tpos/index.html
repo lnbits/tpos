@@ -29,7 +29,7 @@
           :rows="tposs"
           row-key="id"
           :columns="tpossTable.columns"
-          :pagination.sync="tpossTable.pagination"
+          v-model:pagination="tpossTable.pagination"
         >
           <template v-slot:header="props">
             <q-tr :props="props">
