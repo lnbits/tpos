@@ -31,7 +31,10 @@ async def tpos(request: Request, tpos_id):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
-    withdraw_pin_open = tpos.withdraw_pin or 0
+    withdraw_pin_open = 0
+    if tpos.withdraw_pin_disabled:
+        withdraw_pin_open = tpos.withdraw_pin
+
     tpos_clean = TposClean(**tpos.dict())
     response = tpos_renderer().TemplateResponse(
         "tpos/tpos.html",

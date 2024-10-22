@@ -255,7 +255,7 @@ window.app = Vue.createApp({
       this.cartTax = 0.0
       this.total = 0.0
     },
-    activeAtmMode() {
+    startAtmMode() {
       if (this.atmPremium > 0) {
         this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
       }
