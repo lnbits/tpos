@@ -114,7 +114,7 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
     try:
         payment = await create_invoice(
             wallet_id=tpos.wallet,
-            amount=data.amount + data.tip_amount,
+            amount=data.amount + (data.tip_amount or 0),
             memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
             extra={
                 "tag": "tpos",

@@ -37,7 +37,7 @@ async def tpos(request: Request, tpos_id):
         "tpos/tpos.html",
         {
             "request": request,
-            "tpos": tpos_clean,
+            "tpos": tpos_clean.json(),
             "withdraw_pin_open": withdraw_pin_open,
             "withdraw_maximum": tpos.withdraw_maximum,
             "web_manifest": f"/tpos/manifest/{tpos_id}.webmanifest",

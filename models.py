@@ -8,9 +8,9 @@ from pydantic import BaseModel, Field, validator
 
 class CreateTposInvoice(BaseModel):
     amount: int = Query(..., ge=1)
-    tip_amount: int = Query(0, ge=1)
-    memo: str = Query(None)
-    details: str = Query(None)
+    memo: Optional[str] = Query(None)
+    details: Optional[dict] = Query(None)
+    tip_amount: Optional[int] = Query(None, ge=1)
 
 
 class CreateTposData(BaseModel):

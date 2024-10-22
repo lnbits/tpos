@@ -219,7 +219,7 @@
       </q-page-sticky>
       <q-page-sticky position="top-right" :offset="[18, 162]">
         <q-btn
-          @click="atm"
+          @click="activeAtmMode"
           v-if="withdrawMaximum > 0 && !atmMode"
           fab
           icon="atm"
@@ -528,19 +528,14 @@
 </style>
 {% endblock %} {% block scripts %}
 <script>
-  const tpos = {}
-  tpos.id = '{{ tpos.id }}'
-  tpos.currency = '{{ tpos.currency }}'
-  tpos.withdraw_premium = Number('{{ tpos.withdraw_premium }}') / 100
-  withdraw_maximum = Number('{{ withdraw_maximum }}')
-  const items = '{{ tpos.items | safe }}'
-  tpos.items = items ? JSON.parse(items) : []
-  const options = '{{ tpos.tip_options | safe }}'
-  tpos.tip_options = options ? JSON.parse(options) : []
-  tpos.tip_wallet = '{{ tpos.tip_wallet }}'
-  tpos.withdraw_pin_disabled = '{{ tpos.withdraw_pin_disabled }}'
-  tpos.tax_inclusive = '{{ tpos.tax_inclusive }}'
-  tpos.tax_default = Number('{{ tpos.tax_default }}')
+  const tpos = JSON.parse({{ tpos | tojson | safe }})
+  tpos.items = JSON.parse(tpos.items)
+  tpos.tip_options = tpos.tip_options ? JSON.parse(tpos.tip_options) : []
+  if (tpos.withdraw_maximum) {
+    tpos.withdraw_premium = Number(tpos.withdraw_maximum / 100)
+  }
+  const options = tpos.tip_options
+  const withdraw_maximum = tpos.withdraw_limit
   const withdraw_pin_open = Number('{{ withdraw_pin_open }}')
 </script>
 

@@ -244,7 +244,9 @@ window.app = Vue.createApp({
       let total = 0.0
       for (let item of this.cart.values()) {
         let tax = item.tax || this.taxDefault
-        total += item.price * item.quantity * (tax * 0.01)
+        if (tax > 0) {
+          total += item.price * item.quantity * (tax * 0.01)
+        }
       }
       this.cartTax = total
     },
@@ -253,7 +255,7 @@ window.app = Vue.createApp({
       this.cartTax = 0.0
       this.total = 0.0
     },
-    atm() {
+    activeAtmMode() {
       if (this.atmPremium > 0) {
         this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
       }
@@ -425,8 +427,10 @@ window.app = Vue.createApp({
 
         let params = {
           amount: this.sat,
-          memo: this.amountFormatted,
-          tip_amount: this.tipAmountSat
+          memo: this.amountFormatted
+        }
+        if (this.tipAmountSats > 0) {
+          params.tip_amount = this.tipAmountSat
         }
         if (this.cart.size) {
           let details = [...this.cart.values()].map(item => {
@@ -462,7 +466,9 @@ window.app = Vue.createApp({
 
             dialog.paymentChecker = setInterval(() => {
               axios
-                .get(`/tpos/api/v1/tposs/${this.tposId}/invoices/${response.data.payment_hash}`)
+                .get(
+                  `/tpos/api/v1/tposs/${this.tposId}/invoices/${response.data.payment_hash}`
+                )
                 .then(res => {
                   if (res.data.paid) {
                     clearInterval(dialog.paymentChecker)
@@ -629,7 +635,7 @@ window.app = Vue.createApp({
           if (res.data && res.data.length) {
             let last = [...res.data]
             this.lastPaymentsDialog.data = last.map(obj => {
-              obj.dateFrom = moment(obj.time * 1000).fromNow()
+              obj.dateFrom = moment(obj.time).fromNow()
               return obj
             })
           }
