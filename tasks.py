@@ -25,7 +25,7 @@ async def on_invoice_paid(payment: Payment) -> None:
     ):
         return
 
-    tip_amount = payment.extra.get("tipAmount")
+    tip_amount = payment.extra.get("tip_amount")
 
     stripped_payment = {
         "amount": payment.amount,
@@ -35,7 +35,7 @@ async def on_invoice_paid(payment: Payment) -> None:
         "bolt11": payment.bolt11,
     }
 
-    tpos_id = payment.extra.get("tposId")
+    tpos_id = payment.extra.get("tpos_id")
     assert tpos_id
 
     tpos = await get_tpos(tpos_id)
@@ -50,7 +50,7 @@ async def on_invoice_paid(payment: Payment) -> None:
     wallet_id = tpos.tip_wallet
     assert wallet_id
 
-    payment = await create_invoice(
+    tip_payment = await create_invoice(
         wallet_id=wallet_id,
         amount=int(tip_amount),
         internal=True,
@@ -58,9 +58,9 @@ async def on_invoice_paid(payment: Payment) -> None:
     )
     logger.debug(f"tpos: tip invoice created: {payment.payment_hash}")
 
-    payment = await pay_invoice(
-        payment_request=payment.bolt11,
+    paid_payment = await pay_invoice(
+        payment_request=tip_payment.bolt11,
         wallet_id=payment.wallet_id,
         extra={**payment.extra, "tipSplitted": True},
     )
-    logger.debug(f"tpos: tip invoice paid: {payment.checking_id}")
+    logger.debug(f"tpos: tip invoice paid: {paid_payment.checking_id}")

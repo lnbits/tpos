@@ -31,6 +31,7 @@ from .crud import (
 )
 from .models import (
     CreateTposData,
+    CreateTposInvoice,
     CreateUpdateItemData,
     LnurlCharge,
     PayLnurlWData,
@@ -101,13 +102,8 @@ async def api_tpos_delete(
 @tpos_api_router.post(
     "/api/v1/tposs/{tpos_id}/invoices", status_code=HTTPStatus.CREATED
 )
-async def api_tpos_create_invoice(
-    tpos_id: str,
-    amount: int = Query(..., ge=1),
-    memo: str = "",
-    tip_amount: int = 0,
-    details: str = Query(None),
-) -> dict:
+async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict:
+
     tpos = await get_tpos(tpos_id)
 
     if not tpos:
@@ -115,20 +111,17 @@ async def api_tpos_create_invoice(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
 
-    if tip_amount > 0:
-        amount += tip_amount
-
     try:
         payment = await create_invoice(
             wallet_id=tpos.wallet,
-            amount=amount,
-            memo=f"{memo} to {tpos.name}" if memo else f"{tpos.name}",
+            amount=data.amount + data.tip_amount,
+            memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
             extra={
                 "tag": "tpos",
-                "tipAmount": tip_amount,
-                "tposId": tpos_id,
-                "amount": amount - tip_amount if tip_amount else False,
-                "details": details if details else None,
+                "tip_amount": data.tip_amount,
+                "tpos_id": tpos_id,
+                "amount": data.amount,
+                "details": data.details if data.details else None,
             },
         )
     except Exception as exc:

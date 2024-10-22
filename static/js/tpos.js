@@ -426,7 +426,7 @@ window.app = Vue.createApp({
         let params = {
           amount: this.sat,
           memo: this.amountFormatted,
-          tipAmount: this.tipAmountSat
+          tip_amount: this.tipAmountSat
         }
         if (this.cart.size) {
           let details = [...this.cart.values()].map(item => {
@@ -449,9 +449,7 @@ window.app = Vue.createApp({
         }
 
         axios
-          .post('/tpos/api/v1/tposs/' + this.tposId + '/invoices', null, {
-            params: {...params}
-          })
+          .post(`/tpos/api/v1/tposs/${this.tposId}/invoices`, params)
           .then(response => {
             dialog.data = response.data
             dialog.show = true
@@ -464,12 +462,7 @@ window.app = Vue.createApp({
 
             dialog.paymentChecker = setInterval(() => {
               axios
-                .get(
-                  '/tpos/api/v1/tposs/' +
-                    this.tposId +
-                    '/invoices/' +
-                    response.data.payment_hash
-                )
+                .get(`/tpos/api/v1/tposs/${this.tposId}/invoices/${response.data.payment_hash}`)
                 .then(res => {
                   if (res.data.paid) {
                     clearInterval(dialog.paymentChecker)

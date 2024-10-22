@@ -1,9 +1,16 @@
 from typing import Optional
 
-from fastapi import Request
+from fastapi import Query, Request
 from lnurl import Lnurl
 from lnurl import encode as lnurl_encode
 from pydantic import BaseModel, Field, validator
+
+
+class CreateTposInvoice(BaseModel):
+    amount: int = Query(..., ge=1)
+    tip_amount: int = Query(0, ge=1)
+    memo: str = Query(None)
+    details: str = Query(None)
 
 
 class CreateTposData(BaseModel):
