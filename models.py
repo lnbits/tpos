@@ -6,6 +6,10 @@ from lnurl import encode as lnurl_encode
 from pydantic import BaseModel, Field, validator
 
 
+class CreateWithdrawPay(BaseModel):
+    pay_link: str
+
+
 class CreateTposInvoice(BaseModel):
     amount: int = Query(..., ge=1)
     memo: Optional[str] = Query(None)

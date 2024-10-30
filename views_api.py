@@ -33,6 +33,7 @@ from .models import (
     CreateTposData,
     CreateTposInvoice,
     CreateUpdateItemData,
+    CreateWithdrawPay,
     LnurlCharge,
     PayLnurlWData,
     Tpos,
@@ -237,15 +238,15 @@ async def api_tpos_atm_pin_check(tpos_id: str, atmpin: int) -> LnurlCharge:
     return token
 
 
-@tpos_api_router.get(
+@tpos_api_router.post(
     "/api/v1/atm/withdraw/{k1}/{amount}/pay", status_code=HTTPStatus.OK
 )
 async def api_tpos_atm_pay(
-    request: Request, k1: str, amount: int, pay_link: str = Query(...)
+    request: Request, k1: str, amount: int, data: CreateWithdrawPay
 ):
     try:
         # get the payment_request from the lnurl
-        pay_link = pay_link.replace("lnurlp://", "https://")
+        pay_link = data.pay_link.replace("lnurlp://", "https://")
         async with httpx.AsyncClient() as client:
             headers = {"user-agent": "lnbits/tpos"}
             r = await client.get(pay_link, follow_redirects=True, headers=headers)
@@ -254,14 +255,15 @@ async def api_tpos_atm_pay(
             resp = r.json()
 
             amount = amount * 1000  # convert to msats
+            print(resp)
 
             if resp["tag"] != "payRequest":
                 return {"success": False, "detail": "Wrong tag type"}
 
-            if amount < resp["minSendable"]:
+            if amount < int(resp["minSendable"]):
                 return {"success": False, "detail": "Amount too low"}
 
-            if amount > resp["maxSendable"]:
+            if amount > int(resp["maxSendable"]):
                 return {"success": False, "detail": "Amount too high"}
 
             cb_res = await client.get(
