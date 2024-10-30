@@ -255,7 +255,6 @@ async def api_tpos_atm_pay(
             resp = r.json()
 
             amount = amount * 1000  # convert to msats
-            print(resp)
 
             if resp["tag"] != "payRequest":
                 return {"success": False, "detail": "Wrong tag type"}
