@@ -773,6 +773,7 @@
     computed: {
       amount: function () {
         if (!this.stack.length) return 0.0
+        if (this.currency == 'sats') return Number(this.stack.join(""))
         return (
           this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
           (this.currency == 'sats' ? 1 : 0.01)
