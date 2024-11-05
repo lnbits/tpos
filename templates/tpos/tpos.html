@@ -773,6 +773,7 @@
     computed: {
       amount: function () {
         if (!this.stack.length) return 0.0
+        if (this.currency == 'sats') return Number(this.stack.join(""))
         return (
           this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
           (this.currency == 'sats' ? 1 : 0.01)
@@ -1246,11 +1247,13 @@
       getRates() {
         if (this.currency == 'sats') {
           this.exchangeRate = 1
+          this.$q.loading.hide()
         } else {
           LNbits.api
             .request('GET', `/tpos/api/v1/rate/${this.currency}`)
             .then(response => {
               this.exchangeRate = response.data.rate
+              this.$q.loading.hide()
             })
             .catch(e => console.error(e))
         }
@@ -1321,9 +1324,9 @@
         }
       }
     },
-    created: function () {
-      var getRates = this.getRates
-      getRates()
+    created() {
+      this.$q.loading.show()
+      this.getRates()
       this.pinDisabled = JSON.parse('{{ tpos.withdrawpindisabled | tojson }}')
       this.tip_options =
         '{{ tpos.tip_options | tojson }}' == 'null'
@@ -1388,8 +1391,8 @@
         event.preventDefault()
       })
 
-      setInterval(function () {
-        getRates()
+      setInterval(() => {
+        this.getRates()
       }, 120000)
     }
   })

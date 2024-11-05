@@ -1065,6 +1065,9 @@
       itemFormatPrice(price, id) {
         const tpos = id.split(':')[0]
         const currency = _.findWhere(this.tposs, {id: tpos}).currency
+        if(currency == 'sats') {
+          return price + ' sats'
+        }
         return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
       },
       openItemDialog(id) {
