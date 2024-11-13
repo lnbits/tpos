@@ -101,6 +101,7 @@ window.app = Vue.createApp({
   computed: {
     amount: function () {
       if (!this.stack.length) return 0.0
+      if (this.currency == 'sats') return Number(this.stack.join(""))
       return (
         this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
         (this.currency == 'sats' ? 1 : 0.01)
@@ -619,11 +620,13 @@ window.app = Vue.createApp({
     getRates() {
       if (this.currency == 'sats') {
         this.exchangeRate = 1
+        Quasar.Loading.hide()
       } else {
         LNbits.api
           .request('GET', `/tpos/api/v1/rate/${this.currency}`)
           .then(response => {
             this.exchangeRate = response.data.rate
+            Quasar.Loading.hide()
           })
           .catch(e => console.error(e))
       }
@@ -692,6 +695,7 @@ window.app = Vue.createApp({
     }
   },
   created() {
+    Quasar.Loading.show()
     this.tposId = tpos.id
     this.currency = tpos.currency
     this.atmPremium = tpos.withdraw_premium / 100
