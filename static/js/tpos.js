@@ -101,7 +101,7 @@ window.app = Vue.createApp({
   computed: {
     amount: function () {
       if (!this.stack.length) return 0.0
-      if (this.currency == 'sats') return Number(this.stack.join(""))
+      if (this.currency == 'sats') return Number(this.stack.join(''))
       return (
         this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
         (this.currency == 'sats' ? 1 : 0.01)
@@ -336,7 +336,7 @@ window.app = Vue.createApp({
               dialog.show = false
               this.atmPin = null
               this.atmToken = ''
-              this.complete.show = true
+              this.showComplete()
               this.atmMode = false
               this.connectionWithdraw.close()
             }
@@ -477,7 +477,7 @@ window.app = Vue.createApp({
                     dialog.show = false
                     this.clearCart()
 
-                    this.complete.show = true
+                    this.showComplete()
                   }
                 })
             }, 3000)
@@ -691,6 +691,12 @@ window.app = Vue.createApp({
         return LNbits.utils.formatSat(amount) + ' sat'
       } else {
         return LNbits.utils.formatCurrency(Number(amount).toFixed(2), currency)
+      }
+    },
+    showComplete() {
+      this.complete.show = true
+      if (this.$q.screen.width < 1200 && this.cartDrawer) {
+        this.cartDrawer = false
       }
     }
   },
