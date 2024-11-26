@@ -91,7 +91,7 @@ window.app = Vue.createApp({
       },
       monochrome: this.$q.localStorage.getItem('lnbits.tpos.color') || false,
       showPoS: true,
-      cartDrawer: this.$q.screen.width > 1200,
+      cartDrawer: this.$q.screen.gt.md,
       searchTerm: '',
       categoryFilter: '',
       cart: new Map(),
@@ -101,6 +101,7 @@ window.app = Vue.createApp({
   computed: {
     amount: function () {
       if (!this.stack.length) return 0.0
+      if (this.currency == 'sats') return Number(this.stack.join(''))
       return (
         this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
         (this.currency == 'sats' ? 1 : 0.01)
@@ -179,7 +180,7 @@ window.app = Vue.createApp({
       return items
     },
     drawerWidth() {
-      return this.$q.screen.width < 500 ? 375 : 450
+      return this.$q.screen.lt.sm ? 375 : 450
     },
     formattedCartTax() {
       return this.formatAmount(this.cartTax, this.currency)
@@ -335,7 +336,7 @@ window.app = Vue.createApp({
               dialog.show = false
               this.atmPin = null
               this.atmToken = ''
-              this.complete.show = true
+              this.showComplete()
               this.atmMode = false
               this.connectionWithdraw.close()
             }
@@ -476,7 +477,7 @@ window.app = Vue.createApp({
                     dialog.show = false
                     this.clearCart()
 
-                    this.complete.show = true
+                    this.showComplete()
                   }
                 })
             }, 3000)
@@ -619,11 +620,13 @@ window.app = Vue.createApp({
     getRates() {
       if (this.currency == 'sats') {
         this.exchangeRate = 1
+        Quasar.Loading.hide()
       } else {
         LNbits.api
           .request('GET', `/tpos/api/v1/rate/${this.currency}`)
           .then(response => {
             this.exchangeRate = response.data.rate
+            Quasar.Loading.hide()
           })
           .catch(e => console.error(e))
       }
@@ -689,9 +692,16 @@ window.app = Vue.createApp({
       } else {
         return LNbits.utils.formatCurrency(Number(amount).toFixed(2), currency)
       }
+    },
+    showComplete() {
+      this.complete.show = true
+      if (this.$q.screen.lt.lg && this.cartDrawer) {
+        this.cartDrawer = false
+      }
     }
   },
   created() {
+    Quasar.Loading.show()
     this.tposId = tpos.id
     this.currency = tpos.currency
     this.atmPremium = tpos.withdraw_premium / 100
