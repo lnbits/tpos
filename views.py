@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from lnbits.core.models import User
@@ -31,7 +32,7 @@ async def tpos(request: Request, tpos_id):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
-    withdraw_pin_open = 0
+    withdraw_pin_open: Optional[int] = 0
     if tpos.withdraw_pin_disabled:
         withdraw_pin_open = tpos.withdraw_pin
 
