@@ -91,7 +91,7 @@ window.app = Vue.createApp({
       },
       monochrome: this.$q.localStorage.getItem('lnbits.tpos.color') || false,
       showPoS: true,
-      cartDrawer: this.$q.screen.width > 1200,
+      cartDrawer: this.$q.screen.gt.md,
       searchTerm: '',
       categoryFilter: '',
       cart: new Map(),
@@ -180,7 +180,7 @@ window.app = Vue.createApp({
       return items
     },
     drawerWidth() {
-      return this.$q.screen.width < 500 ? 375 : 450
+      return this.$q.screen.lt.sm ? 375 : 450
     },
     formattedCartTax() {
       return this.formatAmount(this.cartTax, this.currency)
@@ -695,7 +695,7 @@ window.app = Vue.createApp({
     },
     showComplete() {
       this.complete.show = true
-      if (this.$q.screen.width < 1200 && this.cartDrawer) {
+      if (this.$q.screen.lt.lg && this.cartDrawer) {
         this.cartDrawer = false
       }
     }
