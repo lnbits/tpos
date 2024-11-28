@@ -574,8 +574,8 @@ window.app = Vue.createApp({
           `/tpos/api/v1/atm/withdraw/${this.atmToken}/${this.sat}/pay`,
           null,
           {
-              pay_link: payLink
-          },
+            pay_link: payLink
+          }
         )
         .then(res => {
           if (!res.data.success) {
