@@ -570,8 +570,12 @@ window.app = Vue.createApp({
       }
       LNbits.api
         .request(
-          'GET',
-          `/tpos/api/v1/atm/withdraw/${this.atmToken}/${this.sat}/pay?payLink=${payLink}`
+          'POST',
+          `/tpos/api/v1/atm/withdraw/${this.atmToken}/${this.sat}/pay`,
+          null,
+          {
+            pay_link: payLink
+          }
         )
         .then(res => {
           if (!res.data.success) {

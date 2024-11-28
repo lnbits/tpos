@@ -13,13 +13,10 @@
         target="_blank"
         rel="noopener noreferrer"
       >
-        <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
-          <lnbits-qrcode
-            :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
-            :options="{width: 800}"
-            class="rounded-borders"
-          ></lnbits-qrcode>
-        </q-responsive>
+        <lnbits-qrcode
+          :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
+          class="rounded-borders"
+        ></lnbits-qrcode>
         <q-tooltip>Pay in wallet</q-tooltip>
       </a>
       <div class="text-center">
@@ -111,7 +108,6 @@
       <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
         <lnbits-qrcode
           value="{{ request.url }}"
-          :options="{width: 800}"
           class="rounded-borders"
         ></lnbits-qrcode>
       </q-responsive>
