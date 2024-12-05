@@ -192,4 +192,21 @@
       </q-card-section>
     </q-card>
   </q-dialog>
+
+  <q-dialog v-model="lnaddressDialog.show">
+    <q-card>
+      <q-card-section class="row items-center q-pb-none">
+        <div class="text-h6">LNaddress</div>
+      </q-card-section>
+      <q-card-section>
+        <q-form autofocus @submit="lnaddressSubmit" class="q-gutter-md">
+          <q-input filled type="text" v-model="lnaddressDialog.lnaddress">
+          </q-input>
+          <div>
+            <q-btn label="Submit" type="submit" color="primary"></q-btn>
+          </div>
+        </q-form>
+      </q-card-section>
+    </q-card>
+  </q-dialog>
 </template>

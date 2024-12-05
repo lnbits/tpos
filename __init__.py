@@ -42,7 +42,7 @@ def tpos_start():
 __all__ = [
     "db",
     "tpos_ext",
-    "tpos_static_files",
     "tpos_start",
+    "tpos_static_files",
     "tpos_stop",
 ]

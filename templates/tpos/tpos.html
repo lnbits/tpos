@@ -236,6 +236,16 @@
           :disable="atmMode"
         ></q-btn>
       </q-page-sticky>
+      <q-page-sticky position="top-right" :offset="[18, 306]">
+        <q-btn
+          @click="clearLNaddress"
+          v-if="lnaddress"
+          fab
+          icon="cancel_schedule_send"
+          color="primary"
+          ><q-tooltip>Clear LNaddress</q-tooltip></q-btn
+        >
+      </q-page-sticky>
     </template>
     <template v-else>
       <q-drawer
@@ -538,6 +548,9 @@
   const options = tpos.tip_options
   const withdraw_maximum = tpos.withdraw_limit
   const withdraw_pin_open = Number('{{ withdraw_pin_open }}')
+  const lnaddress = tpos.lnaddress
+  const lnaddressparam = '{{ lnaddressparam }}'
+  const lnaddress_cut = tpos.lnaddress_cut
 </script>
 
 <script src="{{ static_url_for('tpos/static', path='js/tpos.js') }}"></script>

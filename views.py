@@ -26,7 +26,7 @@ async def index(request: Request, user: User = Depends(check_user_exists)):
 
 
 @tpos_generic_router.get("/{tpos_id}")
-async def tpos(request: Request, tpos_id):
+async def tpos(request: Request, tpos_id, lnaddress: Optional[str] = ""):
     tpos = await get_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
@@ -42,6 +42,7 @@ async def tpos(request: Request, tpos_id):
         {
             "request": request,
             "tpos": tpos_clean.json(),
+            "lnaddressparam": lnaddress,
             "withdraw_pin_open": withdraw_pin_open,
             "withdraw_maximum": tpos.withdraw_maximum,
             "web_manifest": f"/tpos/manifest/{tpos_id}.webmanifest",
