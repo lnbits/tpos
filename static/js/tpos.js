@@ -21,6 +21,10 @@ window.app = Vue.createApp({
       atmMode: false,
       atmToken: '',
       nfcTagReading: false,
+      lnaddressDialog: {
+        show: false,
+        lnaddress: ''
+      },
       lastPaymentsDialog: {
         show: false,
         data: []
@@ -283,6 +287,25 @@ window.app = Vue.createApp({
           LNbits.utils.notifyApiError(error)
         })
     },
+    lnaddressSubmit() {
+      LNbits.api
+        .request(
+          'GET',
+          `/tpos/api/v1/tposs/lnaddresscheck?lnaddress=${encodeURIComponent(this.lnaddressDialog.lnaddress)}`,
+          null
+        )
+        .then(response => {
+          if (response.data) {
+            this.$q.localStorage.set('tpos.lnaddress', this.lnaddressDialog.lnaddress);
+            this.lnaddressDialog.show = false
+            this.lnaddress = true
+          }
+        })
+        .catch(error => {
+          const errorMessage = error.response?.data?.detail || "An unknown error occurred.";
+          LNbits.utils.notifyApiError(errorMessage);
+        });
+    },
     atmGetWithdraw() {
       var dialog = this.invoiceDialog
       if (this.sat > this.withdrawMaximum) {
@@ -444,14 +467,18 @@ window.app = Vue.createApp({
             }
           })
 
-          params.details = {
-            currency: this.currency,
-            exchangeRate: this.exchangeRate,
-            items: details,
-            taxIncluded: this.taxInclusive,
-            taxValue: this.cartTax
-          }
+            params.details = {
+              currency: this.currency,
+              exchangeRate: this.exchangeRate,
+              items: details,
+              taxIncluded: this.taxInclusive,
+              taxValue: this.cartTax
+            }
         }
+        if (this.lnaddress) {
+          params.user_lnaddress = this.lnaddressDialog.lnaddress
+        }
+        console.log(params)
 
         axios
           .post(`/tpos/api/v1/tposs/${this.tposId}/invoices`, params)
@@ -630,6 +657,7 @@ window.app = Vue.createApp({
           .request('GET', `/tpos/api/v1/rate/${this.currency}`)
           .then(response => {
             this.exchangeRate = response.data.rate
+            console.log(this.exchangeRate)
             Quasar.Loading.hide()
           })
           .catch(e => console.error(e))
@@ -668,6 +696,15 @@ window.app = Vue.createApp({
     },
     handleColorScheme(val) {
       this.$q.localStorage.set('lnbits.tpos.color', val)
+    },
+    clearLNaddress() {
+      this.$q.localStorage.remove('tpos.lnaddress')
+      this.lnaddressDialog.lnaddress = ''
+      const url = new URL(window.location.href);
+      url.searchParams.delete('lnaddress');
+      window.history.replaceState({}, document.title, url.toString());
+      this.lnaddressDialog.show = true
+      this.lnaddress = false
     },
     extractCategories(items) {
       let categories = new Set()
@@ -718,6 +755,8 @@ window.app = Vue.createApp({
     this.pinDisabled = tpos.withdraw_pin_disabled
     this.taxInclusive = tpos.tax_inclusive
     this.taxDefault = tpos.tax_default
+    this.tposLNaddress = tpos.lnaddress
+    this.tposLNaddressCut = tpos.lnaddress_cut
 
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
 
@@ -734,6 +773,21 @@ window.app = Vue.createApp({
     if (this.items.length > 0) {
       this.showPoS = false
       this.categories = this.extractCategories(this.items)
+    }
+    if (this.tposLNaddress){
+      this.lnaddressDialog.lnaddress = this.$q.localStorage.getItem('tpos.lnaddress')
+      if(lnaddressparam != ""){
+        this.lnaddressDialog.lnaddress = lnaddressparam
+        this.$q.localStorage.set('tpos.lnaddress', this.lnaddressDialog.lnaddress);
+        this.lnaddress = true
+      }
+      else if (!this.lnaddressDialog.lnaddress){
+        this.lnaddress = false
+        this.lnaddressDialog.show = true
+      }
+      else{
+        this.lnaddress = true
+      }
     }
 
     window.addEventListener('keyup', event => {

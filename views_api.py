@@ -37,7 +37,9 @@ from .models import (
     LnurlCharge,
     PayLnurlWData,
     Tpos,
+    LNaddress,
 )
+from .helpers import get_pr
 
 tpos_api_router = APIRouter()
 
@@ -123,6 +125,7 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
                 "tpos_id": tpos_id,
                 "amount": data.amount,
                 "details": data.details if data.details else None,
+                "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
             },
         )
     except Exception as exc:
@@ -364,3 +367,14 @@ async def api_tpos_create_items(
     tpos.items = json.dumps(data.dict()["items"])
     tpos = await update_tpos(tpos)
     return tpos
+
+@tpos_api_router.get(
+    "/api/v1/tposs/lnaddresscheck", status_code=HTTPStatus.OK
+)
+async def api_tpos_check_lnaddress(lnaddress: str):
+    check = await get_pr(lnaddress, 1)
+    if not check:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+    return True

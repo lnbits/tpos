@@ -15,6 +15,7 @@ class CreateTposInvoice(BaseModel):
     memo: Optional[str] = Query(None)
     details: Optional[dict] = Query(None)
     tip_amount: Optional[int] = Query(None, ge=1)
+    user_lnaddress: Optional[str] = Query(None)
 
 
 class CreateTposData(BaseModel):
@@ -32,6 +33,9 @@ class CreateTposData(BaseModel):
     withdraw_time_option: Optional[str] = Field(None)
     withdraw_premium: Optional[float] = Field(None)
     withdraw_pin_disabled: bool = Field(False)
+    lnaddress: bool = Field(False)
+    lnaddress_cut: Optional[int] = Field(0)
+    user_lnaddress: Optional[str] = Field(None)
 
 
 class TposClean(BaseModel):
@@ -47,6 +51,9 @@ class TposClean(BaseModel):
     withdraw_premium: Optional[float] = None
     withdraw_pin_disabled: Optional[bool] = None
     withdrawn_amount: int = 0
+    lnaddress: Optional[bool] = None
+    lnaddress_cut: int = 0
+    user_lnaddress: Optional[str] = None
     items: Optional[str] = None
     tip_options: Optional[str] = None
 
@@ -88,6 +95,8 @@ class HashCheck(BaseModel):
 class PayLnurlWData(BaseModel):
     lnurl: str
 
+class LNaddress(BaseModel):
+    lnaddress: str
 
 class Item(BaseModel):
     image: Optional[str]

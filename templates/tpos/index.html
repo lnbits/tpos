@@ -318,6 +318,33 @@
         <div class="row">
           <div class="col">
             <q-checkbox
+              v-model="formDialog.data.lnaddress"
+              label="LNaddress funding"
+            >
+            <q-tooltip>
+              <span
+                v-text="'If enabled, the tpos can be funded with a LNaddress in the public page.'"
+              ></span></q-tooltip>
+          </q-checkbox>
+          </div>
+          <div class="col">
+            <q-input
+            filled
+          dense
+              :disable="!formDialog.data.lnaddress"
+              v-model="formDialog.data.lnaddress_cut"
+              type="number"
+              label="LNaddress cut 0-100 percent"
+            ><q-tooltip>
+              <span
+                v-text="'Percent charge for using the LNaddress funding option. To go to the TPoS wallet.'"
+              ></span></q-tooltip>
+          </q-input>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <q-checkbox
               v-model="formDialog.advanced.tips"
               label="Enable tips"
             ></q-checkbox>

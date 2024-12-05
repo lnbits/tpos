@@ -5,7 +5,7 @@ from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
 from .models import CreateTposData, LnurlCharge, Tpos, TposClean
-
+from loguru import logger
 db = Database("ext_tpos")
 
 
@@ -78,10 +78,12 @@ async def get_tposs(wallet_ids: Union[str, list[str]]) -> list[Tpos]:
     if isinstance(wallet_ids, str):
         wallet_ids = [wallet_ids]
     q = ",".join([f"'{wallet_id}'" for wallet_id in wallet_ids])
-    return await db.fetchall(
+    tposs = await db.fetchall(
         f"SELECT * FROM tpos.pos WHERE wallet IN ({q})", model=Tpos
     )
-
+    logger.debug("tposs")
+    logger.debug(tposs)
+    return tposs
 
 async def delete_tpos(tpos_id: str) -> None:
     await db.execute("DELETE FROM tpos.pos WHERE id = :id", {"id": tpos_id})

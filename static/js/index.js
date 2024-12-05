@@ -47,6 +47,18 @@ window.app = Vue.createApp({
             align: 'left',
             label: 'atm pin disabled',
             field: 'withdraw_pin_disabled'
+          },
+          {
+            name: 'lnaddress',
+            align: 'left',
+            label: 'LNaddress',
+            field: 'lnaddress'
+          },
+          {
+            name: 'lnaddress_cut',
+            align: 'left',
+            label: 'LNaddress Cut',
+            field: 'lnaddress_cut'
           }
         ],
         pagination: {
@@ -71,7 +83,9 @@ window.app = Vue.createApp({
           withdraw_between: 10,
           withdraw_time_option: '',
           withdraw_pin_disabled: false,
-          tax_inclusive: true
+          tax_inclusive: true,
+          lnaddress: false,
+          lnaddress_cut: 2
         },
         advanced: {
           tips: false,
@@ -170,7 +184,6 @@ window.app = Vue.createApp({
     },
     getTposs: function () {
       var self = this
-
       LNbits.api
         .request(
           'GET',
@@ -178,6 +191,7 @@ window.app = Vue.createApp({
           this.g.user.wallets[0].inkey
         )
         .then(function (response) {
+          console.log('getTposs', response.data)
           self.tposs = response.data.map(function (obj) {
             return mapTpos(obj)
           })
