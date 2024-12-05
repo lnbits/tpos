@@ -3,9 +3,10 @@ from typing import Optional, Union
 
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
+from loguru import logger
 
 from .models import CreateTposData, LnurlCharge, Tpos, TposClean
-from loguru import logger
+
 db = Database("ext_tpos")
 
 
@@ -84,6 +85,7 @@ async def get_tposs(wallet_ids: Union[str, list[str]]) -> list[Tpos]:
     logger.debug("tposs")
     logger.debug(tposs)
     return tposs
+
 
 async def delete_tpos(tpos_id: str) -> None:
     await db.execute("DELETE FROM tpos.pos WHERE id = :id", {"id": tpos_id})

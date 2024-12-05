@@ -296,15 +296,19 @@ window.app = Vue.createApp({
         )
         .then(response => {
           if (response.data) {
-            this.$q.localStorage.set('tpos.lnaddress', this.lnaddressDialog.lnaddress);
+            this.$q.localStorage.set(
+              'tpos.lnaddress',
+              this.lnaddressDialog.lnaddress
+            )
             this.lnaddressDialog.show = false
             this.lnaddress = true
           }
         })
         .catch(error => {
-          const errorMessage = error.response?.data?.detail || "An unknown error occurred.";
-          LNbits.utils.notifyApiError(errorMessage);
-        });
+          const errorMessage =
+            error.response?.data?.detail || 'An unknown error occurred.'
+          LNbits.utils.notifyApiError(errorMessage)
+        })
     },
     atmGetWithdraw() {
       var dialog = this.invoiceDialog
@@ -467,13 +471,13 @@ window.app = Vue.createApp({
             }
           })
 
-            params.details = {
-              currency: this.currency,
-              exchangeRate: this.exchangeRate,
-              items: details,
-              taxIncluded: this.taxInclusive,
-              taxValue: this.cartTax
-            }
+          params.details = {
+            currency: this.currency,
+            exchangeRate: this.exchangeRate,
+            items: details,
+            taxIncluded: this.taxInclusive,
+            taxValue: this.cartTax
+          }
         }
         if (this.lnaddress) {
           params.user_lnaddress = this.lnaddressDialog.lnaddress
@@ -700,9 +704,9 @@ window.app = Vue.createApp({
     clearLNaddress() {
       this.$q.localStorage.remove('tpos.lnaddress')
       this.lnaddressDialog.lnaddress = ''
-      const url = new URL(window.location.href);
-      url.searchParams.delete('lnaddress');
-      window.history.replaceState({}, document.title, url.toString());
+      const url = new URL(window.location.href)
+      url.searchParams.delete('lnaddress')
+      window.history.replaceState({}, document.title, url.toString())
       this.lnaddressDialog.show = true
       this.lnaddress = false
     },
@@ -774,18 +778,20 @@ window.app = Vue.createApp({
       this.showPoS = false
       this.categories = this.extractCategories(this.items)
     }
-    if (this.tposLNaddress){
-      this.lnaddressDialog.lnaddress = this.$q.localStorage.getItem('tpos.lnaddress')
-      if(lnaddressparam != ""){
+    if (this.tposLNaddress) {
+      this.lnaddressDialog.lnaddress =
+        this.$q.localStorage.getItem('tpos.lnaddress')
+      if (lnaddressparam != '') {
         this.lnaddressDialog.lnaddress = lnaddressparam
-        this.$q.localStorage.set('tpos.lnaddress', this.lnaddressDialog.lnaddress);
+        this.$q.localStorage.set(
+          'tpos.lnaddress',
+          this.lnaddressDialog.lnaddress
+        )
         this.lnaddress = true
-      }
-      else if (!this.lnaddressDialog.lnaddress){
+      } else if (!this.lnaddressDialog.lnaddress) {
         this.lnaddress = false
         this.lnaddressDialog.show = true
-      }
-      else{
+      } else {
         this.lnaddress = true
       }
     }

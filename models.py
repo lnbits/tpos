@@ -95,8 +95,10 @@ class HashCheck(BaseModel):
 class PayLnurlWData(BaseModel):
     lnurl: str
 
+
 class LNaddress(BaseModel):
     lnaddress: str
+
 
 class Item(BaseModel):
     image: Optional[str]

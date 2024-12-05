@@ -6,8 +6,9 @@ from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
 from lnbits.helpers import template_renderer
 from lnbits.settings import settings
-from starlette.responses import HTMLResponse
 from loguru import logger
+from starlette.responses import HTMLResponse
+
 from .crud import get_clean_tpos, get_tpos
 from .models import TposClean
 

@@ -29,6 +29,7 @@ from .crud import (
     update_lnurlcharge,
     update_tpos,
 )
+from .helpers import get_pr
 from .models import (
     CreateTposData,
     CreateTposInvoice,
@@ -37,9 +38,7 @@ from .models import (
     LnurlCharge,
     PayLnurlWData,
     Tpos,
-    LNaddress,
 )
-from .helpers import get_pr
 
 tpos_api_router = APIRouter()
 
@@ -368,9 +367,8 @@ async def api_tpos_create_items(
     tpos = await update_tpos(tpos)
     return tpos
 
-@tpos_api_router.get(
-    "/api/v1/tposs/lnaddresscheck", status_code=HTTPStatus.OK
-)
+
+@tpos_api_router.get("/api/v1/tposs/lnaddresscheck", status_code=HTTPStatus.OK)
 async def api_tpos_check_lnaddress(lnaddress: str):
     check = await get_pr(lnaddress, 1)
     if not check:

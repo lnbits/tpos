@@ -166,6 +166,7 @@ async def m010_rename_tpos_withdraw_columns(db: Database):
     await db.execute("DROP TABLE tpos.pos")
     await db.execute("ALTER TABLE tpos.pos_backup RENAME TO pos")
 
+
 async def m011_lnaddress(db: Database):
     """
     Add lnaddress to tpos table
@@ -175,6 +176,7 @@ async def m011_lnaddress(db: Database):
         ALTER TABLE tpos.pos ADD lnaddress BOOLEAN DEFAULT false;
     """
     )
+
 
 async def m012_addlnaddress(db: Database):
     """
