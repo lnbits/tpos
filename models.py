@@ -35,7 +35,6 @@ class CreateTposData(BaseModel):
     withdraw_pin_disabled: bool = Field(False)
     lnaddress: bool = Field(False)
     lnaddress_cut: Optional[int] = Field(0)
-    user_lnaddress: Optional[str] = Field(None)
 
 
 class TposClean(BaseModel):
@@ -53,7 +52,6 @@ class TposClean(BaseModel):
     withdrawn_amount: int = 0
     lnaddress: Optional[bool] = None
     lnaddress_cut: int = 0
-    user_lnaddress: Optional[str] = None
     items: Optional[str] = None
     tip_options: Optional[str] = None
 

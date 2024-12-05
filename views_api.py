@@ -17,7 +17,6 @@ from lnbits.decorators import (
 )
 from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 from lnurl import decode as decode_lnurl
-from loguru import logger
 
 from .crud import (
     create_tpos,
@@ -293,7 +292,6 @@ async def api_tpos_atm_pay(
             detail=str(exc),
         ) from exc
     except Exception as exc:
-        logger.warning(exc)
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
             detail="Cannot process atm withdraw",

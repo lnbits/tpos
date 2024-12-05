@@ -6,7 +6,6 @@ from lnbits.core.models import User
 from lnbits.decorators import check_user_exists
 from lnbits.helpers import template_renderer
 from lnbits.settings import settings
-from loguru import logger
 from starlette.responses import HTMLResponse
 
 from .crud import get_clean_tpos, get_tpos
@@ -29,7 +28,6 @@ async def index(request: Request, user: User = Depends(check_user_exists)):
 @tpos_generic_router.get("/{tpos_id}")
 async def tpos(request: Request, tpos_id, lnaddress: Optional[str] = ""):
     tpos = await get_tpos(tpos_id)
-    logger.debug(tpos)
     if not tpos:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."

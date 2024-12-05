@@ -482,8 +482,6 @@ window.app = Vue.createApp({
         if (this.lnaddress) {
           params.user_lnaddress = this.lnaddressDialog.lnaddress
         }
-        console.log(params)
-
         axios
           .post(`/tpos/api/v1/tposs/${this.tposId}/invoices`, params)
           .then(response => {
