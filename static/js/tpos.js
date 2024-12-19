@@ -656,9 +656,9 @@ window.app = Vue.createApp({
         Quasar.Loading.hide()
       } else {
         LNbits.api
-          .request('GET', `/tpos/api/v1/rate/${this.currency}`)
+          .request('GET', `/api/v1/rate/${this.currency}`)
           .then(response => {
-            this.exchangeRate = response.data.rate[0]
+            this.exchangeRate = response.data.rate
             Quasar.Loading.hide()
           })
           .catch(e => console.error(e))
