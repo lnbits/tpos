@@ -103,7 +103,7 @@ window.app = Vue.createApp({
     }
   },
   computed: {
-    amount: function () {
+    amount() {
       if (!this.stack.length) return 0.0
       if (this.currency == 'sats') return Number(this.stack.join(''))
       return (
@@ -111,34 +111,34 @@ window.app = Vue.createApp({
         (this.currency == 'sats' ? 1 : 0.01)
       )
     },
-    amountFormatted: function () {
+    amountFormatted() {
       return this.formatAmount(this.amount, this.currency)
     },
     totalFormatted() {
       return this.formatAmount(this.total, this.currency)
     },
-    amountWithTipFormatted: function () {
+    amountWithTipFormatted() {
       return this.formatAmount(this.amount + this.tipAmount, this.currency)
     },
-    sat: function () {
+    sat() {
       if (!this.exchangeRate) return 0
       return Math.ceil(this.amount * this.exchangeRate)
     },
-    totalSat: function () {
+    totalSat() {
       if (!this.exchangeRate) return 0
       return Math.ceil(this.total * this.exchangeRate)
     },
-    tipAmountSat: function () {
+    tipAmountSat() {
       if (!this.exchangeRate) return 0
       return Math.ceil(this.tipAmount * this.exchangeRate)
     },
-    tipAmountFormatted: function () {
+    tipAmountFormatted() {
       return LNbits.utils.formatSat(this.tipAmountSat)
     },
-    fsat: function () {
+    fsat() {
       return LNbits.utils.formatSat(this.sat)
     },
-    totalfsat: function () {
+    totalfsat() {
       return LNbits.utils.formatSat(this.totalSat)
     },
     roundToSugestion() {
@@ -656,10 +656,9 @@ window.app = Vue.createApp({
         Quasar.Loading.hide()
       } else {
         LNbits.api
-          .request('GET', `/tpos/api/v1/rate/${this.currency}`)
+          .request('GET', `/api/v1/rate/${this.currency}`)
           .then(response => {
             this.exchangeRate = response.data.rate
-            console.log(this.exchangeRate)
             Quasar.Loading.hide()
           })
           .catch(e => console.error(e))

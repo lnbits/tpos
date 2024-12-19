@@ -15,7 +15,6 @@ from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
-from lnbits.utils.exchange_rates import get_fiat_rate_satoshis
 from lnurl import decode as decode_lnurl
 
 from .crud import (
@@ -104,7 +103,6 @@ async def api_tpos_delete(
     "/api/v1/tposs/{tpos_id}/invoices", status_code=HTTPStatus.CREATED
 )
 async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict:
-
     tpos = await get_tpos(tpos_id)
 
     if not tpos:
@@ -335,16 +333,6 @@ async def api_tpos_create_withdraw(
         )
     )
     return {**lnurlcharge.dict(), **{"lnurl": lnurlcharge.lnurl(request)}}
-
-
-@tpos_api_router.get("/api/v1/rate/{currency}", status_code=HTTPStatus.OK)
-async def api_check_fiat_rate(currency):
-    try:
-        rate = await get_fiat_rate_satoshis(currency)
-    except AssertionError:
-        rate = None
-
-    return {"rate": rate}
 
 
 @tpos_api_router.put("/api/v1/tposs/{tpos_id}/items", status_code=HTTPStatus.CREATED)
