@@ -184,6 +184,6 @@ async def m012_addlnaddress(db: Database):
     """
     await db.execute(
         """
-        ALTER TABLE tpos.pos ADD lnaddress_cut TEXT NULL;
+        ALTER TABLE tpos.pos ADD lnaddress_cut INTEGER NULL;
     """
     )
