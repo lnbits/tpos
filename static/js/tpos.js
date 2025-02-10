@@ -402,7 +402,6 @@ window.app = Vue.createApp({
     },
     processTipSelection: function (selectedTipOption) {
       this.tipDialog.show = false
-
       if (!selectedTipOption) {
         this.tipAmount = 0.0
         return this.showInvoice()
@@ -457,7 +456,7 @@ window.app = Vue.createApp({
           amount: this.sat,
           memo: this.amountFormatted
         }
-        if (this.tipAmountSats > 0) {
+        if (this.tipAmountSat > 0) {
           params.tip_amount = this.tipAmountSat
         }
         if (this.cart.size) {

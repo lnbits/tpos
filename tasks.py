@@ -1,9 +1,10 @@
 import asyncio
 
+from loguru import logger
+
 from lnbits.core.models import Payment
 from lnbits.core.services import create_invoice, pay_invoice, websocket_updater
 from lnbits.tasks import register_invoice_listener
-from loguru import logger
 
 from .crud import get_tpos
 from .helpers import get_pr
@@ -25,7 +26,6 @@ async def on_invoice_paid(payment: Payment) -> None:
         or payment.extra.get("tipSplitted")
     ):
         return
-
     tip_amount = payment.extra.get("tip_amount")
 
     stripped_payment = {
