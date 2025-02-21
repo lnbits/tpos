@@ -308,6 +308,7 @@
           label="Wallet *"
         ></q-select>
         <q-select
+          v-if="LNBITS_DENOMINATION == 'sats'"
           filled
           dense
           emit-value
