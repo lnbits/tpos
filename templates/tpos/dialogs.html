@@ -20,12 +20,11 @@
         <q-tooltip>Pay in wallet</q-tooltip>
       </a>
       <div class="text-center">
-        <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
+        <h3 class="q-mb-md" v-text="formatBalance(amount + tipAmount)"></h3>
         <h5 class="q-mt-none q-mb-sm">
-          ${ fsat }
-          <small> sat </small>
-          <span v-show="tip_options" style="font-size: 0.75rem"
-            >(+ ${ tipAmountFormatted } tip)</span
+          <span v-text="formatBalance(amount)"></span>
+          <small v-if="tip_options"
+            >(+ <span v-text="formatBalance(tipAmount)"></span> tip)</small
           >
         </h5>
         <q-chip v-if="nfcTagReading" square>
@@ -151,8 +150,9 @@
         </q-item>
         <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
           <q-item-section>
-            <q-item-label class="text-bold"
-              >${payment.amount / 1000} sats</q-item-label
+            <q-item-label class="text-bold" 
+            v-text="formatBalance(payment.amount  / 1000)">
+            </q-item-label
             >
             <q-item-label caption lines="2"
               >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
