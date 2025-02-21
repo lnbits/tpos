@@ -308,7 +308,7 @@
           label="Wallet *"
         ></q-select>
         <q-select
-          v-if="LNBITS_DENOMINATION == 'sats'"
+          v-if="'{{LNBITS_DENOMINATION}}' == 'sats'"
           filled
           dense
           emit-value
@@ -394,7 +394,7 @@
             dense
             v-model.number="formDialog.data.withdraw_limit"
             type="number"
-            label="Max amount to be sold daily (sats)"
+            label="Max amount to be sold daily ({{LNBITS_DENOMINATION}})"
           ></q-input>
 
           <div class="row">
