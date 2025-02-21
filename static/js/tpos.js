@@ -728,8 +728,11 @@ window.app = Vue.createApp({
       }
     },
     formatAmount: function (amount, currency) {
+      if (LNBITS_DENOMINATION != 'sats') {
+        return LNbits.utils.formatCurrency(amount / 100, LNBITS_DENOMINATION)
+      } 
       if (currency == 'sats') {
-        return LNbits.utils.formatSat(amount) + ' sat'
+        return LNbits.utils.formatSat(amount) + ' sats'
       } else {
         return LNbits.utils.formatCurrency(Number(amount).toFixed(2), currency)
       }
