@@ -644,5 +644,8 @@
   </q-dialog>
 </div>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
+<script>
+  const DENOM = '{{ LNBITS_DENOMINATION }}'
+</script>
 <script src="{{ static_url_for('tpos/static', path='js/index.js') }}"></script>
 {% endblock %}

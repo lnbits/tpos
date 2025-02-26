@@ -99,7 +99,7 @@ window.app = Vue.createApp({
       searchTerm: '',
       categoryFilter: '',
       cart: new Map(),
-      denomIsSats: tpos.currency == 'sats'
+      denomIsSats: tpos.currency == DENOMINATION && DENOMINATION == 'sats',
     }
   },
   computed: {
@@ -415,7 +415,7 @@ window.app = Vue.createApp({
         if (this.amount > 0.0) {
           this.total = this.total + this.amount
         }
-        if (this.currency == 'sats') {
+        if (this.currency == DENOMINATION) {
           this.stack = Array.from(String(Math.ceil(this.total), Number))
         } else {
           this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
@@ -650,7 +650,7 @@ window.app = Vue.createApp({
         })
     },
     getRates() {
-      if (this.currency == 'sats') {
+      if (this.currency == DENOMINATION) {
         this.exchangeRate = 1
         Quasar.Loading.hide()
       } else {
@@ -728,8 +728,8 @@ window.app = Vue.createApp({
       }
     },
     formatAmount: function (amount, currency) {
-      if (currency == 'sats') {
-        return LNbits.utils.formatSat(amount) + ' sat'
+      if (currency == DENOMINATION && DENOMINATION == 'sats') {
+        return LNbits.utils.formatSat(amount) + ` sat`
       } else {
         return LNbits.utils.formatCurrency(Number(amount).toFixed(2), currency)
       }

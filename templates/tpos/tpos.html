@@ -32,7 +32,7 @@
             <h5>
               <i
                 >Total: ${totalFormatted}<span v-if="!denomIsSats"
-                  ><br />${totalfsat} sat</span
+                  ><br />${totalfsat} <span v-text="'{{ LNBITS_DENOMINATION }}'"></span></span
                 ></i
               >
             </h5>
@@ -551,6 +551,7 @@
   const lnaddress = tpos.lnaddress
   const lnaddressparam = '{{ lnaddressparam }}'
   const lnaddress_cut = tpos.lnaddress_cut
+  const DENOMINATION = '{{ LNBITS_DENOMINATION }}'
 </script>
 
 <script src="{{ static_url_for('tpos/static', path='js/tpos.js') }}"></script>

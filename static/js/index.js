@@ -303,8 +303,8 @@ window.app = Vue.createApp({
     itemFormatPrice(price, id) {
       const tpos = id.split(':')[0]
       const currency = _.findWhere(this.tposs, {id: tpos}).currency
-      if (currency == 'sats') {
-        return LNbits.utils.formatSat(price) + ' sat'
+      if (currency == DENOM) {
+        return LNbits.utils.formatSat(price) + ` ${DENOM}`
       } else {
         return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
       }
@@ -477,8 +477,8 @@ window.app = Vue.createApp({
       this.urlDialog.show = true
     },
     formatAmount: function (amount, currency) {
-      if (currency == 'sats') {
-        return LNbits.utils.formatSat(amount) + ' sat'
+      if (currency == DENOM) {
+        return LNbits.utils.formatSat(amount) + DENOM
       } else {
         return LNbits.utils.formatCurrency(Number(amount).toFixed(2), currency)
       }
@@ -491,7 +491,7 @@ window.app = Vue.createApp({
     LNbits.api
       .request('GET', '/api/v1/currencies')
       .then(response => {
-        this.currencyOptions = ['sats', ...response.data]
+        this.currencyOptions = [DENOM, ...response.data]
       })
       .catch(err => {
         LNbits.utils.notifyApiError(err)
