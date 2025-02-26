@@ -23,9 +23,9 @@
         <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
         <h5 class="q-mt-none q-mb-sm">
           ${ fsat }
-          <small> sat </small>
+          <small v-text="'{{ LNBITS_DENOMINATION }}'"></small>
           <span v-show="tip_options" style="font-size: 0.75rem"
-            >(+ ${ tipAmountFormatted } tip)</span
+            >&nbsp;(+ ${ tipAmountFormatted } tip)</span
           >
         </h5>
         <q-chip v-if="nfcTagReading" square>
@@ -152,8 +152,10 @@
         <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
           <q-item-section>
             <q-item-label class="text-bold"
-              >${payment.amount / 1000} sats</q-item-label
-            >
+              >${payment.amount / 1000}&nbsp;<span
+                v-text="'{{ LNBITS_DENOMINATION }}'"
+              ></span
+            ></q-item-label>
             <q-item-label caption lines="2"
               >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
             >
