@@ -21,10 +21,10 @@
       </a>
       <div class="text-center">
         <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
-        <h5 class="q-mt-none q-mb-sm">
+        <h5 v-if="DENOMINATION == 'sats'" class="q-mt-none q-mb-sm">
           ${ fsat }
           <small v-text="'{{ LNBITS_DENOMINATION }}'"></small>
-          <span v-show="tip_options" style="font-size: 0.75rem"
+          <span v-show="tip_options.length" style="font-size: 0.75rem"
             >&nbsp;(+ ${ tipAmountFormatted } tip)</span
           >
         </h5>

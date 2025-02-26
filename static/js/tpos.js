@@ -99,7 +99,7 @@ window.app = Vue.createApp({
       searchTerm: '',
       categoryFilter: '',
       cart: new Map(),
-      denomIsSats: tpos.currency == DENOMINATION && DENOMINATION == 'sats',
+      denomIsSats: tpos.currency == DENOMINATION,
     }
   },
   computed: {
