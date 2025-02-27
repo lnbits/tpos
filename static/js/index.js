@@ -493,7 +493,7 @@ window.app = Vue.createApp({
       .then(response => {
         this.currencyOptions = ['sats', ...response.data]
         if (LNBITS_DENOMINATION != 'sats') {
-          this.formDialog.data.currency = 'sats'
+          this.formDialog.data.currency = DENOMINATION
         }
       })
       .catch(err => {
