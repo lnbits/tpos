@@ -650,7 +650,7 @@ window.app = Vue.createApp({
         })
     },
     getRates() {
-      if (this.currency == 'sats') {
+      if (this.currency == LNBITS_DENOMINATION) {
         this.exchangeRate = 1
         Quasar.Loading.hide()
       } else {
