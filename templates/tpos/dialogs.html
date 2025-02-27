@@ -22,8 +22,7 @@
       <div class="text-center">
         <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
         <h5 class="q-mt-none q-mb-sm">
-          ${ fsat }
-          <small> sat </small>
+          ${ amountFormatted }
           <span v-show="tip_options" style="font-size: 0.75rem"
             >(+ ${ tipAmountFormatted } tip)</span
           >
@@ -151,9 +150,11 @@
         </q-item>
         <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
           <q-item-section>
-            <q-item-label class="text-bold"
-              >${payment.amount / 1000} sats</q-item-label
+            <q-item-label
+              class="text-bold"
+              v-text="formatBalance(payment.amount  / 1000)"
             >
+            </q-item-label>
             <q-item-label caption lines="2"
               >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
             >

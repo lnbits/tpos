@@ -308,6 +308,7 @@
           label="Wallet *"
         ></q-select>
         <q-select
+          v-if="'{{LNBITS_DENOMINATION}}' == 'sats'"
           filled
           dense
           emit-value
@@ -393,7 +394,7 @@
             dense
             v-model.number="formDialog.data.withdraw_limit"
             type="number"
-            label="Max amount to be sold daily (sats)"
+            label="Max amount to be sold daily ({{LNBITS_DENOMINATION}})"
           ></q-input>
 
           <div class="row">
@@ -498,13 +499,14 @@
             unelevated
             color="primary"
             type="submit"
+            :disable="formDialog.data.currency == null || formDialog.data.name == null || formDialog.data.wallet == null"
             >Update TPoS</q-btn
           >
           <q-btn
             v-else
             unelevated
             color="primary"
-            :disable="formDialog.data.currency == null || formDialog.data.name == null"
+            :disable="formDialog.data.currency == null || formDialog.data.name == null || formDialog.data.wallet == null"
             type="submit"
             >Create TPoS</q-btn
           >
@@ -644,5 +646,8 @@
   </q-dialog>
 </div>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
+<script>
+  const DENOMINATION = '{{ LNBITS_DENOMINATION }}'
+</script>
 <script src="{{ static_url_for('tpos/static', path='js/index.js') }}"></script>
 {% endblock %}
