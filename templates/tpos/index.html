@@ -499,13 +499,14 @@
             unelevated
             color="primary"
             type="submit"
+            :disable="formDialog.data.currency == null || formDialog.data.name == null || formDialog.data.wallet == null"
             >Update TPoS</q-btn
           >
           <q-btn
             v-else
             unelevated
             color="primary"
-            :disable="formDialog.data.currency == null || formDialog.data.name == null"
+            :disable="formDialog.data.currency == null || formDialog.data.name == null || formDialog.data.wallet == null"
             type="submit"
             >Create TPoS</q-btn
           >
@@ -645,5 +646,8 @@
   </q-dialog>
 </div>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
+<script>
+const DENOMINATION = '{{ LNBITS_DENOMINATION }}'
+</script>
 <script src="{{ static_url_for('tpos/static', path='js/index.js') }}"></script>
 {% endblock %}
