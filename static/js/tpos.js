@@ -10,7 +10,8 @@ window.app = Vue.createApp({
       withdrawMaximum: 0,
       withdrawPinOpen: null,
       tip_options: null,
-      exchangeRate: null,
+      exchangeRateLoaded: false,
+      exchangeRate: 1,
       stack: [],
       tipAmount: 0.0,
       tipRounding: null,
@@ -99,47 +100,61 @@ window.app = Vue.createApp({
       searchTerm: '',
       categoryFilter: '',
       cart: new Map(),
-      denomIsSats: tpos.currency == 'sats'
+      denomIsSats: tpos.currency == 'sats',
+      amount: 0.0,
+      amountFormatted: 0,
+      totalFormatted: 0,
+      amountWithTipFormatted: 0,
+      sat: 0,
+      fsat: 0,
+      totalfsat: 0
+    }
+  },
+  watch: {
+    stack: {
+      handler() {
+        if (!this.stack.length) {
+          this.amount = 0.0
+        } else if (this.currency === 'sats') {
+          this.amount = Number(this.stack.join(''))
+        } else {
+          this.amount =
+            this.stack.reduce((acc, dig) => acc * 10 + dig, 0) * 0.01
+        }
+      },
+      immediate: true,
+      deep: true
+    },
+    amount: {
+      handler(val) {
+        this.amountFormatted = this.formatAmount(val, this.currency)
+        this.amountWithTipFormatted = this.formatAmount(
+          this.amount + this.tipAmount,
+          this.currency
+        )
+        this.sat = Math.ceil(val * this.exchangeRate)
+        this.fsat = LNbits.utils.formatSat(this.sat)
+      },
+      immediate: true
+    },
+    total: {
+      handler(val) {
+        this.totalFormatted = this.formatAmount(val, this.currency)
+        this.totalSat = Math.ceil(val * this.exchangeRate)
+        this.totalfsat = LNbits.utils.formatSat(
+          Math.ceil(val * this.exchangeRate)
+        )
+      },
+      immediate: true
     }
   },
   computed: {
-    amount() {
-      if (!this.stack.length) return 0.0
-      if (this.currency == 'sats') return Number(this.stack.join(''))
-      return (
-        this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
-        (this.currency == 'sats' ? 1 : 0.01)
-      )
-    },
-    amountFormatted() {
-      return this.formatAmount(this.amount, this.currency)
-    },
-    totalFormatted() {
-      return this.formatAmount(this.total, this.currency)
-    },
-    amountWithTipFormatted() {
-      return this.formatAmount(this.amount + this.tipAmount, this.currency)
-    },
-    sat() {
-      if (!this.exchangeRate) return 0
-      return Math.ceil(this.amount * this.exchangeRate)
-    },
-    totalSat() {
-      if (!this.exchangeRate) return 0
-      return Math.ceil(this.total * this.exchangeRate)
-    },
     tipAmountSat() {
       if (!this.exchangeRate) return 0
       return Math.ceil(this.tipAmount * this.exchangeRate)
     },
     tipAmountFormatted() {
       return LNbits.utils.formatSat(this.tipAmountSat)
-    },
-    fsat() {
-      return LNbits.utils.formatSat(this.sat)
-    },
-    totalfsat() {
-      return LNbits.utils.formatSat(this.totalSat)
     },
     roundToSugestion() {
       switch (true) {
@@ -413,13 +428,14 @@ window.app = Vue.createApp({
     submitForm: function () {
       if (this.total != 0.0) {
         if (this.amount > 0.0) {
-          this.total = this.total + this.amount
+          this.total += this.amount
         }
         if (this.currency == 'sats') {
           this.stack = Array.from(String(Math.ceil(this.total), Number))
         } else {
           this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
         }
+        this.sat = this.totalSat
       }
 
       if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
@@ -750,11 +766,12 @@ window.app = Vue.createApp({
       }
     }
   },
-  created() {
+  async created() {
     Quasar.Loading.show()
-    this.tposId = tpos.id
     this.currency = tpos.currency
-    this.exchangeRate = Promise.resolve(this.getRates())
+    this.amountFormatted = this.formatAmount(this.amount, this.currency)
+    this.totalFormatted = this.formatAmount(this.total, this.currency)
+    this.tposId = tpos.id
     this.atmPremium = tpos.withdraw_premium / 100
     this.withdrawMaximum = withdraw_maximum
     this.withdrawPinOpen = withdraw_pin_open
@@ -763,13 +780,13 @@ window.app = Vue.createApp({
     this.taxDefault = tpos.tax_default
     this.tposLNaddress = tpos.lnaddress
     this.tposLNaddressCut = tpos.lnaddress_cut
-    
+
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
-    
+
     if (tpos.tip_wallet) {
       this.tip_options.push('Round')
     }
-    
+
     this.items = tpos.items
     this.items.forEach((item, id) => {
       item.formattedPrice = this.formatAmount(item.price, this.currency)
@@ -780,6 +797,9 @@ window.app = Vue.createApp({
       this.showPoS = false
       this.categories = this.extractCategories(this.items)
     }
+    this.exchangeRate = await this.getRates()
+  },
+  onMounted() {
     setInterval(() => {
       this.getRates()
     }, 120000)
