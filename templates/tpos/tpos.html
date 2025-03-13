@@ -34,7 +34,7 @@
           <div v-if="total > 0.0">
             <h5>
               <i
-                >Total: ${totalFormatted}<span v-if="!denomIsSats"
+                >Total: ${formatAmount(total, currency)}<span v-if="!denomIsSats"
                   ><br />${totalfsat} sat</span
                 ></i
               >

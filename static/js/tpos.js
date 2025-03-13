@@ -649,18 +649,24 @@ window.app = Vue.createApp({
           readerAbortController.abort()
         })
     },
-    getRates() {
-      if (this.currency == LNBITS_DENOMINATION) {
-        this.exchangeRate = 1
+    async getRates() {
+      let rate
+      try {
+        if (this.currency == LNBITS_DENOMINATION) {
+          rate = 1
+        } else {
+          const {data} = await LNbits.api.request(
+            'GET',
+            `/api/v1/rate/${this.currency}`
+          )
+          rate = data.rate
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
         Quasar.Loading.hide()
-      } else {
-        LNbits.api
-          .request('GET', `/api/v1/rate/${this.currency}`)
-          .then(response => {
-            this.exchangeRate = response.data.rate
-            Quasar.Loading.hide()
-          })
-          .catch(e => console.error(e))
+        this.exchangeRate = rate
+        return rate
       }
     },
     getLastPayments() {
@@ -748,25 +754,22 @@ window.app = Vue.createApp({
     Quasar.Loading.show()
     this.tposId = tpos.id
     this.currency = tpos.currency
+    this.exchangeRate = Promise.resolve(this.getRates())
     this.atmPremium = tpos.withdraw_premium / 100
     this.withdrawMaximum = withdraw_maximum
     this.withdrawPinOpen = withdraw_pin_open
-    this.getRates()
-    setInterval(() => {
-      this.getRates()
-    }, 120000)
     this.pinDisabled = tpos.withdraw_pin_disabled
     this.taxInclusive = tpos.tax_inclusive
     this.taxDefault = tpos.tax_default
     this.tposLNaddress = tpos.lnaddress
     this.tposLNaddressCut = tpos.lnaddress_cut
-
+    
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
-
+    
     if (tpos.tip_wallet) {
       this.tip_options.push('Round')
     }
-
+    
     this.items = tpos.items
     this.items.forEach((item, id) => {
       item.formattedPrice = this.formatAmount(item.price, this.currency)
@@ -777,6 +780,9 @@ window.app = Vue.createApp({
       this.showPoS = false
       this.categories = this.extractCategories(this.items)
     }
+    setInterval(() => {
+      this.getRates()
+    }, 120000)
     if (this.tposLNaddress) {
       this.lnaddressDialog.lnaddress =
         this.$q.localStorage.getItem('tpos.lnaddress')
