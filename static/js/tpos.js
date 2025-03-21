@@ -666,11 +666,9 @@ window.app = Vue.createApp({
         })
     },
     async getRates() {
-      let rate
+      let rate = 1
       try {
-        if (this.currency == LNBITS_DENOMINATION) {
-          rate = 1
-        } else {
+        if (this.currency != LNBITS_DENOMINATION) {
           const {data} = await LNbits.api.request(
             'GET',
             `/api/v1/rate/${this.currency}`
