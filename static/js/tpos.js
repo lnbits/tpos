@@ -10,7 +10,8 @@ window.app = Vue.createApp({
       withdrawMaximum: 0,
       withdrawPinOpen: null,
       tip_options: null,
-      exchangeRate: null,
+      exchangeRateLoaded: false,
+      exchangeRate: 1,
       stack: [],
       tipAmount: 0.0,
       tipRounding: null,
@@ -99,47 +100,61 @@ window.app = Vue.createApp({
       searchTerm: '',
       categoryFilter: '',
       cart: new Map(),
-      denomIsSats: tpos.currency == 'sats'
+      denomIsSats: tpos.currency == 'sats',
+      amount: 0.0,
+      amountFormatted: 0,
+      totalFormatted: 0,
+      amountWithTipFormatted: 0,
+      sat: 0,
+      fsat: 0,
+      totalfsat: 0
+    }
+  },
+  watch: {
+    stack: {
+      handler() {
+        if (!this.stack.length) {
+          this.amount = 0.0
+        } else if (this.currency === 'sats') {
+          this.amount = Number(this.stack.join(''))
+        } else {
+          this.amount =
+            this.stack.reduce((acc, dig) => acc * 10 + dig, 0) * 0.01
+        }
+      },
+      immediate: true,
+      deep: true
+    },
+    amount: {
+      handler(val) {
+        this.amountFormatted = this.formatAmount(val, this.currency)
+        this.amountWithTipFormatted = this.formatAmount(
+          this.amount + this.tipAmount,
+          this.currency
+        )
+        this.sat = Math.ceil(val * this.exchangeRate)
+        this.fsat = LNbits.utils.formatSat(this.sat)
+      },
+      immediate: true
+    },
+    total: {
+      handler(val) {
+        this.totalFormatted = this.formatAmount(val, this.currency)
+        this.totalSat = Math.ceil(val * this.exchangeRate)
+        this.totalfsat = LNbits.utils.formatSat(
+          Math.ceil(val * this.exchangeRate)
+        )
+      },
+      immediate: true
     }
   },
   computed: {
-    amount() {
-      if (!this.stack.length) return 0.0
-      if (this.currency == 'sats') return Number(this.stack.join(''))
-      return (
-        this.stack.reduce((acc, dig) => acc * 10 + dig, 0) *
-        (this.currency == 'sats' ? 1 : 0.01)
-      )
-    },
-    amountFormatted() {
-      return this.formatAmount(this.amount, this.currency)
-    },
-    totalFormatted() {
-      return this.formatAmount(this.total, this.currency)
-    },
-    amountWithTipFormatted() {
-      return this.formatAmount(this.amount + this.tipAmount, this.currency)
-    },
-    sat() {
-      if (!this.exchangeRate) return 0
-      return Math.ceil(this.amount * this.exchangeRate)
-    },
-    totalSat() {
-      if (!this.exchangeRate) return 0
-      return Math.ceil(this.total * this.exchangeRate)
-    },
     tipAmountSat() {
       if (!this.exchangeRate) return 0
       return Math.ceil(this.tipAmount * this.exchangeRate)
     },
     tipAmountFormatted() {
       return LNbits.utils.formatSat(this.tipAmountSat)
-    },
-    fsat() {
-      return LNbits.utils.formatSat(this.sat)
-    },
-    totalfsat() {
-      return LNbits.utils.formatSat(this.totalSat)
     },
     roundToSugestion() {
       switch (true) {
@@ -413,13 +428,14 @@ window.app = Vue.createApp({
     submitForm: function () {
       if (this.total != 0.0) {
         if (this.amount > 0.0) {
-          this.total = this.total + this.amount
+          this.total += this.amount
         }
         if (this.currency == 'sats') {
           this.stack = Array.from(String(Math.ceil(this.total), Number))
         } else {
           this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
         }
+        this.sat = this.totalSat
       }
 
       if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
@@ -649,18 +665,22 @@ window.app = Vue.createApp({
           readerAbortController.abort()
         })
     },
-    getRates() {
-      if (this.currency == LNBITS_DENOMINATION) {
-        this.exchangeRate = 1
+    async getRates() {
+      let rate = 1
+      try {
+        if (this.currency != LNBITS_DENOMINATION) {
+          const {data} = await LNbits.api.request(
+            'GET',
+            `/api/v1/rate/${this.currency}`
+          )
+          rate = data.rate
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
         Quasar.Loading.hide()
-      } else {
-        LNbits.api
-          .request('GET', `/api/v1/rate/${this.currency}`)
-          .then(response => {
-            this.exchangeRate = response.data.rate
-            Quasar.Loading.hide()
-          })
-          .catch(e => console.error(e))
+        this.exchangeRate = rate
+        return rate
       }
     },
     getLastPayments() {
@@ -744,17 +764,15 @@ window.app = Vue.createApp({
       }
     }
   },
-  created() {
+  async created() {
     Quasar.Loading.show()
-    this.tposId = tpos.id
     this.currency = tpos.currency
+    this.amountFormatted = this.formatAmount(this.amount, this.currency)
+    this.totalFormatted = this.formatAmount(this.total, this.currency)
+    this.tposId = tpos.id
     this.atmPremium = tpos.withdraw_premium / 100
     this.withdrawMaximum = withdraw_maximum
     this.withdrawPinOpen = withdraw_pin_open
-    this.getRates()
-    setInterval(() => {
-      this.getRates()
-    }, 120000)
     this.pinDisabled = tpos.withdraw_pin_disabled
     this.taxInclusive = tpos.tax_inclusive
     this.taxDefault = tpos.tax_default
@@ -777,6 +795,12 @@ window.app = Vue.createApp({
       this.showPoS = false
       this.categories = this.extractCategories(this.items)
     }
+    this.exchangeRate = await this.getRates()
+  },
+  onMounted() {
+    setInterval(() => {
+      this.getRates()
+    }, 120000)
     if (this.tposLNaddress) {
       this.lnaddressDialog.lnaddress =
         this.$q.localStorage.getItem('tpos.lnaddress')
