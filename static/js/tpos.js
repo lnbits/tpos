@@ -2,7 +2,7 @@ window.app = Vue.createApp({
   el: '#vue',
   mixins: [window.windowMixin],
   delimiters: ['${', '}'],
-  data: function () {
+  data() {
     return {
       tposId: null,
       currency: null,
@@ -298,9 +298,7 @@ window.app = Vue.createApp({
             this.atmMode = true
           }
         })
-        .catch(function (error) {
-          LNbits.utils.notifyApiError(error)
-        })
+        .catch(LNbits.utils.notifyApiError)
     },
     lnaddressSubmit() {
       LNbits.api
@@ -385,9 +383,7 @@ window.app = Vue.createApp({
           }
           this.getRates()
         })
-        .catch(function (error) {
-          LNbits.utils.notifyApiError(error)
-        })
+        .catch(LNbits.utils.notifyApiError)
     },
     setRounding() {
       this.rounding = true
@@ -406,16 +402,16 @@ window.app = Vue.createApp({
       }
       this.processTipSelection(change)
     },
-    closeInvoiceDialog: function () {
+    closeInvoiceDialog() {
       this.stack = []
       this.tipAmount = 0.0
       var dialog = this.invoiceDialog
-      setTimeout(function () {
+      setTimeout(() => {
         clearInterval(dialog.paymentChecker)
         dialog.dismissMsg()
       }, 3000)
     },
-    processTipSelection: function (selectedTipOption) {
+    processTipSelection(selectedTipOption) {
       this.tipDialog.show = false
       if (!selectedTipOption) {
         this.tipAmount = 0.0
@@ -425,7 +421,7 @@ window.app = Vue.createApp({
       this.tipAmount = (selectedTipOption / 100) * this.amount
       this.showInvoice()
     },
-    submitForm: function () {
+    submitForm() {
       if (this.total != 0.0) {
         if (this.amount > 0.0) {
           this.total += this.amount
@@ -455,7 +451,7 @@ window.app = Vue.createApp({
         this.showInvoice()
       }
     },
-    showTipModal: function () {
+    showTipModal() {
       if (!this.atmMode) {
         this.tipDialog.show = true
       } else {
@@ -466,7 +462,7 @@ window.app = Vue.createApp({
       if (this.atmMode) {
         this.atmGetWithdraw()
       } else {
-        var dialog = this.invoiceDialog
+        const dialog = this.invoiceDialog
 
         let params = {
           amount: this.sat,
@@ -526,12 +522,10 @@ window.app = Vue.createApp({
                 })
             }, 3000)
           })
-          .catch(function (error) {
-            LNbits.utils.notifyApiError(error)
-          })
+          .catch(LNbits.utils.notifyApiError)
       }
     },
-    readNfcTag: function () {
+    readNfcTag() {
       try {
         if (typeof NDEFReader == 'undefined') {
           console.debug('NFC not supported on this device or browser.')
@@ -747,7 +741,7 @@ window.app = Vue.createApp({
         this.categoryFilter = category == 'All' ? '' : category
       }
     },
-    formatAmount: function (amount, currency) {
+    formatAmount(amount, currency) {
       if (LNBITS_DENOMINATION != 'sats') {
         return LNbits.utils.formatCurrency(amount / 100, LNBITS_DENOMINATION)
       }
