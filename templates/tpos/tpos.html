@@ -56,151 +56,40 @@
       <q-page-sticky expand position="bottom">
         <div class="row justify-center full-width">
           <div class="col-12 col-sm-8 col-md-6 col-lg-4">
-            <div class="keypad q-pa-sm">
-              <q-btn
-                unelevated
-                @click="stack.push(1)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >1</q-btn
-              >
-              <q-btn
-                unelevated
-                @click="stack.push(2)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >2</q-btn
-              >
-              <q-btn
-                unelevated
-                @click="stack.push(3)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >3</q-btn
-              >
-              <q-btn
-                unelevated
-                @click="stack.push(4)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >4</q-btn
-              >
-              <q-btn
-                unelevated
-                @click="stack.push(5)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >5</q-btn
-              >
-              <q-btn
-                unelevated
-                @click="stack.push(6)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >6</q-btn
-              >
-              <q-btn
-                unelevated
-                @click="stack.push(7)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >7</q-btn
-              >
-              <q-btn
-                unelevated
-                @click="stack.push(8)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >8</q-btn
-              >
-              <q-btn
-                unelevated
-                @click="stack.push(9)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >9</q-btn
-              >
-              <q-btn
-                unelevated
+            <keypad>
+              <keypad-item @click="stack.push(1)" :value="1"></keypad-item>
+              <keypad-item @click="stack.push(2)" :value="2"></keypad-item>
+              <keypad-item @click="stack.push(3)" :value="3"></keypad-item>
+              <keypad-item @click="stack.push(4)" :value="4"></keypad-item>
+              <keypad-item @click="stack.push(5)" :value="5"></keypad-item>
+              <keypad-item @click="stack.push(6)" :value="6"></keypad-item>
+              <keypad-item @click="stack.push(7)" :value="7"></keypad-item>
+              <keypad-item @click="stack.push(8)" :value="8"></keypad-item>
+              <keypad-item @click="stack.push(9)" :value="9"></keypad-item>
+              <keypad-item
                 @click="total > 0.0 ? cancelAddAmount() : stack = []"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
+                :value="'C'"
                 :color="monochrome ? 'secondary' : 'negative'"
-                :disable="keypadDisabled"
-                >C</q-btn
-              >
-              <q-btn
-                unelevated
-                @click="stack.push(0)"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
-                :disable="keypadDisabled"
-                >0</q-btn
-              >
-              <q-btn
-                unelevated
+              ></keypad-item>
+              <keypad-item @click="stack.push(0)" :value="0"></keypad-item>
+              <keypad-item
                 @click="stack.pop()"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
+                :value="'⬅'"
                 :color="monochrome ? 'secondary' : 'warning'"
                 class="btn-cancel"
-                :disable="keypadDisabled"
-                >⬅</q-btn
-              >
-              <q-btn
-                unelevated
+              ></keypad-item>
+              <keypad-item
                 @click="addAmount()"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
-                color="primary"
+                :value="'+'"
                 class="btn-plus"
-                :disable="keypadDisabled"
-                >+</q-btn
-              >
-              <q-btn
-                unelevated
+              ></keypad-item>
+              <keypad-item
                 @click="submitForm()"
-                size="xl"
-                :outline="!($q.dark.isActive)"
-                rounded
+                :value="'Ok'"
                 :color="monochrome ? 'secondary' : 'positive'"
                 class="btn-confirm"
-                :disable="keypadDisabled"
-                >Ok</q-btn
-              >
-            </div>
+              ></keypad-item>
+            </keypad>
           </div>
         </div>
       </q-page-sticky>
@@ -558,6 +447,7 @@
 
 <script src="{{ static_url_for('tpos/static', path='js/tpos.js') }}"></script>
 <script src="{{ static_url_for('tpos/static', path='components/item-list.js') }}"></script>
+<script src="{{ static_url_for('tpos/static', path='components/keypad.js') }}"></script>
 
 <style scoped>
   input::-webkit-outer-spin-button,
