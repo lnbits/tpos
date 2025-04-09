@@ -324,7 +324,7 @@ window.app = Vue.createApp({
         })
     },
     atmGetWithdraw() {
-      var dialog = this.invoiceDialog
+      const dialog = this.invoiceDialog
       if (this.sat > this.withdrawMaximum) {
         Quasar.Notify.create({
           type: 'negative',
@@ -391,7 +391,7 @@ window.app = Vue.createApp({
       this.$nextTick(() => this.$refs.inputRounding.focus())
     },
     calculatePercent() {
-      let change = ((this.tipRounding - this.amount) / this.amount) * 100
+      const change = ((this.tipRounding - this.amount) / this.amount) * 100
       if (change < 0) {
         Quasar.Notify.create({
           type: 'warning',
@@ -405,7 +405,7 @@ window.app = Vue.createApp({
     closeInvoiceDialog() {
       this.stack = []
       this.tipAmount = 0.0
-      var dialog = this.invoiceDialog
+      const dialog = this.invoiceDialog
       setTimeout(() => {
         clearInterval(dialog.paymentChecker)
         dialog.dismissMsg()
@@ -458,7 +458,7 @@ window.app = Vue.createApp({
         this.showInvoice()
       }
     },
-    showInvoice() {
+    async showInvoice() {
       if (this.atmMode) {
         this.atmGetWithdraw()
       } else {
@@ -493,36 +493,49 @@ window.app = Vue.createApp({
         if (this.lnaddress) {
           params.user_lnaddress = this.lnaddressDialog.lnaddress
         }
-        axios
-          .post(`/tpos/api/v1/tposs/${this.tposId}/invoices`, params)
-          .then(response => {
-            dialog.data = response.data
-            dialog.show = true
-            this.readNfcTag()
-
-            dialog.dismissMsg = Quasar.Notify.create({
-              timeout: 0,
-              message: 'Waiting for payment...'
-            })
-
-            dialog.paymentChecker = setInterval(() => {
-              axios
-                .get(
-                  `/tpos/api/v1/tposs/${this.tposId}/invoices/${response.data.payment_hash}`
-                )
-                .then(res => {
-                  if (res.data.paid) {
-                    clearInterval(dialog.paymentChecker)
-                    dialog.dismissMsg()
-                    dialog.show = false
-                    this.clearCart()
-
-                    this.showComplete()
-                  }
-                })
-            }, 3000)
+        try {
+          const {data} = await LNbits.api.request(
+            'POST',
+            `/tpos/api/v1/tposs/${this.tposId}/invoices`,
+            null,
+            params
+          )
+          dialog.data = data
+          dialog.show = true
+          this.readNfcTag()
+          dialog.dismissMsg = Quasar.Notify.create({
+            timeout: 0,
+            message: 'Waiting for payment...'
           })
-          .catch(LNbits.utils.notifyApiError)
+          this.subscribeToPaymentWS(data.payment_hash)
+        } catch (error) {
+          console.error(error)
+          LNbits.utils.notifyApiError(error)
+        }
+      }
+    },
+    subscribeToPaymentWS(paymentHash) {
+      try {
+        const url = new URL(window.location)
+        url.protocol = url.protocol === 'https:' ? 'wss' : 'ws'
+        url.pathname = `/api/v1/ws/${paymentHash}`
+        const ws = new WebSocket(url)
+        ws.onmessage = async ({data}) => {
+          const payment = JSON.parse(data)
+          if (payment.pending === false) {
+            Quasar.Notify.create({
+              type: 'positive',
+              message: 'Invoice Paid!'
+            })
+            this.invoiceDialog.show = false
+            this.clearCart()
+            this.showComplete()
+            ws.close()
+          }
+        }
+      } catch (err) {
+        console.warn(err)
+        LNbits.utils.notifyApiError(err)
       }
     },
     readNfcTag() {
