@@ -465,7 +465,7 @@ window.app = Vue.createApp({
         const dialog = this.invoiceDialog
         let params = {
           amount: this.sat,
-          memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
+          memo: this.total > 0 ? this.totalFormatted : this.amountFormatted
         }
         if (this.tipAmountSat > 0) {
           params.tip_amount = this.tipAmountSat
@@ -570,7 +570,7 @@ window.app = Vue.createApp({
             readerAbortController.abort()
           }
 
-          ndef.onreading = ({ message }) => {
+          ndef.onreading = ({message}) => {
             // Abort scan immediately to prevent duplicate reads
             readerAbortController.abort()
 
@@ -588,8 +588,8 @@ window.app = Vue.createApp({
               Quasar.Notify.create({
                 type: 'negative',
                 message: 'No valid LNURL found on this NFC tag.'
-              });
-              return;
+              })
+              return
             }
 
             const lnurl = textDecoder.decode(record.data)
@@ -677,7 +677,6 @@ window.app = Vue.createApp({
               message: response.data.detail
             })
           }
-
         })
         .catch(error => {
           console.error(error)
