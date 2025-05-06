@@ -463,10 +463,9 @@ window.app = Vue.createApp({
         this.atmGetWithdraw()
       } else {
         const dialog = this.invoiceDialog
-
         let params = {
           amount: this.sat,
-          memo: this.amountFormatted
+          memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
         }
         if (this.tipAmountSat > 0) {
           params.tip_amount = this.tipAmountSat
