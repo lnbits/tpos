@@ -36,6 +36,12 @@ class CreateTposData(BaseModel):
     lnaddress: bool = Field(False)
     lnaddress_cut: Optional[int] = Field(0)
 
+    @validator("withdraw_pin", pre=True)
+    def empty_string_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class TposClean(BaseModel):
     id: str
