@@ -14,6 +14,7 @@
         rel="noopener noreferrer"
       >
         <lnbits-qrcode
+          :options="{margin: 4}"
           :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
           class="rounded-borders"
         ></lnbits-qrcode>
