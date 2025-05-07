@@ -463,10 +463,9 @@ window.app = Vue.createApp({
         this.atmGetWithdraw()
       } else {
         const dialog = this.invoiceDialog
-
         let params = {
           amount: this.sat,
-          memo: this.amountFormatted
+          memo: this.total > 0 ? this.totalFormatted : this.amountFormatted
         }
         if (this.tipAmountSat > 0) {
           params.tip_amount = this.tipAmountSat
@@ -572,6 +571,11 @@ window.app = Vue.createApp({
           }
 
           ndef.onreading = ({message}) => {
+            // Abort scan immediately to prevent duplicate reads
+            readerAbortController.abort()
+
+            this.nfcTagReading = false
+
             //Decode NDEF data from tag
             const textDecoder = new TextDecoder('utf-8')
 
@@ -580,19 +584,26 @@ window.app = Vue.createApp({
               return payload.toUpperCase().indexOf('LNURL') !== -1
             })
 
+            if (!record) {
+              Quasar.Notify.create({
+                type: 'negative',
+                message: 'No valid LNURL found on this NFC tag.'
+              })
+              return
+            }
+
             const lnurl = textDecoder.decode(record.data)
 
             //User feedback, show loader icon
-            this.nfcTagReading = false
             if (this.atmMode) {
               const URL = lnurl.replace('lnurlp://', 'https://')
               LNbits.api
                 .request('GET', `${lnurl.replace('lnurlw://', 'https://')}`)
                 .then(res => {
-                  this.makeWithdraw(res.data.payLink, readerAbortController)
+                  this.makeWithdraw(res.data.payLink)
                 })
             } else {
-              this.payInvoice(lnurl, readerAbortController)
+              this.payInvoice(lnurl)
             }
 
             Quasar.Notify.create({
@@ -611,7 +622,7 @@ window.app = Vue.createApp({
         })
       }
     },
-    makeWithdraw(payLink, readerAbortController) {
+    makeWithdraw(payLink) {
       if (!payLink) {
         Quasar.Notify.create({
           type: 'negative',
@@ -642,14 +653,12 @@ window.app = Vue.createApp({
               message: 'Topup successful!'
             })
           }
-          readerAbortController.abort()
         })
         .catch(e => {
           console.error(e)
-          readerAbortController.abort()
         })
     },
-    payInvoice(lnurl, readerAbortController) {
+    payInvoice(lnurl) {
       return axios
         .post(
           '/tpos/api/v1/tposs/' +
@@ -668,8 +677,9 @@ window.app = Vue.createApp({
               message: response.data.detail
             })
           }
-
-          readerAbortController.abort()
+        })
+        .catch(error => {
+          console.error(error)
         })
     },
     async getRates() {
