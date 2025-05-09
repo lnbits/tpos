@@ -1,0 +1,60 @@
+<q-fab
+  v-model="moreBtn"
+  color="primary"
+  icon="keyboard_arrow_down"
+  direction="down"
+  vertical-actions-align="right"
+  padding="sm"
+>
+  <q-fab-action
+    color="primary"
+    @click="showLastPayments"
+    icon="receipt_long"
+    external-label
+    label-position="left"
+    label="Receipts"
+  ></q-fab-action>
+  <q-fab-action
+    color="primary"
+    @click="toggleFullscreen"
+    :icon="fullScreenIcon"
+    external-label
+    label-position="left"
+    label="Fullscreen"
+  ></q-fab-action>
+  <q-fab-action
+    color="primary"
+    @click="startAtmMode"
+    v-if="withdrawMaximum > 0 && !atmMode"
+    icon="atm"
+    external-label
+    label-position="left"
+    label="ATM"
+  ></q-fab-action>
+  <q-fab-action
+    color="primary"
+    @click="showPoS = !showPoS"
+    v-if="items.length > 0"
+    :icon="showPoS ? 'point_of_sale' : 'dialpad'"
+    external-label
+    label-position="left"
+    :label="showPoS ? 'Cart View' : 'PoS View'"
+  ></q-fab-action>
+  <q-fab-action
+    color="primary"
+    @click="clearLNaddress"
+    v-if="tposLNaddress"
+    icon="alternate_email"
+    external-label
+    label-position="left"
+    label="Clear LNaddress"
+  ></q-fab-action>
+  <q-fab-action
+    color="primary"
+    @click.prevent="urlDialog.show = true"
+    icon="share"
+    external-label
+    label-position="left"
+    label="Share URL"
+  ></q-fab-action>
+</q-fab>
