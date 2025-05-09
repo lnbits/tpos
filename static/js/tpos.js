@@ -47,6 +47,8 @@ window.app = Vue.createApp({
       },
       rounding: false,
       isFullScreen: false,
+      isGridView: this.$q.screen.gt.sm,
+      moreBtn: false,
       total: 0.0,
       cartTax: 0.0,
       itemsTable: {
@@ -107,7 +109,8 @@ window.app = Vue.createApp({
       amountWithTipFormatted: 0,
       sat: 0,
       fsat: 0,
-      totalfsat: 0
+      totalfsat: 0,
+      addedAmount: 0
     }
   },
   watch: {
@@ -199,7 +202,7 @@ window.app = Vue.createApp({
       return items
     },
     drawerWidth() {
-      return this.$q.screen.lt.sm ? 375 : 450
+      return this.$q.screen.lt.sm ? 360 : 450
     },
     formattedCartTax() {
       return this.formatAmount(this.cartTax, this.currency)
@@ -217,11 +220,13 @@ window.app = Vue.createApp({
   },
   methods: {
     addAmount() {
+      this.addedAmount += this.amount
       this.total = +(this.total + this.amount).toFixed(2)
       this.stack = []
     },
     cancelAddAmount() {
-      this.total = 0.0
+      this.total = +(this.total - this.addedAmount).toFixed(2)
+      this.addedAmount = 0
       this.stack = []
     },
     addToCart(item, quantity = 1) {
@@ -270,10 +275,17 @@ window.app = Vue.createApp({
       }
       this.cartTax = total
     },
+    itemCartQty(item_id) {
+      if (this.cart.has(item_id)) {
+        return this.cart.get(item_id).quantity
+      }
+      return 0
+    },
     clearCart() {
       this.cart.clear()
       this.cartTax = 0.0
       this.total = 0.0
+      this.addedAmount = 0.0
     },
     startAtmMode() {
       if (this.atmPremium > 0) {
