@@ -86,50 +86,7 @@
       </q-page-sticky>
       <q-page-sticky position="top-right" :offset="[18, 18]">
         {% include "tpos/_options_fab.html" %}
-        <!-- <q-btn
-          @click="showLastPayments"
-          fab
-          icon="receipt_long"
-          color="primary"
-        ></q-btn> -->
       </q-page-sticky>
-      <!-- <q-page-sticky position="top-right" :offset="[18, 90]">
-        <q-btn
-          @click="toggleFullscreen"
-          fab
-          :icon="fullScreenIcon"
-          color="primary"
-        ></q-btn>
-      </q-page-sticky>
-      <q-page-sticky position="top-right" :offset="[18, 162]">
-        <q-btn
-          @click="startAtmMode"
-          v-if="withdrawMaximum > 0 && !atmMode"
-          fab
-          icon="atm"
-          color="primary"
-        ></q-btn>
-      </q-page-sticky>
-      <q-page-sticky position="top-right" :offset="[18, 234]">
-        <q-btn
-          @click="showPoS = false"
-          v-if="items.length > 0"
-          fab
-          icon="point_of_sale"
-          color="primary"
-          :disable="atmMode"
-        ></q-btn>
-      </q-page-sticky>
-      <q-page-sticky position="top-right" :offset="[18, 306]">
-        <q-btn
-          @click="clearLNaddress"
-          v-if="tposLNaddress"
-          fab
-          icon="cancel_schedule_send"
-          color="primary"
-          ><q-tooltip>Clear LNaddress</q-tooltip></q-btn
-        >
-      </q-page-sticky> -->
     </template>
     <template v-else> {% include "tpos/_cart.html" %} </template>
     {% include "tpos/dialogs.html" %}
