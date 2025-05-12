@@ -30,6 +30,9 @@ window.app = Vue.createApp({
         show: false,
         data: []
       },
+      heldCartsDialog: {
+        show: false
+      },
       invoiceDialog: {
         show: false,
         data: null,
@@ -102,6 +105,7 @@ window.app = Vue.createApp({
       searchTerm: '',
       categoryFilter: '',
       cart: new Map(),
+      heldCarts: {},
       denomIsSats: tpos.currency == 'sats',
       amount: 0.0,
       amountFormatted: 0,
@@ -286,6 +290,96 @@ window.app = Vue.createApp({
       this.cartTax = 0.0
       this.total = 0.0
       this.addedAmount = 0.0
+    },
+    holdCart() {
+      if (!this.cart.size) {
+        Quasar.Notify.create({
+          type: 'warning',
+          message: 'Cart is empty. Nothing to hold.'
+        })
+        return
+      }
+
+      const saveCart = note => {
+        const cartId = Date.now()
+        this.heldCarts[cartId] = {
+          cart: Array.from(this.cart.values()),
+          note
+        }
+        localStorage.setItem('lnbits.heldCarts', JSON.stringify(this.heldCarts))
+
+        this.clearCart()
+
+        Quasar.Notify.create({
+          type: 'positive',
+          message: `Cart held successfully.`
+        })
+      }
+
+      this.$q
+        .dialog({
+          title: 'Hold Cart',
+          message: 'Add a note to the cart?',
+          prompt: {
+            model: '',
+            type: 'text'
+          },
+          cancel: true,
+          persistent: false
+        })
+        .onOk(val => {
+          saveCart(val || '')
+        })
+        .onDismiss(() => {
+          return
+        })
+    },
+    restoreCart(cartId) {
+      this.clearCart()
+      if (this.heldCarts[cartId]) {
+        const cartData = this.heldCarts[cartId]
+        cartData.cart.forEach(item => {
+          this.addToCart(item, item.quantity)
+        })
+        Quasar.Notify.create({
+          type: 'positive',
+          message: `Cart restored successfully. Note: ${cartData.note}`
+        })
+      } else {
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Cart not found.'
+        })
+      }
+      this.heldCartsDialog.show = false
+      this.$q
+        .dialog({
+          title: 'Cart Restored',
+          message: 'Delete cart from held carts?',
+          cancel: true,
+          persistent: false
+        })
+        .onOk(() => {
+          this.deleteHeldCart(cartId)
+        })
+    },
+    deleteHeldCart(cartId) {
+      if (this.heldCarts[cartId]) {
+        delete this.heldCarts[cartId]
+        localStorage.setItem('lnbits.heldCarts', JSON.stringify(this.heldCarts))
+        Quasar.Notify.create({
+          type: 'positive',
+          message: `Cart deleted successfully.`
+        })
+      } else {
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Cart not found.'
+        })
+      }
+      if (Object.entries(this.heldCarts).length === 0) {
+        this.heldCartsDialog.show = false
+      }
     },
     startAtmMode() {
       if (this.atmPremium > 0) {
@@ -786,6 +880,9 @@ window.app = Vue.createApp({
         return LNbits.utils.formatCurrency(Number(amount).toFixed(2), currency)
       }
     },
+    formatDate(timestamp) {
+      return LNbits.utils.formatDate(timestamp / 1000)
+    },
     showComplete() {
       this.complete.show = true
       if (this.$q.screen.lt.lg && this.cartDrawer) {
@@ -825,6 +922,16 @@ window.app = Vue.createApp({
       this.categories = this.extractCategories(this.items)
     }
     this.exchangeRate = await this.getRates()
+    this.heldCarts = JSON.parse(
+      localStorage.getItem('lnbits.heldCarts') || '{}'
+    )
+    // remove held carts older than 1 day
+    const now = Date.now()
+    Object.keys(this.heldCarts).forEach(cartId => {
+      if (cartId < now - 86400000) {
+        delete this.heldCarts[cartId]
+      }
+    })
   },
   onMounted() {
     setInterval(() => {
