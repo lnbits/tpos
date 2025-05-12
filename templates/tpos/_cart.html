@@ -1,0 +1,358 @@
+<div>
+  <q-drawer
+    side="right"
+    v-model="cartDrawer"
+    show-if-above
+    bordered
+    :width="drawerWidth"
+    :breakpoint="1024"
+  >
+    <div class="row full-width q-pa-md">
+      <div class="absolute-top-right q-pa-md">
+        <q-btn @click="cartDrawer = !cartDrawer" icon="close" flat round
+          ><q-tooltip>Hide Cart</q-tooltip></q-btn
+        >
+      </div>
+      <div class="col-12 text-center">
+        <h3 class="q-mb-md">${totalFormatted}</h3>
+        <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
+          ${totalfsat}<small> sat</small>
+        </h5>
+      </div>
+      <div class="col-12" style="max-height: 60vh; overflow-y: auto">
+        <table class="table full-width">
+          <colgroup>
+            <col width="50%" />
+            <col width="25%" />
+            <col width="0%" />
+            <col width="0%" />
+          </colgroup>
+          <tbody>
+            <tr v-for="item in [...cart.values()]" :key="item.id">
+              <td
+                class="text-bold ellipsis"
+                style="
+                  white-space: nowrap;
+                  text-overflow: ellipsis;
+                  overflow: hidden;
+                  max-width: 1px;
+                "
+              >
+                ${item.title}
+              </td>
+              <td>
+                <div class="flex justify-evenly" style="align-items: center">
+                  <q-btn
+                    @click="removeFromCart(item)"
+                    flat
+                    dense
+                    round
+                    size="sm"
+                    icon="remove"
+                    :disabled="item.quantity == 1"
+                  ></q-btn>
+                  <div class="text-center">
+                    <span class="text-bold">${item.quantity}</span>
+                  </div>
+                  <q-btn
+                    @click="addToCart(item)"
+                    flat
+                    dense
+                    round
+                    size="sm"
+                    icon="add"
+                  ></q-btn>
+                </div>
+              </td>
+              <td>
+                <div class="text-center">
+                  <span>${item.formattedPrice}</span>
+                </div>
+              </td>
+              <td>
+                <q-btn
+                  @click="removeFromCart(item, item.quantity)"
+                  color="negative"
+                  size="sm"
+                  round
+                  icon="delete"
+                ></q-btn>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="row q-col-gutter-md q-pa-md absolute-bottom q-mb-lg">
+      <div v-if="total > 0" class="col-12">
+        <q-list dense padding class="rounded-borders">
+          <q-item>
+            <q-item-section> Subtotal </q-item-section>
+            <q-item-section side v-text="taxSubtotal"></q-item-section>
+          </q-item>
+          <q-item>
+            <q-item-section
+              v-text="`Tax ${taxInclusive ? '(incl.)' : ''}`"
+            ></q-item-section>
+            <q-item-section side v-text="formattedCartTax"></q-item-section>
+          </q-item>
+          <q-item v-if="addedAmount > 0">
+            <q-item-section> Manual Input </q-item-section>
+            <q-item-section
+              side
+              v-text="formatAmount(addedAmount, currency)"
+            ></q-item-section>
+          </q-item>
+          <q-separator></q-separator>
+          <q-item>
+            <q-item-section> Total </q-item-section>
+            <q-item-section side> ${totalFormatted} </q-item-section>
+          </q-item>
+        </q-list>
+      </div>
+      <div class="col-12 col-sm-6">
+        <q-btn
+          class="full-width"
+          @click="submitForm"
+          color="positive"
+          label="Pay"
+          padding="md"
+          :disabled="cart.size == 0"
+        ></q-btn>
+      </div>
+      <div class="col-12 col-sm-6">
+        <q-btn
+          class="full-width"
+          @click="clearCart"
+          color="negative"
+          label="Clear cart"
+          padding="md"
+        ></q-btn>
+      </div>
+    </div>
+  </q-drawer>
+  <div class="flex flex-center q-pa-md">
+    <q-btn
+      round
+      padding="sm"
+      color="primary"
+      :icon="isGridView ? 'view_list' : 'grid_view'"
+      @click="isGridView = !isGridView"
+    ></q-btn>
+    <q-space></q-space>
+    <q-input v-model="searchTerm" label="Filter" dense>
+      <q-icon
+        v-if="searchTerm !== ''"
+        name="close"
+        @click="searchTerm = ''"
+        class="cursor-pointer"
+      ></q-icon>
+    </q-input>
+    <q-space></q-space>
+    {% include "tpos/_options_fab.html" %}
+  </div>
+  <div
+    class="flex justify-center q-pa-md q-gutter-md"
+    v-if="categories && categories.length"
+  >
+    <template
+      v-if="$q.screen.gt.sm"
+      v-for="category in Array.from(categories.values())"
+    >
+      <q-btn
+        color="secondary"
+        :label="category"
+        @click="handleCategoryBtn(category)"
+        :outline="!(categoryFilter === category || (categoryFilter === '' && category === 'All'))"
+      ></q-btn>
+    </template>
+    <template v-else>
+      <q-btn
+        size="sm"
+        color="primary"
+        label="All Items"
+        class="text-capitalize"
+        @click="categoryFilter = ''"
+      ></q-btn>
+      <q-space></q-space>
+      <q-btn-dropdown
+        size="sm"
+        color="primary"
+        label="Categories"
+        class="text-capitalize"
+      >
+        <q-list dense>
+          <q-item
+            v-for="category in Array.from(categories.values())"
+            :key="category"
+            @click="handleCategoryBtn(category)"
+            class="text-capitalize"
+            :class="{ 'bg-primary text-white': category == categoryFilter }"
+            clickable
+            v-close-popup
+          >
+            <q-item-section>
+              <q-item-label v-text="category"></q-item-label>
+            </q-item-section>
+            <q-item-section side>
+              <q-icon
+                v-if="categoryFilter == category"
+                name="check"
+                color="white"
+                size="xs"
+              ></q-icon>
+            </q-item-section>
+          </q-item>
+        </q-list>
+      </q-btn-dropdown>
+    </template>
+  </div>
+  <div :class="{'dimmed': moreBtn}">
+    <div v-if="isGridView" class="row q-col-gutter-md q-pa-md">
+      <div
+        class="col-12 col-sm-6 col-md-4 col-lg-3"
+        v-for="item in filteredItems"
+        :key="item.id"
+      >
+        <q-card class="full-height" flat bordered>
+          <q-img
+            :src="item.image || null"
+            :ratio="4/3"
+            fit="contain"
+            :style="$q.screen.gt.sm ? 'height: 200px' : 'height: 100px'"
+          >
+          </q-img>
+
+          <q-card-section>
+            <div class="text-subtitle1 text-weight-bold ellipsis">
+              <span v-text="item.title"></span>
+            </div>
+            <div class="text-caption text-grey ellipsis">
+              <span v-text="item.description"></span>
+            </div>
+          </q-card-section>
+          <q-separator></q-separator>
+
+          <q-card-actions class="q-pa-md">
+            <span>
+              <div class="text-subtitle1">
+                <span v-text="item.formattedPrice"></span>
+              </div>
+              <div class="text-caption text-grey" v-if="item.tax || taxDefault">
+                <span>
+                  (tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax ||
+                  taxDefault}%)
+                </span>
+              </div>
+            </span>
+            <q-space></q-space>
+            <div class="flex">
+              <q-btn
+                round
+                dense
+                size="sm"
+                color="secondary"
+                icon="remove"
+                @click="removeFromCart(item)"
+                :disabled="!itemCartQty(item.id)"
+              ></q-btn>
+              <div
+                class="text-subtitle2 text-center q-mx-sm"
+                style="width: 2ch"
+              >
+                <span v-text="itemCartQty(item.id)"></span>
+              </div>
+              <q-btn
+                round
+                dense
+                size="sm"
+                color="secondary"
+                icon="add"
+                @click="addToCart(item)"
+              ></q-btn>
+            </div>
+          </q-card-actions>
+        </q-card>
+      </div>
+    </div>
+
+    <q-list v-else class="col-12">
+      <q-item v-for="item in filteredItems" :key="item.id">
+        <q-item-section avatar>
+          <q-avatar rounded>
+            <q-img
+              v-if="item.image"
+              :class="{'bg-grey': !item.image}"
+              :ratio="1"
+              :src="item.image"
+              fit="contain"
+            ></q-img>
+            <q-icon
+              v-else
+              name="sell"
+              size="xs"
+              class="absolute-center text-grey"
+            ></q-icon>
+          </q-avatar>
+        </q-item-section>
+        <q-item-section>
+          <q-item-label
+            class="text-subtitle1 ellipsis"
+            v-text="item.title"
+          ></q-item-label>
+          <q-item-label class="text-subtitle2">
+            <span v-text="item.formattedPrice"></span>
+            <span v-if="item.tax || taxDefault" class="text-caption">
+              (tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax ||
+              taxDefault}%)
+            </span></q-item-label
+          >
+        </q-item-section>
+        <q-item-section side>
+          <div class="flex">
+            <q-btn
+              round
+              dense
+              size="sm"
+              color="secondary"
+              icon="remove"
+              @click="removeFromCart(item)"
+              :disabled="!itemCartQty(item.id)"
+            ></q-btn>
+            <div class="text-subtitle2 text-center q-mx-sm" style="width: 2ch">
+              <span v-text="itemCartQty(item.id)"></span>
+            </div>
+            <q-btn
+              round
+              dense
+              size="sm"
+              color="secondary"
+              icon="add"
+              @click="addToCart(item)"
+            ></q-btn>
+          </div>
+        </q-item-section>
+      </q-item>
+    </q-list>
+  </div>
+  <q-page-sticky position="bottom" :offset="[0, 22]" v-if="cart.size > 0">
+    <!-- TODO: put cart on hold -->
+    <q-btn
+      color="primary"
+      size="sm"
+      padding="md"
+      label="Save"
+      style="width: 90px"
+      class="q-mr-sm"
+      :disabled="true"
+    ></q-btn>
+    <q-btn
+      color="primary"
+      size="sm"
+      padding="md"
+      label="Checkout"
+      style="width: 90px"
+      @click="cartDrawer = !cartDrawer"
+    ></q-btn>
+  </q-page-sticky>
+</div>
