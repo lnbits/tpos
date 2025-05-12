@@ -169,6 +169,38 @@
     </q-card>
   </q-dialog>
 
+  <q-dialog v-model="heldCartsDialog.show" position="bottom">
+    <q-card class="lnbits__dialog-card">
+      <q-card-section class="row items-center q-pb-none">
+        <q-space />
+        <q-btn icon="close" flat round dense v-close-popup />
+      </q-card-section>
+      <q-list separator>
+        <q-item
+          v-for="[key, value] in Object.entries(heldCarts)"
+          :key="key"
+          clickable
+        >
+          <q-item-section @click="restoreCart(key)">
+            <q-item-label class="text-bold" v-text="formatDate(key)">
+            </q-item-label>
+            <q-item-label caption lines="2" v-text="value.note"></q-item-label>
+          </q-item-section>
+          <q-item-section side top>
+            <q-btn
+              icon="delete"
+              color="red"
+              @click.stop="deleteHeldCart(key)"
+              class="q-ml-sm"
+              size="sm"
+              round
+            ></q-btn>
+          </q-item-section>
+        </q-item>
+      </q-list>
+    </q-card>
+  </q-dialog>
+
   <q-dialog v-model="atmBox" @hide="atmPin = null">
     <q-card>
       <q-card-section class="row items-center q-pb-none">

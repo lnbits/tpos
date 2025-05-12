@@ -341,10 +341,11 @@
       color="primary"
       size="sm"
       padding="md"
-      label="Save"
+      label="Hold Cart"
       style="width: 90px"
       class="q-mr-sm"
-      :disabled="true"
+      :disabled="cart.size == 0"
+      @click="holdCart"
     ></q-btn>
     <q-btn
       color="primary"

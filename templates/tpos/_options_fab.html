@@ -51,6 +51,15 @@
   ></q-fab-action>
   <q-fab-action
     color="primary"
+    @click="heldCartsDialog.show = true"
+    v-if="Object.keys(heldCarts).length > 0"
+    icon="pause_presentation"
+    external-label
+    label-position="left"
+    label="Carts on hold"
+  ></q-fab-action>
+  <q-fab-action
+    color="primary"
     @click.prevent="urlDialog.show = true"
     icon="share"
     external-label
