@@ -92,6 +92,11 @@
     {% include "tpos/dialogs.html" %}
   </q-page>
 </q-page-container>
+<template v-if="enablePrint">
+  <Teleport to="body">
+    <receipt class="receipt" v-if="receiptData" :data="receiptData"></receipt>
+  </Teleport>
+</template>
 {% endblock %} {% block styles %}
 <style>
   * {
@@ -138,6 +143,35 @@
     padding: 8px;
     text-align: left;
   }
+  @media screen {
+    .receipt {
+      display: none;
+    }
+  }
+  @media print {
+    @page {
+      size: auto;
+      margin: 0;
+    }
+    html {
+      font-size: 12px !important;
+    }
+    * {
+      color: black !important;
+      background: white !important;
+    }
+    body > * {
+      display: none !important;
+    }
+    .receipt {
+      display: block !important;
+      margin: 0mm !important;
+    }
+
+    .receipt p {
+      margin: 0 !important;
+    }
+  }
 </style>
 {% endblock %} {% block scripts %}
 <script>
@@ -159,6 +193,7 @@
 <script src="{{ static_url_for('tpos/static', path='js/tpos.js') }}"></script>
 <script src="{{ static_url_for('tpos/static', path='components/item-list.js') }}"></script>
 <script src="{{ static_url_for('tpos/static', path='components/keypad.js') }}"></script>
+<script src="{{ static_url_for('tpos/static', path='components/receipt.js') }}"></script>
 
 <style scoped>
   input::-webkit-outer-spin-button,
