@@ -3,6 +3,8 @@ from http import HTTPStatus
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from lnurl import decode as decode_lnurl
+
 from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
@@ -15,7 +17,6 @@ from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
-from lnurl import decode as decode_lnurl
 
 from .crud import (
     create_tpos,
@@ -212,7 +213,9 @@ async def api_tpos_pay_invoice(
 @tpos_api_router.get(
     "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}", status_code=HTTPStatus.OK
 )
-async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
+async def api_tpos_check_invoice(
+    tpos_id: str, payment_hash: str, extra: bool = Query(False)
+):
     tpos = await get_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
@@ -223,7 +226,19 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
         )
-    return {"paid": payment.success}
+    if payment.extra.get("tag") != "tpos":
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
+        )
+    return (
+        {"paid": payment.success}
+        if not extra
+        else {
+            "paid": payment.success,
+            "extra": payment.extra,
+            "created_at": payment.created_at,
+        }
+    )
 
 
 @tpos_api_router.get("/api/v1/atm/{tpos_id}/{atmpin}", status_code=HTTPStatus.CREATED)
