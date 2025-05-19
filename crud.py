@@ -1,8 +1,6 @@
 from time import time
 from typing import Optional, Union
 
-from loguru import logger
-
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
@@ -32,7 +30,9 @@ async def start_lnurlcharge(tpos: Tpos) -> LnurlCharge:
         else tpos.withdraw_between
     )
     last_withdraw = tpos.withdraw_time - now
-    assert last_withdraw < seconds, f"""
+    assert (
+        last_withdraw < seconds
+    ), f"""
         Last withdraw was made too recently, please try again in
         {int(seconds - (last_withdraw))} secs
     """

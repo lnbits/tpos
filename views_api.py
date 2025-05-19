@@ -3,8 +3,6 @@ from http import HTTPStatus
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from lnurl import decode as decode_lnurl
-
 from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
@@ -17,6 +15,7 @@ from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
+from lnurl import decode as decode_lnurl
 
 from .crud import (
     create_tpos,
