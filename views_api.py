@@ -143,6 +143,8 @@ async def api_tpos_get_latest_invoices(tpos_id: str):
             "amount": payment.amount,
             "time": payment.time,
             "pending": payment.pending,
+            "currency": payment.extra.get("details", {}).get("currency"),
+            "exchangeRate": payment.extra.get("details", {}).get("exchangeRate"),
         }
         for payment in payments
     ]

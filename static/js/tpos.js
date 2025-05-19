@@ -818,8 +818,15 @@ window.app = Vue.createApp({
             let last = [...res.data]
             this.lastPaymentsDialog.data = last.map(obj => {
               obj.dateFrom = moment(obj.time).fromNow()
+              if (obj.currency != LNBITS_DENOMINATION) {
+                obj.amountFiat = this.formatAmount(
+                  obj.amount / 1000 / this.exchangeRate,
+                  this.currency
+                )
+              }
               return obj
             })
+            console.log(this.lastPaymentsDialog.data)
           }
         })
         .catch(e => console.error(e))

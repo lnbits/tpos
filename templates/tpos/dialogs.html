@@ -139,9 +139,9 @@
 
   <q-dialog v-model="lastPaymentsDialog.show" position="bottom">
     <q-card class="lnbits__dialog-card">
-      <q-card-section class="row items-center q-pb-none">
-        <q-space />
-        <q-btn icon="close" flat round dense v-close-popup />
+      <q-card-section class="row items-center q-pb-sm">
+        <q-space></q-space>
+        <q-btn icon="close" flat round dense v-close-popup></q-btn>
       </q-card-section>
       <q-list separator class="q-mb-lg">
         <q-item v-if="!lastPaymentsDialog.data.length">
@@ -151,6 +151,12 @@
         </q-item>
         <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
           <q-item-section>
+            <q-item-label
+              v-if="payment.amountFiat"
+              class="text-bold"
+              v-text="payment.amountFiat"
+            >
+            </q-item-label>
             <q-item-label
               class="text-bold"
               v-text="formatBalance(payment.amount  / 1000)"
