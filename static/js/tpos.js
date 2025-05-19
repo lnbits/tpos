@@ -826,7 +826,6 @@ window.app = Vue.createApp({
               }
               return obj
             })
-            console.log(this.lastPaymentsDialog.data)
           }
         })
         .catch(e => console.error(e))
