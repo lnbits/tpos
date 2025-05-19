@@ -14,7 +14,6 @@
         rel="noopener noreferrer"
       >
         <lnbits-qrcode
-          :options="{margin: 4}"
           :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
           class="rounded-borders"
         ></lnbits-qrcode>
@@ -162,13 +161,26 @@
               v-text="formatBalance(payment.amount  / 1000)"
             >
             </q-item-label>
+            <q-item-label caption>
+              <q-icon
+                class="q-mr-sm"
+                size="sm"
+                name="check"
+                color="green"
+              ></q-icon>
+              <span v-text="payment.dateFrom"></span>
+            </q-item-label>
             <q-item-label caption lines="2"
               >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
             >
           </q-item-section>
-          <q-item-section side top>
-            <q-item-label caption>${payment.dateFrom}</q-item-label>
-            <q-icon name="check" color="green" />
+          <q-item-section side>
+            <q-btn
+              round
+              icon="print"
+              color="primary"
+              @click="printReceipt(payment.checking_id)"
+            ></q-btn>
           </q-item-section>
         </q-item>
       </q-list>
