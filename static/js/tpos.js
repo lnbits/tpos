@@ -114,7 +114,9 @@ window.app = Vue.createApp({
       sat: 0,
       fsat: 0,
       totalfsat: 0,
-      addedAmount: 0
+      addedAmount: 0,
+      enablePrint: false,
+      receiptData: null
     }
   },
   watch: {
@@ -635,6 +637,8 @@ window.app = Vue.createApp({
             this.invoiceDialog.show = false
             this.clearCart()
             this.showComplete()
+            console.log('Payment received:', payment)
+            this.printReceipt(paymentHash)
             ws.close()
           }
         }
@@ -814,6 +818,12 @@ window.app = Vue.createApp({
             let last = [...res.data]
             this.lastPaymentsDialog.data = last.map(obj => {
               obj.dateFrom = moment(obj.time).fromNow()
+              if (obj.currency != LNBITS_DENOMINATION) {
+                obj.amountFiat = this.formatAmount(
+                  obj.amount / 1000 / this.exchangeRate,
+                  this.currency
+                )
+              }
               return obj
             })
           }
@@ -888,6 +898,34 @@ window.app = Vue.createApp({
       if (this.$q.screen.lt.lg && this.cartDrawer) {
         this.cartDrawer = false
       }
+    },
+    async printReceipt(paymentHash) {
+      this.receiptData = null
+      try {
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
+        )
+        this.receiptData = data
+
+        this.$q
+          .dialog({
+            title: 'Print Receipt',
+            message: 'Do you want to print the receipt?',
+            cancel: true,
+            persistent: false
+          })
+          .onOk(() => {
+            console.log('Printing receipt for payment hash:', paymentHash)
+            window.print()
+          })
+      } catch (error) {
+        console.error('Error fetching receipt data:', error)
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Error fetching receipt data.'
+        })
+      }
     }
   },
   async created() {
@@ -904,6 +942,7 @@ window.app = Vue.createApp({
     this.taxDefault = tpos.tax_default
     this.tposLNaddress = tpos.lnaddress
     this.tposLNaddressCut = tpos.lnaddress_cut
+    this.enablePrint = tpos.enable_receipt_print
 
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
 

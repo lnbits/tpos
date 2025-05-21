@@ -187,3 +187,18 @@ async def m012_addlnaddress(db: Database):
         ALTER TABLE tpos.pos ADD lnaddress_cut INTEGER NULL;
     """
     )
+
+
+async def m013_add_receipt_print(db: Database):
+    """
+    Add enable_receipt_print to tpos table
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD enable_receipt_print BOOLEAN DEFAULT false;
+    """
+    )
+
+    await db.execute("ALTER TABLE tpos.pos ADD business_name TEXT;")
+    await db.execute("ALTER TABLE tpos.pos ADD business_address TEXT;")
+    await db.execute("ALTER TABLE tpos.pos ADD business_vat_id TEXT;")

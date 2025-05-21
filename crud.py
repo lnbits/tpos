@@ -3,7 +3,6 @@ from typing import Optional, Union
 
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
-from loguru import logger
 
 from .models import CreateTposData, LnurlCharge, Tpos, TposClean
 
@@ -82,8 +81,6 @@ async def get_tposs(wallet_ids: Union[str, list[str]]) -> list[Tpos]:
     tposs = await db.fetchall(
         f"SELECT * FROM tpos.pos WHERE wallet IN ({q})", model=Tpos
     )
-    logger.debug("tposs")
-    logger.debug(tposs)
     return tposs
 
 

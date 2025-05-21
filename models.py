@@ -35,6 +35,10 @@ class CreateTposData(BaseModel):
     withdraw_pin_disabled: bool = Field(False)
     lnaddress: bool = Field(False)
     lnaddress_cut: Optional[int] = Field(0)
+    enable_receipt_print: bool = Query(False)
+    business_name: Optional[str]
+    business_address: Optional[str]
+    business_vat_id: Optional[str]
 
     @validator("withdraw_pin", pre=True)
     def empty_string_to_none(cls, v):
@@ -60,6 +64,10 @@ class TposClean(BaseModel):
     lnaddress_cut: int = 0
     items: Optional[str] = None
     tip_options: Optional[str] = None
+    enable_receipt_print: bool
+    business_name: Optional[str] = None
+    business_address: Optional[str] = None
+    business_vat_id: Optional[str] = None
 
     @property
     def withdraw_maximum(self) -> int:

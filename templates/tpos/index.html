@@ -355,10 +355,43 @@
           <div class="col">
             <q-checkbox
               v-model="formDialog.advanced.otc"
-              label="Enable selling Bitcoin (ATM)"
+              label="Enable selling BTC (ATM)"
+            ></q-checkbox>
+          </div>
+          <div class="col">
+            <q-checkbox
+              v-model="formDialog.data.enable_receipt_print"
+              label="Enable printing (experimental)"
             ></q-checkbox>
           </div>
         </div>
+        <template v-if="formDialog.data.enable_receipt_print">
+          <p class="text-caption">
+            Receipt printing is an experimental feature. Not all devices work
+            correctly, or work at all.
+          </p>
+          <q-input
+            filled
+            dense
+            v-model="formDialog.data.business_name"
+            label="Business name"
+            placeholder="My Shop"
+          ></q-input>
+          <q-input
+            v-model="formDialog.data.business_address"
+            filled
+            label="Business address"
+            placeholder="123 Main St, City, Country"
+            type="textarea"
+          ></q-input>
+          <q-input
+            filled
+            dense
+            v-model="formDialog.data.business_vat_id"
+            label="VAT ID"
+            placeholder="123456789"
+          ></q-input>
+        </template>
         <template v-if="formDialog.advanced.tips">
           <q-select
             filled

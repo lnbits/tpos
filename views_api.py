@@ -142,6 +142,8 @@ async def api_tpos_get_latest_invoices(tpos_id: str):
             "amount": payment.amount,
             "time": payment.time,
             "pending": payment.pending,
+            "currency": payment.extra.get("details", {}).get("currency"),
+            "exchangeRate": payment.extra.get("details", {}).get("exchangeRate"),
         }
         for payment in payments
     ]
@@ -212,7 +214,9 @@ async def api_tpos_pay_invoice(
 @tpos_api_router.get(
     "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}", status_code=HTTPStatus.OK
 )
-async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
+async def api_tpos_check_invoice(
+    tpos_id: str, payment_hash: str, extra: bool = Query(False)
+):
     tpos = await get_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
@@ -223,6 +227,20 @@ async def api_tpos_check_invoice(tpos_id: str, payment_hash: str):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
         )
+    if payment.extra.get("tag") != "tpos":
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
+        )
+
+    if extra:
+        return {
+            "paid": payment.success,
+            "extra": payment.extra,
+            "created_at": payment.created_at,
+            "business_name": tpos.business_name,
+            "business_address": tpos.business_address,
+            "business_vat_id": tpos.business_vat_id,
+        }
     return {"paid": payment.success}
 
 

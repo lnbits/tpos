@@ -14,7 +14,6 @@
         rel="noopener noreferrer"
       >
         <lnbits-qrcode
-          :options="{margin: 4}"
           :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
           class="rounded-borders"
         ></lnbits-qrcode>
@@ -139,9 +138,9 @@
 
   <q-dialog v-model="lastPaymentsDialog.show" position="bottom">
     <q-card class="lnbits__dialog-card">
-      <q-card-section class="row items-center q-pb-none">
-        <q-space />
-        <q-btn icon="close" flat round dense v-close-popup />
+      <q-card-section class="row items-center q-pb-sm">
+        <q-space></q-space>
+        <q-btn icon="close" size="sm" flat round dense v-close-popup></q-btn>
       </q-card-section>
       <q-list separator class="q-mb-lg">
         <q-item v-if="!lastPaymentsDialog.data.length">
@@ -152,17 +151,36 @@
         <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
           <q-item-section>
             <q-item-label
+              v-if="payment.amountFiat"
+              class="text-bold"
+              v-text="payment.amountFiat"
+            >
+            </q-item-label>
+            <q-item-label
               class="text-bold"
               v-text="formatBalance(payment.amount  / 1000)"
             >
+            </q-item-label>
+            <q-item-label caption>
+              <q-icon
+                class="q-mr-sm"
+                size="sm"
+                name="check"
+                color="green"
+              ></q-icon>
+              <span v-text="payment.dateFrom"></span>
             </q-item-label>
             <q-item-label caption lines="2"
               >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
             >
           </q-item-section>
-          <q-item-section side top>
-            <q-item-label caption>${payment.dateFrom}</q-item-label>
-            <q-icon name="check" color="green" />
+          <q-item-section side>
+            <q-btn
+              round
+              icon="print"
+              color="primary"
+              @click="printReceipt(payment.checking_id)"
+            ></q-btn>
           </q-item-section>
         </q-item>
       </q-list>
