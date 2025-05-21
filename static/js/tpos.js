@@ -292,6 +292,7 @@ window.app = Vue.createApp({
       this.cartTax = 0.0
       this.total = 0.0
       this.addedAmount = 0.0
+      this.cartDrawer = false
     },
     holdCart() {
       if (!this.cart.size) {
