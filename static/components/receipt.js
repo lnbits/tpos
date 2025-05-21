@@ -27,10 +27,15 @@ window.app.component('receipt', {
     },
     formattedDate() {
       return LNbits.utils.formatDateString(this.data.created_at)
+    },
+    businessAddress() {
+      return this.data.business_address.split('\n')
     }
   },
   methods: {},
-  created() {},
+  created() {
+    console.log('Receipt component created', this.data)
+  },
   template: `
     <div class="q-pa-md">
     <div class="text-center q-mb-xl">
@@ -38,8 +43,18 @@ window.app.component('receipt', {
     <p class=''><span v-text="formattedDate"></span></p>
     <p class=''><span v-text="exchangeRateInfo"></span></p>
     </div>
+    <div v-if=data.business_name>
+      <span v-text="data.business_name"></span>
+    </div>
+    <div v-if=data.business_address v-for="line in businessAddress">
+    <span v-text="line"></span>
+    </div>
+    <div v-if=data.business_vat_id>
+    <span class="text-h6 text-uppercase">VAT: </span>
+      <span v-text="data.business_vat_id"></span>
+    </div>
     <q-table
-    class="q-mb-xl"
+    class="q-my-xl"
       :rows="data.extra.details.items"
       :columns="[
           { name: 'title', label: 'Item', field: 'title' },
