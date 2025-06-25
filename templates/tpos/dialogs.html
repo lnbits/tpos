@@ -174,7 +174,7 @@
               >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
             >
           </q-item-section>
-          <q-item-section side>
+          <q-item-section side v-if="enablePrint">
             <q-btn
               round
               icon="print"

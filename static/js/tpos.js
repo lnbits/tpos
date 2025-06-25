@@ -638,8 +638,9 @@ window.app = Vue.createApp({
             this.invoiceDialog.show = false
             this.clearCart()
             this.showComplete()
-            console.log('Payment received:', payment)
-            this.printReceipt(paymentHash)
+            if (this.enablePrint) {
+              this.printReceipt(paymentHash)
+            }
             ws.close()
           }
         }
