@@ -10,7 +10,7 @@ window.app.component('receipt', {
   computed: {
     cartSubtotal() {
       let subtotal = 0
-      if (!this.data.extra.details || !this.data.extra.details.items) { 
+      if (!this.data.extra.details || !this.data.extra.details.items) {
         subtotal = this.fiatAmount(this.data.extra.amount)
       } else {
         this.data.extra.details.items.forEach(item => {
@@ -22,7 +22,7 @@ window.app.component('receipt', {
     cartTotal() {
       let total = 0
       if (!this.data.extra.details || !this.data.extra.details.items) {
-          return this.fiatAmount(this.data.extra.amount)
+        return this.fiatAmount(this.data.extra.amount)
       }
       this.data.extra.details.items.forEach(item => {
         total += item.price * item.quantity
@@ -53,7 +53,7 @@ window.app.component('receipt', {
       if (!this.exchangeRate) {
         return amount
       }
-      return (amount / this.exchangeRate)
+      return amount / this.exchangeRate
     }
   },
   created() {

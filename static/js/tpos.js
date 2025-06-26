@@ -575,7 +575,7 @@ window.app = Vue.createApp({
         let params = {
           amount: this.sat,
           memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
-          exchange_rate: this.exchangeRate,
+          exchange_rate: this.exchangeRate
         }
         if (this.tipAmountSat > 0) {
           params.tip_amount = this.tipAmountSat
