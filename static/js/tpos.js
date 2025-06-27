@@ -574,7 +574,8 @@ window.app = Vue.createApp({
         const dialog = this.invoiceDialog
         let params = {
           amount: this.sat,
-          memo: this.total > 0 ? this.totalFormatted : this.amountFormatted
+          memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
+          exchange_rate: this.exchangeRate
         }
         if (this.tipAmountSat > 0) {
           params.tip_amount = this.tipAmountSat
@@ -638,8 +639,9 @@ window.app = Vue.createApp({
             this.invoiceDialog.show = false
             this.clearCart()
             this.showComplete()
-            console.log('Payment received:', payment)
-            this.printReceipt(paymentHash)
+            if (this.enablePrint) {
+              this.printReceipt(paymentHash)
+            }
             ws.close()
           }
         }

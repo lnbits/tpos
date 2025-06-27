@@ -110,6 +110,22 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
 
+    if not data.details:
+        tax_value = 0.0
+        if tpos.tax_default:
+            tax_value = (
+                (data.amount / data.exchange_rate) * (tpos.tax_default * 0.01)
+                if data.exchange_rate
+                else 0.0
+            )
+        data.details = {
+            "currency": tpos.currency,
+            "exchangeRate": data.exchange_rate,
+            "items": None,
+            "taxIncluded": True,
+            "taxValue": tax_value,
+        }
+
     try:
         payment = await create_invoice(
             wallet_id=tpos.wallet,
@@ -120,6 +136,7 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
                 "tip_amount": data.tip_amount,
                 "tpos_id": tpos_id,
                 "amount": data.amount,
+                "exchangeRate": data.exchange_rate if data.exchange_rate else None,
                 "details": data.details if data.details else None,
                 "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
             },
@@ -136,14 +153,20 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
 async def api_tpos_get_latest_invoices(tpos_id: str):
     payments = await get_latest_payments_by_extension(ext_name="tpos", ext_id=tpos_id)
 
+    details = payments[0].extra.get("details", None)
+    exchange_rate = None
+    currency = None
+    if details:
+        exchange_rate = details.get("exchange_rate", None)
+        currency = details.get("currency", None)
     return [
         {
             "checking_id": payment.checking_id,
             "amount": payment.amount,
             "time": payment.time,
             "pending": payment.pending,
-            "currency": payment.extra.get("details", {}).get("currency"),
-            "exchangeRate": payment.extra.get("details", {}).get("exchangeRate"),
+            "currency": currency,
+            "exchange_rate": exchange_rate,
         }
         for payment in payments
     ]

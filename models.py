@@ -13,6 +13,7 @@ class CreateWithdrawPay(BaseModel):
 class CreateTposInvoice(BaseModel):
     amount: int = Query(..., ge=1)
     memo: Optional[str] = Query(None)
+    exchange_rate: Optional[float] = Query(None, ge=0.0)
     details: Optional[dict] = Query(None)
     tip_amount: Optional[int] = Query(None, ge=1)
     user_lnaddress: Optional[str] = Query(None)
