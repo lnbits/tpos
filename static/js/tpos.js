@@ -670,12 +670,13 @@ window.app = Vue.createApp({
         })
 
         return ndef.scan({signal: readerAbortController.signal}).then(() => {
-          ndef.onreadingerror = () => {
+          ndef.onreadingerror = event => {
             this.nfcTagReading = false
 
             Quasar.Notify.create({
               type: 'negative',
-              message: 'There was an error reading this NFC tag.'
+              message: 'There was an error reading this NFC tag.',
+              caption: event.message || 'Please try again.'
             })
 
             readerAbortController.abort()
