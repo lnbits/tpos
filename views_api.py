@@ -183,6 +183,13 @@ async def api_tpos_pay_invoice(
                 lnurl_response = {"success": False, "detail": "Error loading"}
             else:
                 resp = r.json()
+                if resp["status"] == "ERROR":
+                    lnurl_response = {
+                        "success": False,
+                        "detail": resp.get("reason", ""),
+                    }
+                    return lnurl_response
+
                 if resp["tag"] != "withdrawRequest":
                     lnurl_response = {"success": False, "detail": "Wrong tag type"}
                 else:
