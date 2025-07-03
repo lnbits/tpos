@@ -40,6 +40,7 @@ class CreateTposData(BaseModel):
     business_name: Optional[str]
     business_address: Optional[str]
     business_vat_id: Optional[str]
+    fiat: bool = Field(False)
 
     @validator("withdraw_pin", pre=True)
     def empty_string_to_none(cls, v):

@@ -59,7 +59,13 @@ window.app = Vue.createApp({
             align: 'left',
             label: 'LNaddress Cut',
             field: 'lnaddress_cut'
-          }
+          },
+          {
+            name: 'fiat',
+            align: 'left',
+            label: 'Fiat',
+            field: 'fiat'
+          },
         ],
         pagination: {
           rowsPerPage: 10
@@ -86,7 +92,8 @@ window.app = Vue.createApp({
           tax_inclusive: true,
           lnaddress: false,
           lnaddress_cut: 2,
-          enable_receipt_print: false
+          enable_receipt_print: false,
+          fiat: false,
         },
         advanced: {
           tips: false,

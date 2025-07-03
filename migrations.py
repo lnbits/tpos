@@ -202,3 +202,14 @@ async def m013_add_receipt_print(db: Database):
     await db.execute("ALTER TABLE tpos.pos ADD business_name TEXT;")
     await db.execute("ALTER TABLE tpos.pos ADD business_address TEXT;")
     await db.execute("ALTER TABLE tpos.pos ADD business_vat_id TEXT;")
+
+
+async def m014_addfiat(db: Database):
+    """
+    Add fiat invoicing to tpos table
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD fiat BOOLEAN DEFAULT false;
+    """
+    )
