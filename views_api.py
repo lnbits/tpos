@@ -9,8 +9,8 @@ from lnbits.core.crud import (
     get_user,
     get_wallet,
 )
-from lnbits.core.models import WalletTypeInfo
-from lnbits.core.services import create_invoice
+from lnbits.core.models import CreateInvoice, Payment, WalletTypeInfo
+from lnbits.core.services import create_payment_request
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
@@ -103,7 +103,7 @@ async def api_tpos_delete(
 @tpos_api_router.post(
     "/api/v1/tposs/{tpos_id}/invoices", status_code=HTTPStatus.CREATED
 )
-async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict:
+async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Payment:
     tpos = await get_tpos(tpos_id)
 
     if not tpos:
@@ -127,10 +127,16 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
             "taxValue": tax_value,
         }
 
+    currency = tpos.currency if data.pay_in_fiat else "sat"
+    amount = data.amount + (data.tip_amount or 0)
+    if data.pay_in_fiat:
+        amount = (data.amount_fiat or 0.0) + (data.tip_amount_fiat or 0.0)
+
     try:
-        payment = await create_invoice(
-            wallet_id=tpos.wallet,
-            amount=data.amount + (data.tip_amount or 0),
+        invoice_data = CreateInvoice(
+            unit=currency,
+            out=False,
+            amount=amount,
             memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
             extra={
                 "tag": "tpos",
@@ -142,13 +148,14 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
                 "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
                 "internal_memo": data.internal_memo if data.internal_memo else None,
             },
+            fiat_provider=tpos.fiat_provider if data.pay_in_fiat else None,
         )
+        return await create_payment_request(tpos.wallet, invoice_data)
+
     except Exception as exc:
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
         ) from exc
-
-    return {"payment_hash": payment.payment_hash, "payment_request": payment.bolt11}
 
 
 @tpos_api_router.get("/api/v1/tposs/{tpos_id}/invoices")
