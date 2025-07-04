@@ -27,6 +27,7 @@ window.app = Vue.createApp({
     return {
       tposs: [],
       currencyOptions: [],
+      hasFiatProvider: false,
       tpossTable: {
         columns: [
           {name: 'name', align: 'left', label: 'Name', field: 'name'},
@@ -493,7 +494,7 @@ window.app = Vue.createApp({
       }
     }
   },
-  created: function () {
+  created() {
     if (this.g.user.wallets.length) {
       this.getTposs()
     }
@@ -508,5 +509,8 @@ window.app = Vue.createApp({
       .catch(err => {
         LNbits.utils.notifyApiError(err)
       })
+    if(this.g.user.fiat_providers && this.g.user.fiat_providers.length > 0) {
+      this.hasFiatProvider = true
+    }
   }
 })

@@ -329,7 +329,7 @@
               ></q-tooltip>
             </q-checkbox>
           </div>
-          <div class="col">
+          <div class="col" v-if="formDialog.data.lnaddress">
             <q-input
               filled
               dense
@@ -344,7 +344,7 @@
               ></q-tooltip>
             </q-input>
           </div>
-          <div class="col">
+          <div class="col" v-if="hasFiatProvider">
             <q-checkbox
               v-model="formDialog.data.fiat"
               label="Fiat invoicing"
