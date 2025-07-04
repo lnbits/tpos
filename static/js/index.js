@@ -202,7 +202,6 @@ window.app = Vue.createApp({
           this.g.user.wallets[0].inkey
         )
         .then(function (response) {
-          console.log(response.data)
           self.tposs = response.data.map(function (obj) {
             return mapTpos(obj)
           })

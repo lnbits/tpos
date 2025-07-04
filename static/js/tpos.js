@@ -575,12 +575,10 @@ window.app = Vue.createApp({
           title: 'Payment Method',
           message: 'How are you paying?',
           options: {
-            type: 'radio',
             model: 'btc',
-            inline: true,
             items: [
               { label: 'Bitcoin', value: 'btc' },
-              { label: 'Fiat', value: 'fiat' }
+              { label: `Fiat (${tpos.currency})`, value: 'fiat' }
             ]
           },
           cancel: true,
@@ -597,7 +595,7 @@ window.app = Vue.createApp({
         exchange_rate: this.exchangeRate,
         pay_in_fiat: this.payInFiat,
       }
-      if (this.currency != LNBITS_DENOMINATION && this.payInFiat) {
+      if (this.currency != LNBITS_DENOMINATION) {
         params.amount_fiat = this.total > 0 ? this.total : this.amount
         params.tip_amount_fiat = this.tipAmount > 0 ? this.tipAmount : 0.0
       }
@@ -636,7 +634,7 @@ window.app = Vue.createApp({
       }
 
       const params = this.buildInvoiceParams()
-      
+      console.log('Invoice Params:', params)
       try {
         const { data } = await LNbits.api.request(
           'POST',
