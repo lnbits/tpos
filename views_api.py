@@ -127,11 +127,17 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
             "taxValue": tax_value,
         }
 
+    amount = data.amount + (data.tip_amount or 0)
+    if data.pay_in_fiat and data.amount_fiat:
+        amount = data.amount_fiat + (data.tip_amount_fiat or 0)
+
+    currency = "sat" if tpos.currency == "sats" else tpos.currency
+
     try:
         invoice_data = CreateInvoice(
-            unit=tpos.currency,
+            unit=currency,
             out=False,
-            amount=data.amount + (data.tip_amount or 0),
+            amount=amount,
             memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
             extra={
                 "tag": "tpos",
@@ -154,7 +160,11 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
         ) from exc
 
-    return payment
+    return {
+        "payment_hash": payment.payment_hash,
+        "payment_request": payment.bolt11,
+        "fiat_payment_request": payment.extra.get("fiat_payment_request", None),
+    }
 
 
 @tpos_api_router.get("/api/v1/tposs/{tpos_id}/invoices")
