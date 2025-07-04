@@ -2,13 +2,26 @@
   <q-dialog
     v-model="invoiceDialog.show"
     position="top"
+    persistent
     @hide="closeInvoiceDialog"
   >
     <q-card
       v-if="invoiceDialog.data"
       class="q-pa-lg q-pt-xl lnbits__dialog-card"
     >
+    <a
+        v-if="invoiceDialog.data.fiat_payment_request"
+        :href="invoiceDialog.data.fiat_payment_request"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <lnbits-qrcode
+          :value="invoiceDialog.data.fiat_payment_request"
+          class="rounded-borders"
+        ></lnbits-qrcode>
+      </a>
       <a
+        v-else
         :href="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
         target="_blank"
         rel="noopener noreferrer"
