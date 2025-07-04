@@ -571,21 +571,22 @@ window.app = Vue.createApp({
     },
     showPaymentMethod() {
       return new Promise(resolve => {
-        this.$q.dialog({
-          title: 'Payment Method',
-          message: 'How are you paying?',
-          options: {
-            model: 'btc',
-            items: [
-              { label: 'Bitcoin', value: 'btc' },
-              { label: `Fiat (${tpos.currency})`, value: 'fiat' }
-            ]
-          },
-          cancel: true,
-          persistent: true
-        })
-        .onOk(val => resolve(val))
-        .onCancel(() => resolve('btc'))
+        this.$q
+          .dialog({
+            title: 'Payment Method',
+            message: 'How are you paying?',
+            options: {
+              model: 'btc',
+              items: [
+                {label: 'Bitcoin', value: 'btc'},
+                {label: `Fiat (${tpos.currency})`, value: 'fiat'}
+              ]
+            },
+            cancel: true,
+            persistent: true
+          })
+          .onOk(val => resolve(val))
+          .onCancel(() => resolve('btc'))
       })
     },
     buildInvoiceParams() {
@@ -593,7 +594,7 @@ window.app = Vue.createApp({
         amount: this.sat,
         memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
         exchange_rate: this.exchangeRate,
-        pay_in_fiat: this.payInFiat,
+        pay_in_fiat: this.payInFiat
       }
       if (this.currency != LNBITS_DENOMINATION) {
         params.amount_fiat = this.total > 0 ? this.total : this.amount
@@ -636,7 +637,7 @@ window.app = Vue.createApp({
       const params = this.buildInvoiceParams()
       console.log('Invoice Params:', params)
       try {
-        const { data } = await LNbits.api.request(
+        const {data} = await LNbits.api.request(
           'POST',
           `/tpos/api/v1/tposs/${this.tposId}/invoices`,
           null,
@@ -962,7 +963,7 @@ window.app = Vue.createApp({
           message: 'Error fetching receipt data.'
         })
       }
-    },
+    }
   },
   async created() {
     Quasar.Loading.show()

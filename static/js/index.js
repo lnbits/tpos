@@ -68,7 +68,7 @@ window.app = Vue.createApp({
             align: 'left',
             label: 'LNaddress Cut',
             field: 'lnaddress_cut'
-          },
+          }
         ],
         pagination: {
           rowsPerPage: 10
@@ -96,7 +96,7 @@ window.app = Vue.createApp({
           lnaddress: false,
           lnaddress_cut: 2,
           enable_receipt_print: false,
-          fiat: false,
+          fiat: false
         },
         advanced: {
           tips: false,
@@ -510,7 +510,7 @@ window.app = Vue.createApp({
       .catch(err => {
         LNbits.utils.notifyApiError(err)
       })
-    if(this.g.user.fiat_providers && this.g.user.fiat_providers.length > 0) {
+    if (this.g.user.fiat_providers && this.g.user.fiat_providers.length > 0) {
       this.hasFiatProvider = true
       this.fiatProviders = [...this.g.user.fiat_providers]
     }
