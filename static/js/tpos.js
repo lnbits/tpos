@@ -635,7 +635,6 @@ window.app = Vue.createApp({
       }
 
       const params = this.buildInvoiceParams()
-      console.log('Invoice Params:', params)
       try {
         const {data} = await LNbits.api.request(
           'POST',

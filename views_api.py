@@ -148,7 +148,6 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
             },
             fiat_provider=tpos.fiat_provider if data.pay_in_fiat else None,
         )
-        print(f"Creating TPoS invoice for {tpos.name} with data: {invoice_data}")
         payment = await create_payment_request(
             wallet_id=tpos.wallet, invoice_data=invoice_data
         )
