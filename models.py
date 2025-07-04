@@ -18,6 +18,8 @@ class CreateTposInvoice(BaseModel):
     tip_amount: Optional[int] = Query(None, ge=1)
     user_lnaddress: Optional[str] = Query(None)
     pay_in_fiat: bool = Query(False)
+    amount_fiat: Optional[float] = Query(None, ge=0.0)
+    tip_amount_fiat: Optional[float] = Query(None, ge=0.0)
 
 
 class CreateTposData(BaseModel):
