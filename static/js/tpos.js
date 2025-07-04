@@ -6,6 +6,8 @@ window.app = Vue.createApp({
     return {
       tposId: null,
       currency: null,
+      fiatProvider: null,
+      payInFiat: false,
       atmPremium: tpos.withdraw_premium / 100,
       withdrawMaximum: 0,
       withdrawPinOpen: null,
@@ -567,15 +569,45 @@ window.app = Vue.createApp({
         this.showInvoice()
       }
     },
+    showPaymentMethod() {
+      return new Promise(resolve => { 
+        this.$q
+        .dialog({
+          title: 'Payment Method',
+          message: 'How are you paying?',
+          options: {
+            type: 'radio',
+            model: 'btc',
+            inline: true,
+            items: [
+              { label: 'Bitcoin', value: 'btc' },
+              { label: 'Fiat', value: 'fiat' }
+            ]
+          },
+          cancel: true,
+          persistent: true
+        })
+        .onDismiss(val => {
+          console.log('Selected payment method:', val)
+          this.payInFiat = val === 'fiat'
+          resolve()
+        })
+
+      })
+    },
     async showInvoice() {
       if (this.atmMode) {
         this.atmGetWithdraw()
       } else {
+        if (this.fiatProvider) {
+          await this.showPaymentMethod()
+        }
         const dialog = this.invoiceDialog
         let params = {
           amount: this.sat,
           memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
-          exchange_rate: this.exchangeRate
+          exchange_rate: this.exchangeRate,
+          pay_in_fiat: this.payInFiat
         }
         if (this.tipAmountSat > 0) {
           params.tip_amount = this.tipAmountSat
@@ -609,6 +641,7 @@ window.app = Vue.createApp({
             null,
             params
           )
+          console.debug('Invoice data:', data)
           dialog.data = data
           dialog.show = true
           this.readNfcTag()
@@ -947,6 +980,7 @@ window.app = Vue.createApp({
     this.tposLNaddress = tpos.lnaddress
     this.tposLNaddressCut = tpos.lnaddress_cut
     this.enablePrint = tpos.enable_receipt_print
+    this.fiatProvider = tpos.fiat_provider
 
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
 

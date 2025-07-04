@@ -3,19 +3,20 @@ from http import HTTPStatus
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from lnurl import decode as decode_lnurl
+
 from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
     get_user,
     get_wallet,
 )
-from lnbits.core.models import WalletTypeInfo
-from lnbits.core.services import create_invoice
+from lnbits.core.models import CreateInvoice, WalletTypeInfo
+from lnbits.core.services import create_payment_request
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
-from lnurl import decode as decode_lnurl
 
 from .crud import (
     create_tpos,
@@ -127,8 +128,9 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
         }
 
     try:
-        payment = await create_invoice(
-            wallet_id=tpos.wallet,
+        invoice_data = CreateInvoice(
+            unit=tpos.currency,
+            out=False,
             amount=data.amount + (data.tip_amount or 0),
             memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
             extra={
@@ -140,13 +142,19 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
                 "details": data.details if data.details else None,
                 "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
             },
+            fiat_provider=tpos.fiat_provider if data.pay_in_fiat else None,
         )
+
+        payment = await create_payment_request(
+            wallet_id=tpos.wallet, invoice_data=invoice_data
+        )
+
     except Exception as exc:
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
         ) from exc
 
-    return {"payment_hash": payment.payment_hash, "payment_request": payment.bolt11}
+    return payment
 
 
 @tpos_api_router.get("/api/v1/tposs/{tpos_id}/invoices")
