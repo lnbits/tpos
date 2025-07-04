@@ -570,9 +570,8 @@ window.app = Vue.createApp({
       }
     },
     showPaymentMethod() {
-      return new Promise(resolve => { 
-        this.$q
-        .dialog({
+      return new Promise(resolve => {
+        this.$q.dialog({
           title: 'Payment Method',
           message: 'How are you paying?',
           options: {
@@ -587,73 +586,75 @@ window.app = Vue.createApp({
           cancel: true,
           persistent: true
         })
-        .onDismiss(val => {
-          console.log('Selected payment method:', val)
-          this.payInFiat = val === 'fiat'
-          resolve()
-        })
-
+        .onOk(val => resolve(val))
+        .onCancel(() => resolve('btc'))
       })
+    },
+    buildInvoiceParams() {
+      const params = {
+        amount: this.sat,
+        memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
+        exchange_rate: this.exchangeRate,
+        pay_in_fiat: this.payInFiat,
+      }
+      if (this.currency != LNBITS_DENOMINATION && this.payInFiat) {
+        params.amount_fiat = this.total > 0 ? this.total : this.amount
+        params.tip_amount_fiat = this.tipAmount > 0 ? this.tipAmount : 0.0
+      }
+      if (this.tipAmountSat > 0) {
+        params.tip_amount = this.tipAmountSat
+      }
+      if (this.cart.size) {
+        params.details = {
+          currency: this.currency,
+          exchangeRate: this.exchangeRate,
+          items: [...this.cart.values()].map(item => ({
+            price: item.price,
+            formattedPrice: item.formattedPrice,
+            quantity: item.quantity,
+            title: item.title,
+            tax: item.tax || this.taxDefault
+          })),
+          taxIncluded: this.taxInclusive,
+          taxValue: this.cartTax
+        }
+      }
+      if (this.lnaddress) {
+        params.user_lnaddress = this.lnaddressDialog.lnaddress
+      }
+      return params
     },
     async showInvoice() {
       if (this.atmMode) {
         this.atmGetWithdraw()
-      } else {
-        if (this.fiatProvider) {
-          await this.showPaymentMethod()
-        }
-        const dialog = this.invoiceDialog
-        let params = {
-          amount: this.sat,
-          memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
-          exchange_rate: this.exchangeRate,
-          pay_in_fiat: this.payInFiat
-        }
-        if (this.tipAmountSat > 0) {
-          params.tip_amount = this.tipAmountSat
-        }
-        if (this.cart.size) {
-          let details = [...this.cart.values()].map(item => {
-            return {
-              price: item.price,
-              formattedPrice: item.formattedPrice,
-              quantity: item.quantity,
-              title: item.title,
-              tax: item.tax || this.taxDefault
-            }
-          })
+        return
+      }
 
-          params.details = {
-            currency: this.currency,
-            exchangeRate: this.exchangeRate,
-            items: details,
-            taxIncluded: this.taxInclusive,
-            taxValue: this.cartTax
-          }
-        }
-        if (this.lnaddress) {
-          params.user_lnaddress = this.lnaddressDialog.lnaddress
-        }
-        try {
-          const {data} = await LNbits.api.request(
-            'POST',
-            `/tpos/api/v1/tposs/${this.tposId}/invoices`,
-            null,
-            params
-          )
-          console.debug('Invoice data:', data)
-          dialog.data = data
-          dialog.show = true
-          this.readNfcTag()
-          dialog.dismissMsg = Quasar.Notify.create({
-            timeout: 0,
-            message: 'Waiting for payment...'
-          })
-          this.subscribeToPaymentWS(data.payment_hash)
-        } catch (error) {
-          console.error(error)
-          LNbits.utils.notifyApiError(error)
-        }
+      if (this.fiatProvider) {
+        const method = await this.showPaymentMethod()
+        this.payInFiat = method === 'fiat'
+      }
+
+      const params = this.buildInvoiceParams()
+      
+      try {
+        const { data } = await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices`,
+          null,
+          params
+        )
+        this.invoiceDialog.data = data
+        this.invoiceDialog.show = true
+        this.readNfcTag()
+        this.invoiceDialog.dismissMsg = Quasar.Notify.create({
+          timeout: 0,
+          message: 'Waiting for payment...'
+        })
+        this.subscribeToPaymentWS(data.payment_hash)
+      } catch (error) {
+        console.error(error)
+        LNbits.utils.notifyApiError(error)
       }
     },
     subscribeToPaymentWS(paymentHash) {
@@ -963,7 +964,7 @@ window.app = Vue.createApp({
           message: 'Error fetching receipt data.'
         })
       }
-    }
+    },
   },
   async created() {
     Quasar.Loading.show()
