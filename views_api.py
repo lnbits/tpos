@@ -9,7 +9,7 @@ from lnbits.core.crud import (
     get_user,
     get_wallet,
 )
-from lnbits.core.models import CreateInvoice, WalletTypeInfo
+from lnbits.core.models import CreateInvoice, Payment, WalletTypeInfo
 from lnbits.core.services import create_payment_request
 from lnbits.decorators import (
     require_admin_key,
@@ -102,7 +102,7 @@ async def api_tpos_delete(
 @tpos_api_router.post(
     "/api/v1/tposs/{tpos_id}/invoices", status_code=HTTPStatus.CREATED
 )
-async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict:
+async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Payment:
     tpos = await get_tpos(tpos_id)
 
     if not tpos:
@@ -148,20 +148,12 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
             },
             fiat_provider=tpos.fiat_provider if data.pay_in_fiat else None,
         )
-        payment = await create_payment_request(
-            wallet_id=tpos.wallet, invoice_data=invoice_data
-        )
+        return await create_payment_request(tpos.wallet, invoice_data)
 
     except Exception as exc:
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
         ) from exc
-
-    return {
-        "payment_hash": payment.payment_hash,
-        "payment_request": payment.bolt11,
-        "fiat_payment_request": payment.extra.get("fiat_payment_request", None),
-    }
 
 
 @tpos_api_router.get("/api/v1/tposs/{tpos_id}/invoices")

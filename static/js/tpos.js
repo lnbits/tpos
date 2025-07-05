@@ -37,7 +37,7 @@ window.app = Vue.createApp({
       },
       invoiceDialog: {
         show: false,
-        data: null,
+        data: {},
         dismissMsg: null,
         paymentChecker: null
       },
@@ -642,7 +642,14 @@ window.app = Vue.createApp({
           null,
           params
         )
-        this.invoiceDialog.data = data
+        if (data.extra.fiat_payment_request) {
+          this.invoiceDialog.data.payment_request =
+            data.extra.fiat_payment_request
+        } else {
+          this.invoiceDialog.data.payment_request =
+            'lightning:' + data.bolt11.toUpperCase()
+        }
+        this.invoiceDialog.data.payment_hash = data.payment_hash
         this.invoiceDialog.show = true
         this.readNfcTag()
         this.invoiceDialog.dismissMsg = Quasar.Notify.create({
