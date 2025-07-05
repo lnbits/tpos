@@ -27,6 +27,8 @@ window.app = Vue.createApp({
     return {
       tposs: [],
       currencyOptions: [],
+      hasFiatProvider: false,
+      fiatProviders: null,
       tpossTable: {
         columns: [
           {name: 'name', align: 'left', label: 'Name', field: 'name'},
@@ -35,6 +37,13 @@ window.app = Vue.createApp({
             align: 'left',
             label: 'Currency',
             field: 'currency'
+          },
+          {
+            name: 'fiat_provider',
+            align: 'left',
+            label: 'Fiat Provider',
+            field: 'fiat_provider',
+            format: val => val && val.charAt(0).toUpperCase() + val.slice(1)
           },
           {
             name: 'withdraw_time_option',
@@ -86,7 +95,8 @@ window.app = Vue.createApp({
           tax_inclusive: true,
           lnaddress: false,
           lnaddress_cut: 2,
-          enable_receipt_print: false
+          enable_receipt_print: false,
+          fiat: false
         },
         advanced: {
           tips: false,
@@ -192,7 +202,6 @@ window.app = Vue.createApp({
           this.g.user.wallets[0].inkey
         )
         .then(function (response) {
-          console.log(response.data)
           self.tposs = response.data.map(function (obj) {
             return mapTpos(obj)
           })
@@ -486,7 +495,7 @@ window.app = Vue.createApp({
       }
     }
   },
-  created: function () {
+  created() {
     if (this.g.user.wallets.length) {
       this.getTposs()
     }
@@ -501,5 +510,9 @@ window.app = Vue.createApp({
       .catch(err => {
         LNbits.utils.notifyApiError(err)
       })
+    if (this.g.user.fiat_providers && this.g.user.fiat_providers.length > 0) {
+      this.hasFiatProvider = true
+      this.fiatProviders = [...this.g.user.fiat_providers]
+    }
   }
 })

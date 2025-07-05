@@ -124,7 +124,7 @@ async def m008_atm_time_option_and_pin_toggle(db: Database):
     Add a time mins/sec and pin toggle
     """
     await db.execute(
-        "ALTER TABLE tpos.pos " "ADD COLUMN withdrawtimeopt TEXT DEFAULT 'mins'"
+        "ALTER TABLE tpos.pos ADD COLUMN withdrawtimeopt TEXT DEFAULT 'mins'"
     )
     await db.execute(
         "ALTER TABLE tpos.pos "
@@ -202,3 +202,14 @@ async def m013_add_receipt_print(db: Database):
     await db.execute("ALTER TABLE tpos.pos ADD business_name TEXT;")
     await db.execute("ALTER TABLE tpos.pos ADD business_address TEXT;")
     await db.execute("ALTER TABLE tpos.pos ADD business_vat_id TEXT;")
+
+
+async def m014_addfiat(db: Database):
+    """
+    Add fiat invoicing to tpos table
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD fiat_provider TEXT NULL;
+    """
+    )
