@@ -118,7 +118,9 @@ window.app = Vue.createApp({
       totalfsat: 0,
       addedAmount: 0,
       enablePrint: false,
-      receiptData: null
+      receiptData: null,
+      currency_choice: false,
+     _currencyResolver: null
     }
   },
   watch: {
@@ -571,23 +573,16 @@ window.app = Vue.createApp({
     },
     showPaymentMethod() {
       return new Promise(resolve => {
-        this.$q
-          .dialog({
-            title: 'Payment Method',
-            message: 'How are you paying?',
-            options: {
-              model: 'btc',
-              items: [
-                {label: 'Bitcoin', value: 'btc'},
-                {label: `Fiat (${tpos.currency})`, value: 'fiat'}
-              ]
-            },
-            cancel: true,
-            persistent: true
-          })
-          .onOk(val => resolve(val))
-          .onCancel(() => resolve('btc'))
+        this.currency_choice = true
+        this._currencyResolver = resolve
       })
+    },
+    selectPaymentMethod(method) {
+      this.currency_choice = false
+      if (this._currencyResolver) {
+        this._currencyResolver(method)
+        this._currencyResolver = null
+      }
     },
     buildInvoiceParams() {
       const params = {
