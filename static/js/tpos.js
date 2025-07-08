@@ -121,7 +121,7 @@ window.app = Vue.createApp({
       enablePrint: false,
       receiptData: null,
       currency_choice: false,
-     _currencyResolver: null
+      _currencyResolver: null
     }
   },
   watch: {
