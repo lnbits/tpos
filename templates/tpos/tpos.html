@@ -8,7 +8,16 @@
       ]"
   size="sm"
   @input="handleColorScheme"
-/>
+></q-btn-toggle>
+<q-btn
+  square
+  size="sm"
+  color="primary"
+  icon="add_comment"
+  class="q-ml-md"
+  @click="addComment"
+  ><q-tooltip>Add a comment</q-tooltip></q-btn
+>
 {% endblock %} {% block footer %}{% endblock %} {% block page_container %}
 <q-page-container>
   <q-page>

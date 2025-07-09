@@ -17,6 +17,7 @@ class CreateTposInvoice(BaseModel):
     details: Optional[dict] = Query(None)
     tip_amount: Optional[int] = Query(None, ge=1)
     user_lnaddress: Optional[str] = Query(None)
+    internal_memo: Optional[str] = Query(None, max_length=512)
 
 
 class CreateTposData(BaseModel):

@@ -131,8 +131,6 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
             wallet_id=tpos.wallet,
             amount=data.amount + (data.tip_amount or 0),
             memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
-            amount=amount,
-            memo=f"{memo} - ({tpos.name})" if memo else f"{tpos.name}",
             extra={
                 "tag": "tpos",
                 "tip_amount": data.tip_amount,
@@ -141,6 +139,7 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> dict
                 "exchangeRate": data.exchange_rate if data.exchange_rate else None,
                 "details": data.details if data.details else None,
                 "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
+                "internal_memo": data.internal_memo if data.internal_memo else None,
             },
         )
     except Exception as exc:
