@@ -604,6 +604,7 @@ window.app = Vue.createApp({
         amount: this.sat,
         memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
         exchange_rate: this.exchangeRate,
+        internal_memo: this.invoiceDialog.internalMemo || null,
         pay_in_fiat: this.payInFiat
       }
       if (this.currency != LNBITS_DENOMINATION) {
