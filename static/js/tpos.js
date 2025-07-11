@@ -37,7 +37,8 @@ window.app = Vue.createApp({
         show: false,
         data: null,
         dismissMsg: null,
-        paymentChecker: null
+        paymentChecker: null,
+        internalMemo: null
       },
       tipDialog: {
         show: false
@@ -575,7 +576,8 @@ window.app = Vue.createApp({
         let params = {
           amount: this.sat,
           memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
-          exchange_rate: this.exchangeRate
+          exchange_rate: this.exchangeRate,
+          internal_memo: this.invoiceDialog.internalMemo || null
         }
         if (this.tipAmountSat > 0) {
           params.tip_amount = this.tipAmountSat
@@ -637,6 +639,7 @@ window.app = Vue.createApp({
               message: 'Invoice Paid!'
             })
             this.invoiceDialog.show = false
+            this.invoiceDialog.internalMemo = null
             this.clearCart()
             this.showComplete()
             if (this.enablePrint) {
@@ -930,6 +933,32 @@ window.app = Vue.createApp({
           message: 'Error fetching receipt data.'
         })
       }
+    },
+    async addComment() {
+      this.$q
+        .dialog({
+          title: 'Add Comment',
+          message: 'Add a comment to the invoice?',
+          prompt: {
+            model: '',
+            type: 'text',
+            placeholder: 'Enter your comment here...'
+          },
+          cancel: true,
+          persistent: false
+        })
+        .onOk(comment => {
+          if (comment) {
+            this.invoiceDialog.internalMemo = comment
+            Quasar.Notify.create({
+              type: 'positive',
+              message: 'Comment added to the invoice.'
+            })
+          }
+        })
+        .onCancel(() => {
+          this.invoiceDialog.internalMemo = ''
+        })
     }
   },
   async created() {
