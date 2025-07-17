@@ -22,8 +22,7 @@ const mapTpos = obj => {
 window.app = Vue.createApp({
   el: '#vue',
   mixins: [window.windowMixin],
-  delimiters: ['${', '}'],
-  data: function () {
+  data() {
     return {
       tposs: [],
       currencyOptions: [],
@@ -193,16 +192,15 @@ window.app = Vue.createApp({
         tax_inclusive: true
       }
     },
-    getTposs: function () {
-      var self = this
+    getTposs() {
       LNbits.api
         .request(
           'GET',
           '/tpos/api/v1/tposs?all_wallets=true',
           this.g.user.wallets[0].inkey
         )
-        .then(function (response) {
-          self.tposs = response.data.map(function (obj) {
+        .then(response => {
+          this.tposs = response.data.map(obj => {
             return mapTpos(obj)
           })
         })
@@ -283,30 +281,27 @@ window.app = Vue.createApp({
           LNbits.utils.notifyApiError(error)
         })
     },
-    deleteTpos: function (tposId) {
-      var self = this
-      var tpos = _.findWhere(this.tposs, {id: tposId})
+    deleteTpos(tposId) {
+      const tpos = _.findWhere(this.tposs, {id: tposId})
 
       LNbits.utils
         .confirmDialog('Are you sure you want to delete this Tpos?')
-        .onOk(function () {
+        .onOk(() => {
           LNbits.api
             .request(
               'DELETE',
               '/tpos/api/v1/tposs/' + tposId,
-              _.findWhere(self.g.user.wallets, {id: tpos.wallet}).adminkey
+              _.findWhere(this.g.user.wallets, {id: tpos.wallet}).adminkey
             )
-            .then(function (response) {
-              self.tposs = _.reject(self.tposs, function (obj) {
+            .then(() => {
+              this.tposs = _.reject(this.tposs, obj => {
                 return obj.id == tposId
               })
             })
-            .catch(function (error) {
-              LNbits.utils.notifyApiError(error)
-            })
+            .catch(LNbits.utils.notifyApiError)
         })
     },
-    exportCSV: function () {
+    exportCSV() {
       LNbits.utils.exportCSV(this.tpossTable.columns, this.tposs)
     },
     itemsArray(tposId) {
@@ -489,7 +484,7 @@ window.app = Vue.createApp({
       this.urlDialog.data = _.findWhere(this.tposs, {id})
       this.urlDialog.show = true
     },
-    formatAmount: function (amount, currency) {
+    formatAmount(amount, currency) {
       if (currency == 'sats') {
         return LNbits.utils.formatSat(amount) + ' sat'
       } else {
@@ -497,7 +492,7 @@ window.app = Vue.createApp({
       }
     }
   },
-  created: function () {
+  created(){
     if (this.g.user.wallets.length) {
       this.getTposs()
     }
@@ -509,8 +504,6 @@ window.app = Vue.createApp({
           this.formDialog.data.currency = DENOMINATION
         }
       })
-      .catch(err => {
-        LNbits.utils.notifyApiError(err)
-      })
+      .catch(LNbits.utils.notifyApiError)
   }
 })

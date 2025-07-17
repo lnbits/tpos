@@ -112,17 +112,17 @@
                 v-text="col.value"
               >
               </q-td>
-              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
-                ${props.row.withdraw_pin}
-              </q-td>
-              <q-td v-else auto-width> N/A </q-td>
-              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
-                ${props.row.withdraw_limit}
-              </q-td>
-              <q-td v-else auto-width> N/A </q-td>
-              <q-td v-if="props.row.withdraw_premium > 0" auto-width>
-                ${props.row.withdraw_premium}%
-              </q-td>
+                <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
+                <span v-text="props.row.withdraw_pin"></span>
+                </q-td>
+                <q-td v-else auto-width> N/A </q-td>
+                <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
+                <span v-text="props.row.withdraw_limit"></span>
+                </q-td>
+                <q-td v-else auto-width> N/A </q-td>
+                <q-td v-if="props.row.withdraw_premium > 0" auto-width>
+                <span v-text="`${props.row.withdraw_premium}%`"></span>
+                </q-td>
               <q-td v-else auto-width> 0 </q-td>
             </q-tr>
             <q-tr v-show="props.expand" :props="props">
@@ -238,22 +238,20 @@
                                         icon="edit"
                                       ></q-btn>
                                     </q-td>
-
                                     <q-td key="id" :props="props">
-                                      ${props.row.id.split(':')[1]}
+                                      <span v-text="props.row.id.split(':')[1]"></span>
                                     </q-td>
                                     <q-td key="title" :props="props">
-                                      ${props.row.title}
+                                      <span v-text="props.row.title"></span>
                                     </q-td>
                                     <q-td key="price" :props="props">
-                                      ${itemFormatPrice(props.row.price,
-                                      props.row.id)}
+                                      <span v-text="itemFormatPrice(props.row.price, props.row.id)"></span>
                                     </q-td>
                                     <q-td key="tax" :props="props">
-                                      ${props.row.tax}%
+                                      <span v-text="`${props.row.tax}%`"></span>
                                     </q-td>
                                     <q-td key="disabled" :props="props">
-                                      ${props.row.disabled}
+                                      <span v-text="props.row.disabled"></span>
                                     </q-td>
                                   </q-tr>
                                 </template>
@@ -609,7 +607,8 @@
             color="primary"
             :disable="!Boolean(itemDialog.data.title) || !Boolean(itemDialog.data.price)"
             type="submit"
-            >${itemDialog.data.id ? 'Update Item' : 'Create Item'}</q-btn
+            :label="itemDialog.data.id ? 'Update Item' : 'Create Item'"
+            ></q-btn
           >
           <q-btn
             v-close-popup
@@ -628,8 +627,8 @@
       <lnbits-qrcode :value="urlDialog.data.shareUrl"></lnbits-qrcode>
       <div class="text-center q-mb-xl">
         <p style="word-break: break-all">
-          <strong>${ urlDialog.data.name }</strong><br />${
-          urlDialog.data.shareUrl }
+          <strong v-text="urlDialog.data.name"></strong><br />
+          <span v-text="urlDialog.data.shareUrl"></span>
         </p>
       </div>
       <div class="row q-mt-lg">
@@ -647,7 +646,7 @@
     <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
       <q-card-section>
         <h6 class="text-subtitle1 q-my-none">
-          Importing ${fileDataDialog?.count} items
+          <span v-text="`Importing ${fileDataDialog?.count} items`"></span>
         </h6>
       </q-card-section>
       <q-list bordered padding separator>
@@ -659,10 +658,8 @@
           </q-item-section>
 
           <q-item-section>
-            <q-item-label>${item.title}</q-item-label>
-            <q-item-label v-if="item.description" caption
-              >${item.description}</q-item-label
-            >
+            <q-item-label v-text="item.title"></q-item-label>
+            <q-item-label v-if="item.description" caption v-text="item.description"></q-item-label>
           </q-item-section>
 
           <q-item-section side top>
