@@ -296,7 +296,7 @@
           filled
           dense
           v-model.trim="formDialog.data.name"
-          label="Name"
+          label="Name *"
           placeholder="Tiago's PoS"
         ></q-input>
         <q-select
@@ -428,7 +428,7 @@
             dense
             v-model.number="formDialog.data.withdraw_limit"
             type="number"
-            label="Max amount to be sold daily ({{LNBITS_DENOMINATION}})"
+            label="Max amount to be sold daily ({{LNBITS_DENOMINATION}}) *"
           ></q-input>
 
           <div class="row">
@@ -533,14 +533,14 @@
             unelevated
             color="primary"
             type="submit"
-            :disable="formDialog.data.currency == null || formDialog.data.name == null || formDialog.data.wallet == null"
+            :disable="createOrUpdateDisabled"
             >Update TPoS</q-btn
           >
           <q-btn
             v-else
             unelevated
             color="primary"
-            :disable="formDialog.data.currency == null || formDialog.data.name == null || formDialog.data.wallet == null"
+            :disable="createOrUpdateDisabled"
             type="submit"
             >Create TPoS</q-btn
           >

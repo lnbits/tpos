@@ -167,6 +167,16 @@ window.app = Vue.createApp({
           )
         )
       )
+    },
+    createOrUpdateDisabled() {
+      if(!this.formDialog.show) return true
+      const data = this.formDialog.data
+      return (
+        !data.name ||
+        !data.currency ||
+        !data.wallet ||
+        this.formDialog.advanced.otc && !data.withdraw_limit
+      )
     }
   },
   methods: {
@@ -192,7 +202,6 @@ window.app = Vue.createApp({
           this.g.user.wallets[0].inkey
         )
         .then(function (response) {
-          console.log(response.data)
           self.tposs = response.data.map(function (obj) {
             return mapTpos(obj)
           })
@@ -241,6 +250,8 @@ window.app = Vue.createApp({
       }
       if (this.formDialog.data.withdraw_limit >= 1) {
         this.formDialog.advanced.otc = true
+      } else {
+        this.formDialog.advanced.otc = false
       }
       if (!this.formDialog.data.withdraw_pin) {
         this.formDialog.data.withdraw_pin = this.generatePIN()
