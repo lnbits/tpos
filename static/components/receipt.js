@@ -79,6 +79,8 @@ window.app.component('receipt', {
       <span v-text="data.business_vat_id"></span>
     </div>
     <q-table v-if="data.extra.details.items && data.extra.details.items.length > 0"
+      :hide-pagination="true"
+      :rows-per-page-options="[0]"  
       :rows="data.extra.details.items"
       :columns="[
           { name: 'title', label: 'Item', field: 'title' },
