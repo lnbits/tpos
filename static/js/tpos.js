@@ -385,7 +385,18 @@ window.app = Vue.createApp({
         this.heldCartsDialog.show = false
       }
     },
+    exitAtmMode() {
+      this.atmMode = false
+      this.getRates()
+      this.cancelAddAmount()
+    },
     startAtmMode() {
+      if (!this.showPoS) {
+        this.showPoS = true
+      }
+      this.clearCart()
+      this.cancelAddAmount()
+
       if (this.atmPremium > 0) {
         this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
       }
