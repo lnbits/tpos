@@ -211,6 +211,9 @@ window.app = Vue.createApp({
     drawerWidth() {
       return this.$q.screen.lt.sm ? 360 : 450
     },
+    drawerItemsHeight() {
+      return `overflow-y: auto; height: ${this.$q.screen.gt.sm ? 'calc(100vh - 400px)' : 'calc(100vh - 465px)'}`
+    },
     formattedCartTax() {
       return this.formatAmount(this.cartTax, this.currency)
     },

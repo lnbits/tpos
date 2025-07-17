@@ -112,17 +112,17 @@
                 v-text="col.value"
               >
               </q-td>
-                <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
+              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
                 <span v-text="props.row.withdraw_pin"></span>
-                </q-td>
-                <q-td v-else auto-width> N/A </q-td>
-                <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
+              </q-td>
+              <q-td v-else auto-width> N/A </q-td>
+              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
                 <span v-text="props.row.withdraw_limit"></span>
-                </q-td>
-                <q-td v-else auto-width> N/A </q-td>
-                <q-td v-if="props.row.withdraw_premium > 0" auto-width>
+              </q-td>
+              <q-td v-else auto-width> N/A </q-td>
+              <q-td v-if="props.row.withdraw_premium > 0" auto-width>
                 <span v-text="`${props.row.withdraw_premium}%`"></span>
-                </q-td>
+              </q-td>
               <q-td v-else auto-width> 0 </q-td>
             </q-tr>
             <q-tr v-show="props.expand" :props="props">
@@ -239,13 +239,17 @@
                                       ></q-btn>
                                     </q-td>
                                     <q-td key="id" :props="props">
-                                      <span v-text="props.row.id.split(':')[1]"></span>
+                                      <span
+                                        v-text="props.row.id.split(':')[1]"
+                                      ></span>
                                     </q-td>
                                     <q-td key="title" :props="props">
                                       <span v-text="props.row.title"></span>
                                     </q-td>
                                     <q-td key="price" :props="props">
-                                      <span v-text="itemFormatPrice(props.row.price, props.row.id)"></span>
+                                      <span
+                                        v-text="itemFormatPrice(props.row.price, props.row.id)"
+                                      ></span>
                                     </q-td>
                                     <q-td key="tax" :props="props">
                                       <span v-text="`${props.row.tax}%`"></span>
@@ -608,8 +612,7 @@
             :disable="!Boolean(itemDialog.data.title) || !Boolean(itemDialog.data.price)"
             type="submit"
             :label="itemDialog.data.id ? 'Update Item' : 'Create Item'"
-            ></q-btn
-          >
+          ></q-btn>
           <q-btn
             v-close-popup
             @hide="closeItemDialog"
@@ -659,7 +662,11 @@
 
           <q-item-section>
             <q-item-label v-text="item.title"></q-item-label>
-            <q-item-label v-if="item.description" caption v-text="item.description"></q-item-label>
+            <q-item-label
+              v-if="item.description"
+              caption
+              v-text="item.description"
+            ></q-item-label>
           </q-item-section>
 
           <q-item-section side top>

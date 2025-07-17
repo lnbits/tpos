@@ -31,19 +31,14 @@
             v-show="!denomIsSats && '{{LNBITS_DENOMINATION}}' == 'sats'"
             class="q-mt-none q-mb-sm"
           >
-            <span v-text="fsat">
-            </span>
+            <span v-text="fsat"> </span>
             <small>&nbsp;sat</small>
-
           </h5>
           <div v-if="total > 0.0">
             <h5 class="text-italic">
-              
-                <span v-text="`Total: ${totalFormatted}`"></span>
-                <br />
-                <span v-if="!denomIsSats" v-text="`${totalfsat} sat`"
-                  ></span
-                >
+              <span v-text="`Total: ${totalFormatted}`"></span>
+              <br />
+              <span v-if="!denomIsSats" v-text="`${totalfsat} sat`"></span>
             </h5>
           </div>
         </div>

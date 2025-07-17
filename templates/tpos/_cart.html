@@ -19,8 +19,9 @@
           <span v-text="totalfsat"></span><small> sat</small>
         </h5>
       </div>
-      <div class="col-12" style="max-height: 60vh; overflow-y: auto">
-        <table class="table full-width">
+      <div class="col-12" 
+      :style="drawerItemsHeight">
+        <table class="table full-width" virtual-scroll>
           <colgroup>
             <col width="50%" />
             <col width="25%" />
@@ -38,7 +39,7 @@
                   max-width: 1px;
                 "
               >
-              <span v-text="item.title"></span>
+                <span v-text="item.title"></span>
               </td>
               <td>
                 <div class="flex justify-evenly" style="align-items: center">
@@ -240,13 +241,15 @@
                 <span v-text="item.formattedPrice"></span>
               </div>
               <div class="text-caption text-grey" v-if="item.tax || taxDefault">
-                <span v-text="`(tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax || taxDefault}%)`"></span>
+                <span
+                  v-text="`(tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax || taxDefault}%)`"
+                ></span>
               </div>
             </span>
             <q-space></q-space>
             <div class="flex">
               <q-btn
-              :outline="itemCartQty(item.id) == 0"
+                :outline="itemCartQty(item.id) == 0"
                 round
                 dense
                 size="sm"
@@ -302,9 +305,10 @@
           <q-item-label class="text-subtitle2">
             <span v-text="item.formattedPrice"></span>
             <span v-if="item.tax || taxDefault" class="text-caption">
-              <span v-text="`(tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax || taxDefault}%)`"></span>
-            </span></q-item-label
-          >
+              <span
+                v-text="`(tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax || taxDefault}%)`"
+              ></span> </span
+          ></q-item-label>
         </q-item-section>
         <q-item-section side>
           <div class="flex">

@@ -168,13 +168,13 @@ window.app = Vue.createApp({
       )
     },
     createOrUpdateDisabled() {
-      if(!this.formDialog.show) return true
+      if (!this.formDialog.show) return true
       const data = this.formDialog.data
       return (
         !data.name ||
         !data.currency ||
         !data.wallet ||
-        this.formDialog.advanced.otc && !data.withdraw_limit
+        (this.formDialog.advanced.otc && !data.withdraw_limit)
       )
     }
   },
@@ -492,7 +492,7 @@ window.app = Vue.createApp({
       }
     }
   },
-  created(){
+  created() {
     if (this.g.user.wallets.length) {
       this.getTposs()
     }
