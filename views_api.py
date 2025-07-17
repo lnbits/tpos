@@ -15,7 +15,6 @@ from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
-from lnurl import decode as decode_lnurl
 
 from .crud import (
     create_tpos,
@@ -34,7 +33,6 @@ from .models import (
     CreateUpdateItemData,
     CreateWithdrawPay,
     LnurlCharge,
-    PayLnurlWData,
     Tpos,
 )
 
@@ -171,75 +169,6 @@ async def api_tpos_get_latest_invoices(tpos_id: str):
         }
         for payment in payments
     ]
-
-
-@tpos_api_router.post(
-    "/api/v1/tposs/{tpos_id}/invoices/{payment_request}/pay", status_code=HTTPStatus.OK
-)
-async def api_tpos_pay_invoice(
-    lnurl_data: PayLnurlWData, payment_request: str, tpos_id: str
-):
-    tpos = await get_tpos(tpos_id)
-
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-
-    lnurl = (
-        lnurl_data.lnurl.replace("lnurlw://", "")
-        .replace("lightning://", "")
-        .replace("LIGHTNING://", "")
-        .replace("lightning:", "")
-        .replace("LIGHTNING:", "")
-    )
-
-    if lnurl.lower().startswith("lnurl"):
-        lnurl = decode_lnurl(lnurl)
-    else:
-        lnurl = "https://" + lnurl
-
-    async with httpx.AsyncClient() as client:
-        try:
-            headers = {"user-agent": "lnbits/tpos"}
-            r = await client.get(lnurl, follow_redirects=True, headers=headers)
-            if r.is_error:
-                lnurl_response = {"success": False, "detail": "Error loading"}
-            else:
-                resp = r.json()
-                if resp["status"] == "ERROR":
-                    lnurl_response = {
-                        "success": False,
-                        "detail": resp.get("reason", ""),
-                    }
-                    return lnurl_response
-
-                if resp["tag"] != "withdrawRequest":
-                    lnurl_response = {"success": False, "detail": "Wrong tag type"}
-                else:
-                    r2 = await client.get(
-                        resp["callback"],
-                        follow_redirects=True,
-                        headers=headers,
-                        params={
-                            "k1": resp["k1"],
-                            "pr": payment_request,
-                        },
-                    )
-                    resp2 = r2.json()
-                    if r2.is_error:
-                        lnurl_response = {
-                            "success": False,
-                            "detail": "Error loading callback",
-                        }
-                    elif resp2["status"] == "ERROR":
-                        lnurl_response = {"success": False, "detail": resp2["reason"]}
-                    else:
-                        lnurl_response = {"success": True, "detail": resp2}
-        except (httpx.ConnectError, httpx.RequestError):
-            lnurl_response = {"success": False, "detail": "Unexpected error occurred"}
-
-    return lnurl_response
 
 
 @tpos_api_router.get(

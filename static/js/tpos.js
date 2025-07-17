@@ -776,16 +776,12 @@ window.app = Vue.createApp({
         })
     },
     payInvoice(lnurl) {
-      return axios
-        .post(
-          '/tpos/api/v1/tposs/' +
-            this.tposId +
-            '/invoices/' +
-            this.invoiceDialog.data.payment_request +
-            '/pay',
-          {
-            lnurl: lnurl
-          }
+      LNbits.api
+        .request(
+          'POST',
+          `/api/v1/payments/${this.invoiceDialog.data.payment_request}/pay-with-nfc`,
+          this.g.wallet.adminkey,
+          {lnurl_w: lnurl}
         )
         .then(response => {
           if (!response.data.success) {
@@ -795,9 +791,7 @@ window.app = Vue.createApp({
             })
           }
         })
-        .catch(error => {
-          console.error(error)
-        })
+        .catch(LNbits.api.notifyApiError)
     },
     async getRates() {
       let rate = 1

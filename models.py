@@ -106,10 +106,6 @@ class HashCheck(BaseModel):
     lnurl: bool
 
 
-class PayLnurlWData(BaseModel):
-    lnurl: str
-
-
 class LNaddress(BaseModel):
     lnaddress: str
 
