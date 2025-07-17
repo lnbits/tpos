@@ -24,27 +24,33 @@
     <q-page-sticky v-if="exchangeRate && showPoS" expand position="top">
       <div class="row justify-center full-width">
         <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
-          <h3 class="q-mb-md">${ amountFormatted }</h3>
+          <h3 class="q-mb-md">
+            <span v-text="amountFormatted"></span>
+          </h3>
           <h5
             v-show="!denomIsSats && '{{LNBITS_DENOMINATION}}' == 'sats'"
             class="q-mt-none q-mb-sm"
           >
-            ${ fsat }<small> sat</small>
+            <span v-text="fsat">
+            </span>
+            <small>&nbsp;sat</small>
+
           </h5>
           <div v-if="total > 0.0">
-            <h5>
-              <i
-                >Total: ${totalFormatted}<span v-if="!denomIsSats"
-                  ><br />${totalfsat} sat</span
-                ></i
-              >
+            <h5 class="text-italic">
+              
+                <span v-text="`Total: ${totalFormatted}`"></span>
+                <br />
+                <span v-if="!denomIsSats" v-text="`${totalfsat} sat`"
+                  ></span
+                >
             </h5>
           </div>
         </div>
       </div>
       <div class="col-12 col-sm-8 col-md-6 col-lg-4 text-center">
         <q-btn
-          @click="() => {atmMode = false; getRates()}"
+          @click="exitAtmMode"
           v-if="atmMode == true"
           rounded
           color="negative"
@@ -67,7 +73,7 @@
               <keypad-item @click="stack.push(8)" :value="8"></keypad-item>
               <keypad-item @click="stack.push(9)" :value="9"></keypad-item>
               <keypad-item
-                @click="total > 0.0 ? cancelAddAmount() : stack = []"
+                @click="cancelAddAmount()"
                 :value="'C'"
                 :color="monochrome ? 'secondary' : 'negative'"
               ></keypad-item>
