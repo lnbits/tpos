@@ -6,8 +6,16 @@ authors = ["Alan Bits <alan@lnbits.com>"]
 package-mode = false
 
 [tool.poetry.dependencies]
+<<<<<<< HEAD
 python = "~3.12 | ~3.11 | ~3.10"
 lnbits = {version = "*",  allow-prereleases = true}
+=======
+python = ">=3.10,<3.13"
+
+[tool.poetry.dependencies.lnbits]
+version = ">=1.*"
+allow-prereleases = true
+>>>>>>> efb9bfe (.)
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.3.0"
