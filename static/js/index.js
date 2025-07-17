@@ -492,7 +492,7 @@ window.app = Vue.createApp({
       }
     }
   },
-  created() {
+  created(){
     if (this.g.user.wallets.length) {
       this.getTposs()
     }
