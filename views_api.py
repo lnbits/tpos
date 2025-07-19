@@ -405,7 +405,7 @@ async def api_tpos_create_items(
 
 @tpos_api_router.get("/api/v1/tposs/lnaddresscheck", status_code=HTTPStatus.OK)
 async def api_tpos_check_lnaddress(lnaddress: str):
-    check = await get_pr(lnaddress, 1)
+    check = await get_pr(lnaddress, 1000)
     if not check:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
