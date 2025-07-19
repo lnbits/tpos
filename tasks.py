@@ -42,15 +42,17 @@ async def on_invoice_paid(payment: Payment) -> None:
     assert tpos
     if payment.extra.get("lnaddress") and payment.extra["lnaddress"] != "":
         calc_amount = payment.amount - ((payment.amount / 100) * tpos.lnaddress_cut)
-        pr = await get_pr(payment.extra.get("lnaddress"), calc_amount / 1000)
-        if pr:
-            payment.extra["lnaddress"] = ""
-            paid_payment = await pay_invoice(
-                payment_request=pr,
-                wallet_id=payment.wallet_id,
-                extra={**payment.extra},
-            )
-            logger.debug(f"tpos: LNaddress paid cut: {paid_payment.checking_id}")
+        address = payment.extra.get("lnaddress")
+        if address:
+            pr = await get_pr(address, int(calc_amount))
+            if pr:
+                payment.extra["lnaddress"] = ""
+                paid_payment = await pay_invoice(
+                    payment_request=pr,
+                    wallet_id=payment.wallet_id,
+                    extra={**payment.extra},
+                )
+                logger.debug(f"tpos: LNaddress paid cut: {paid_payment.checking_id}")
 
     await websocket_updater(tpos_id, str(stripped_payment))
 
