@@ -18,6 +18,9 @@ class CreateTposInvoice(BaseModel):
     tip_amount: Optional[int] = Query(None, ge=1)
     user_lnaddress: Optional[str] = Query(None)
     internal_memo: Optional[str] = Query(None, max_length=512)
+    pay_in_fiat: bool = Query(False)
+    amount_fiat: Optional[float] = Query(None, ge=0.0)
+    tip_amount_fiat: Optional[float] = Query(None, ge=0.0)
 
 
 class CreateTposData(BaseModel):
@@ -41,6 +44,7 @@ class CreateTposData(BaseModel):
     business_name: Optional[str]
     business_address: Optional[str]
     business_vat_id: Optional[str]
+    fiat_provider: Optional[str] = Field(None)
 
     @validator("withdraw_pin", pre=True)
     def empty_string_to_none(cls, v):
@@ -70,6 +74,7 @@ class TposClean(BaseModel):
     business_name: Optional[str] = None
     business_address: Optional[str] = None
     business_vat_id: Optional[str] = None
+    fiat_provider: Optional[str] = None
 
     @property
     def withdraw_maximum(self) -> int:
