@@ -14,13 +14,13 @@
         >
       </div>
       <div class="col-12 text-center">
-        <h3 class="q-mb-md">${totalFormatted}</h3>
+        <h3 class="q-mb-md" v-text="totalFormatted"></h3>
         <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
-          ${totalfsat}<small> sat</small>
+          <span v-text="totalfsat"></span><small> sat</small>
         </h5>
       </div>
-      <div class="col-12" style="max-height: 60vh; overflow-y: auto">
-        <table class="table full-width">
+      <div class="col-12" :style="drawerItemsHeight">
+        <table class="table full-width" virtual-scroll>
           <colgroup>
             <col width="50%" />
             <col width="25%" />
@@ -38,7 +38,7 @@
                   max-width: 1px;
                 "
               >
-                ${item.title}
+                <span v-text="item.title"></span>
               </td>
               <td>
                 <div class="flex justify-evenly" style="align-items: center">
@@ -52,7 +52,7 @@
                     :disabled="item.quantity == 1"
                   ></q-btn>
                   <div class="text-center">
-                    <span class="text-bold">${item.quantity}</span>
+                    <span class="text-bold" v-text="item.quantity"></span>
                   </div>
                   <q-btn
                     @click="addToCart(item)"
@@ -66,7 +66,7 @@
               </td>
               <td>
                 <div class="text-center">
-                  <span>${item.formattedPrice}</span>
+                  <span v-text="item.formattedPrice"></span>
                 </div>
               </td>
               <td>
@@ -106,7 +106,7 @@
           <q-separator></q-separator>
           <q-item>
             <q-item-section> Total </q-item-section>
-            <q-item-section side> ${totalFormatted} </q-item-section>
+            <q-item-section side v-text="totalFormatted"></q-item-section>
           </q-item>
         </q-list>
       </div>
@@ -208,6 +208,7 @@
     </template>
   </div>
   <div :class="{'dimmed': moreBtn}">
+    <!-- Items List Large -->
     <div v-if="isGridView" class="row q-col-gutter-md q-pa-md">
       <div
         class="col-12 col-sm-6 col-md-4 col-lg-3"
@@ -239,15 +240,15 @@
                 <span v-text="item.formattedPrice"></span>
               </div>
               <div class="text-caption text-grey" v-if="item.tax || taxDefault">
-                <span>
-                  (tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax ||
-                  taxDefault}%)
-                </span>
+                <span
+                  v-text="`(tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax || taxDefault}%)`"
+                ></span>
               </div>
             </span>
             <q-space></q-space>
             <div class="flex">
               <q-btn
+                :outline="itemCartQty(item.id) == 0"
                 round
                 dense
                 size="sm"
@@ -275,10 +276,10 @@
         </q-card>
       </div>
     </div>
-
+    <!-- Items List Small -->
     <q-list v-else class="col-12">
       <q-item v-for="item in filteredItems" :key="item.id">
-        <q-item-section avatar>
+        <q-item-section avatar @click="addToCart(item)">
           <q-avatar rounded>
             <q-img
               v-if="item.image"
@@ -295,7 +296,7 @@
             ></q-icon>
           </q-avatar>
         </q-item-section>
-        <q-item-section>
+        <q-item-section @click="addToCart(item)">
           <q-item-label
             class="text-subtitle1 ellipsis"
             v-text="item.title"
@@ -303,16 +304,16 @@
           <q-item-label class="text-subtitle2">
             <span v-text="item.formattedPrice"></span>
             <span v-if="item.tax || taxDefault" class="text-caption">
-              (tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax ||
-              taxDefault}%)
-            </span></q-item-label
-          >
+              <span
+                v-text="`(tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax || taxDefault}%)`"
+              ></span> </span
+          ></q-item-label>
         </q-item-section>
         <q-item-section side>
           <div class="flex">
             <q-btn
+              :outline="itemCartQty(item.id) == 0"
               round
-              dense
               size="sm"
               color="secondary"
               icon="remove"
@@ -324,7 +325,6 @@
             </div>
             <q-btn
               round
-              dense
               size="sm"
               color="secondary"
               icon="add"
@@ -336,7 +336,6 @@
     </q-list>
   </div>
   <q-page-sticky position="bottom" :offset="[0, 22]" v-if="cart.size > 0">
-    <!-- TODO: put cart on hold -->
     <q-btn
       color="primary"
       size="sm"
