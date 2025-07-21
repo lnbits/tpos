@@ -10,7 +10,7 @@ from lnbits.core.crud import (
     get_wallet,
 )
 from lnbits.core.models import CreateInvoice, Payment, WalletTypeInfo
-from lnbits.core.services import create_fiat_invoice, create_wallet_invoice
+from lnbits.core.services import create_payment_request
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
@@ -98,15 +98,6 @@ async def api_tpos_delete(
 
     await delete_tpos(tpos_id)
     return "", HTTPStatus.NO_CONTENT
-
-
-async def create_payment_request(
-    wallet_id: str, invoice_data: CreateInvoice
-) -> Payment:
-    if invoice_data.fiat_provider:
-        return await create_fiat_invoice(wallet_id, invoice_data)
-
-    return await create_wallet_invoice(wallet_id, invoice_data)
 
 
 @tpos_api_router.post(
