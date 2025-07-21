@@ -414,6 +414,10 @@ async def api_tpos_check_lnaddress(lnaddress: str):
             detail=f"Error checking lnaddress: {exc!s}",
         ) from exc
 
-    if isinstance(res, LnurlPayResponse):
-        return True
-    return False
+    if not isinstance(res, LnurlPayResponse):
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="The provided lnaddress returned an unexpected response type.",
+        )
+
+    return True
