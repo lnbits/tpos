@@ -1,12 +1,16 @@
 import asyncio
 
 from lnbits.core.models import Payment
-from lnbits.core.services import create_invoice, pay_invoice, websocket_updater
+from lnbits.core.services import (
+    create_invoice,
+    get_pr_from_lnurl,
+    pay_invoice,
+    websocket_updater,
+)
 from lnbits.tasks import register_invoice_listener
 from loguru import logger
 
 from .crud import get_tpos
-from .helpers import get_pr
 
 
 async def wait_for_paid_invoices():
@@ -44,15 +48,19 @@ async def on_invoice_paid(payment: Payment) -> None:
         calc_amount = payment.amount - ((payment.amount / 100) * tpos.lnaddress_cut)
         address = payment.extra.get("lnaddress")
         if address:
-            pr = await get_pr(address, int(calc_amount))
-            if pr:
-                payment.extra["lnaddress"] = ""
-                paid_payment = await pay_invoice(
-                    payment_request=pr,
-                    wallet_id=payment.wallet_id,
-                    extra={**payment.extra},
-                )
-                logger.debug(f"tpos: LNaddress paid cut: {paid_payment.checking_id}")
+            try:
+                pr = await get_pr_from_lnurl(address, int(calc_amount))
+            except Exception as e:
+                logger.error(f"tpos: Error getting payment request from lnurl: {e}")
+                return
+
+            payment.extra["lnaddress"] = ""
+            paid_payment = await pay_invoice(
+                payment_request=pr,
+                wallet_id=payment.wallet_id,
+                extra={**payment.extra},
+            )
+            logger.debug(f"tpos: LNaddress paid cut: {paid_payment.checking_id}")
 
     await websocket_updater(tpos_id, str(stripped_payment))
 

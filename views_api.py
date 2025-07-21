@@ -15,7 +15,10 @@ from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
+from lnurl import LnAddress, LnurlPayResponse
 from lnurl import decode as decode_lnurl
+from lnurl import handle as lnurl_handle
+from pydantic import parse_obj_as
 
 from .crud import (
     create_tpos,
@@ -27,7 +30,6 @@ from .crud import (
     update_lnurlcharge,
     update_tpos,
 )
-from .helpers import get_pr
 from .models import (
     CreateTposData,
     CreateTposInvoice,
@@ -405,9 +407,15 @@ async def api_tpos_create_items(
 
 @tpos_api_router.get("/api/v1/tposs/lnaddresscheck", status_code=HTTPStatus.OK)
 async def api_tpos_check_lnaddress(lnaddress: str):
-    check = await get_pr(lnaddress, 1000)
-    if not check:
+    try:
+        _ = parse_obj_as(LnAddress, lnaddress)
+        res = await lnurl_handle(lnaddress)
+    except Exception as exc:
         raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-    return True
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail=f"Error checking lnaddress: {exc!s}",
+        ) from exc
+
+    if isinstance(res, LnurlPayResponse):
+        return True
+    return False
