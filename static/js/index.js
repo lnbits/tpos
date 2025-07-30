@@ -26,6 +26,8 @@ window.app = Vue.createApp({
     return {
       tposs: [],
       currencyOptions: [],
+      hasFiatProvider: false,
+      fiatProviders: null,
       tpossTable: {
         columns: [
           {name: 'name', align: 'left', label: 'Name', field: 'name'},
@@ -34,6 +36,13 @@ window.app = Vue.createApp({
             align: 'left',
             label: 'Currency',
             field: 'currency'
+          },
+          {
+            name: 'fiat_provider',
+            align: 'left',
+            label: 'Fiat Provider',
+            field: 'fiat_provider',
+            format: val => val && val.charAt(0).toUpperCase() + val.slice(1)
           },
           {
             name: 'withdraw_time_option',
@@ -85,7 +94,8 @@ window.app = Vue.createApp({
           tax_inclusive: true,
           lnaddress: false,
           lnaddress_cut: 2,
-          enable_receipt_print: false
+          enable_receipt_print: false,
+          fiat: false
         },
         advanced: {
           tips: false,
@@ -505,5 +515,9 @@ window.app = Vue.createApp({
         }
       })
       .catch(LNbits.utils.notifyApiError)
+    if (this.g.user.fiat_providers && this.g.user.fiat_providers.length > 0) {
+      this.hasFiatProvider = true
+      this.fiatProviders = [...this.g.user.fiat_providers]
+    }
   }
 })

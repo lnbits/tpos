@@ -2,6 +2,7 @@
   <q-dialog
     v-model="invoiceDialog.show"
     position="top"
+    persistent
     @hide="closeInvoiceDialog"
   >
     <q-card
@@ -9,12 +10,12 @@
       class="q-pa-lg q-pt-xl lnbits__dialog-card"
     >
       <a
-        :href="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
+        :href="invoiceDialog.data.payment_request"
         target="_blank"
         rel="noopener noreferrer"
       >
         <lnbits-qrcode
-          :value="'lightning:' + invoiceDialog.data.payment_request.toUpperCase()"
+          :value="invoiceDialog.data.payment_request"
           class="rounded-borders"
         ></lnbits-qrcode>
         <q-tooltip>Pay in wallet</q-tooltip>
@@ -261,6 +262,31 @@
           </div>
         </q-form>
       </q-card-section>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="currency_choice" persistent>
+    <q-card class="q-pa-md">
+      <div class="text-h6 q-mb-md">Payment Method</div>
+      <div class="row q-gutter-sm justify-center">
+        <q-btn
+          class="q-ma-lg"
+          size="xl"
+          label="BTC"
+          color="primary"
+          rounded
+          @click="selectPaymentMethod('btc')"
+        >
+        </q-btn>
+        <q-btn
+          class="q-ma-lg"
+          size="xl"
+          :label="currency"
+          color="secondary"
+          rounded
+          @click="selectPaymentMethod('fiat')"
+        ></q-btn>
+      </div>
     </q-card>
   </q-dialog>
 </template>

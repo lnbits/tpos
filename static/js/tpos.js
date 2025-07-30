@@ -6,6 +6,8 @@ window.app = Vue.createApp({
     return {
       tposId: null,
       currency: null,
+      fiatProvider: null,
+      payInFiat: false,
       atmPremium: tpos.withdraw_premium / 100,
       withdrawMaximum: 0,
       withdrawPinOpen: null,
@@ -35,7 +37,7 @@ window.app = Vue.createApp({
       },
       invoiceDialog: {
         show: false,
-        data: null,
+        data: {},
         dismissMsg: null,
         paymentChecker: null,
         internalMemo: null
@@ -117,7 +119,9 @@ window.app = Vue.createApp({
       totalfsat: 0,
       addedAmount: 0,
       enablePrint: false,
-      receiptData: null
+      receiptData: null,
+      currency_choice: false,
+      _currencyResolver: null
     }
   },
   watch: {
@@ -582,61 +586,91 @@ window.app = Vue.createApp({
         this.showInvoice()
       }
     },
+    showPaymentMethod() {
+      return new Promise(resolve => {
+        this.currency_choice = true
+        this._currencyResolver = resolve
+      })
+    },
+    selectPaymentMethod(method) {
+      this.currency_choice = false
+      if (this._currencyResolver) {
+        this._currencyResolver(method)
+        this._currencyResolver = null
+      }
+    },
+    buildInvoiceParams() {
+      const params = {
+        amount: this.sat,
+        memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
+        exchange_rate: this.exchangeRate,
+        internal_memo: this.invoiceDialog.internalMemo || null,
+        pay_in_fiat: this.payInFiat
+      }
+      if (this.currency != LNBITS_DENOMINATION) {
+        params.amount_fiat = this.total > 0 ? this.total : this.amount
+        params.tip_amount_fiat = this.tipAmount > 0 ? this.tipAmount : 0.0
+      }
+      if (this.tipAmountSat > 0) {
+        params.tip_amount = this.tipAmountSat
+      }
+      if (this.cart.size) {
+        params.details = {
+          currency: this.currency,
+          exchangeRate: this.exchangeRate,
+          items: [...this.cart.values()].map(item => ({
+            price: item.price,
+            formattedPrice: item.formattedPrice,
+            quantity: item.quantity,
+            title: item.title,
+            tax: item.tax || this.taxDefault
+          })),
+          taxIncluded: this.taxInclusive,
+          taxValue: this.cartTax
+        }
+      }
+      if (this.lnaddress) {
+        params.user_lnaddress = this.lnaddressDialog.lnaddress
+      }
+      return params
+    },
     async showInvoice() {
       if (this.atmMode) {
         this.atmGetWithdraw()
-      } else {
-        const dialog = this.invoiceDialog
-        let params = {
-          amount: this.sat,
-          memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
-          exchange_rate: this.exchangeRate,
-          internal_memo: this.invoiceDialog.internalMemo || null
-        }
-        if (this.tipAmountSat > 0) {
-          params.tip_amount = this.tipAmountSat
-        }
-        if (this.cart.size) {
-          let details = [...this.cart.values()].map(item => {
-            return {
-              price: item.price,
-              formattedPrice: item.formattedPrice,
-              quantity: item.quantity,
-              title: item.title,
-              tax: item.tax || this.taxDefault
-            }
-          })
+        return
+      }
 
-          params.details = {
-            currency: this.currency,
-            exchangeRate: this.exchangeRate,
-            items: details,
-            taxIncluded: this.taxInclusive,
-            taxValue: this.cartTax
-          }
+      if (this.fiatProvider) {
+        const method = await this.showPaymentMethod()
+        this.payInFiat = method === 'fiat'
+      }
+
+      const params = this.buildInvoiceParams()
+      try {
+        const {data} = await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices`,
+          null,
+          params
+        )
+        if (data.extra.fiat_payment_request) {
+          this.invoiceDialog.data.payment_request =
+            data.extra.fiat_payment_request
+        } else {
+          this.invoiceDialog.data.payment_request =
+            'lightning:' + data.bolt11.toUpperCase()
         }
-        if (this.lnaddress) {
-          params.user_lnaddress = this.lnaddressDialog.lnaddress
-        }
-        try {
-          const {data} = await LNbits.api.request(
-            'POST',
-            `/tpos/api/v1/tposs/${this.tposId}/invoices`,
-            null,
-            params
-          )
-          dialog.data = data
-          dialog.show = true
-          this.readNfcTag()
-          dialog.dismissMsg = Quasar.Notify.create({
-            timeout: 0,
-            message: 'Waiting for payment...'
-          })
-          this.subscribeToPaymentWS(data.payment_hash)
-        } catch (error) {
-          console.error(error)
-          LNbits.utils.notifyApiError(error)
-        }
+        this.invoiceDialog.data.payment_hash = data.payment_hash
+        this.invoiceDialog.show = true
+        this.readNfcTag()
+        this.invoiceDialog.dismissMsg = Quasar.Notify.create({
+          timeout: 0,
+          message: 'Waiting for payment...'
+        })
+        this.subscribeToPaymentWS(data.payment_hash)
+      } catch (error) {
+        console.error(error)
+        LNbits.utils.notifyApiError(error)
       }
     },
     subscribeToPaymentWS(paymentHash) {
@@ -990,6 +1024,7 @@ window.app = Vue.createApp({
     this.tposLNaddress = tpos.lnaddress
     this.tposLNaddressCut = tpos.lnaddress_cut
     this.enablePrint = tpos.enable_receipt_print
+    this.fiatProvider = tpos.fiat_provider
 
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
 

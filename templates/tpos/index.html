@@ -318,6 +318,24 @@
           :options="currencyOptions"
           label="Currency *"
         ></q-select>
+        <q-select
+          v-if="formDialog.data.currency != '{{LNBITS_DENOMINATION}}' && hasFiatProvider"
+          filled
+          dense
+          emit-value
+          v-model="formDialog.data.fiat_provider"
+          :options="fiatProviders"
+          label="Fiat payments"
+          hint="Choose what fiat platform to use for fiat payments."
+        >
+          <template v-if="formDialog.data.fiat_provider" v-slot:append>
+            <q-icon
+              name="cancel"
+              @click.stop.prevent="formDialog.data.fiat_provider = null"
+              class="cursor-pointer"
+            />
+          </template>
+        </q-select>
         <div class="row">
           <div class="col">
             <q-checkbox
@@ -346,6 +364,18 @@
               ></q-tooltip>
             </q-input>
           </div>
+          <!-- <div class="col" v-if="hasFiatProvider">
+            <q-checkbox
+              v-model="formDialog.data.fiat"
+              label="Fiat invoicing"
+            >
+              <q-tooltip>
+                <span
+                  v-text="'If enabled, tpos will fetch fiat invoices. Server admin needs to have fiat invoicing enabled.'"
+                ></span
+              ></q-tooltip>
+            </q-checkbox>
+          </div> -->
         </div>
         <div class="row">
           <div class="col">
