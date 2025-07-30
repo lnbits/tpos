@@ -121,8 +121,8 @@ window.app = Vue.createApp({
       enablePrint: false,
       receiptData: null,
       currency_choice: false,
-      _currencyResolver: null
-      headerElement: null,
+      _currencyResolver: null,
+      headerElement: null
     }
   },
   watch: {
@@ -1011,7 +1011,8 @@ window.app = Vue.createApp({
     },
     headerToggle() {
       if (this.headerElement) {
-        this.headerElement.style.display = this.headerElement.style.display === 'none' ? '' : 'none'
+        this.headerElement.style.display =
+          this.headerElement.style.display === 'none' ? '' : 'none'
         if (this.headerElement.style.display === 'none') {
           this.$q.localStorage.set('lnbits.tpos.header', 'hidden')
         } else {
@@ -1066,9 +1067,11 @@ window.app = Vue.createApp({
     })
     this.headerElement = document.querySelector('.q-header')
     if (this.headerElement) {
-      this.headerElement.style.display = this.$q.localStorage.getItem('lnbits.tpos.header') === 'hidden' ? 'none' : ''
+      this.headerElement.style.display =
+        this.$q.localStorage.getItem('lnbits.tpos.header') === 'hidden'
+          ? 'none'
+          : ''
     }
-  
   },
   onMounted() {
     setInterval(() => {
