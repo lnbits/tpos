@@ -1070,7 +1070,7 @@ window.app = Vue.createApp({
       this.headerElement.style.display =
         this.$q.localStorage.getItem('lnbits.tpos.header') === 'hidden'
           ? 'none'
-          : ''
+          : null
     }
   },
   onMounted() {
