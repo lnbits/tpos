@@ -121,7 +121,8 @@ window.app = Vue.createApp({
       enablePrint: false,
       receiptData: null,
       currency_choice: false,
-      _currencyResolver: null
+      _currencyResolver: null,
+      headerElement: null
     }
   },
   watch: {
@@ -1007,6 +1008,17 @@ window.app = Vue.createApp({
         .onCancel(() => {
           this.invoiceDialog.internalMemo = ''
         })
+    },
+    headerToggle() {
+      if (this.headerElement) {
+        this.headerElement.style.display =
+          this.headerElement.style.display === 'none' ? '' : 'none'
+        if (this.headerElement.style.display === 'none') {
+          this.$q.localStorage.set('lnbits.tpos.header', 'hidden')
+        } else {
+          this.$q.localStorage.remove('lnbits.tpos.header')
+        }
+      }
     }
   },
   async created() {
@@ -1053,6 +1065,13 @@ window.app = Vue.createApp({
         delete this.heldCarts[cartId]
       }
     })
+    this.headerElement = document.querySelector('.q-header')
+    if (this.headerElement) {
+      this.headerElement.style.display =
+        this.$q.localStorage.getItem('lnbits.tpos.header') === 'hidden'
+          ? 'none'
+          : null
+    }
   },
   onMounted() {
     setInterval(() => {
