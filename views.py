@@ -32,9 +32,6 @@ async def tpos(request: Request, tpos_id, lnaddress: Optional[str] = ""):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
-    withdraw_pin_open: Optional[int] = 0
-    if tpos.withdraw_pin_disabled:
-        withdraw_pin_open = tpos.withdraw_pin
 
     tpos_clean = TposClean(**tpos.dict())
     response = tpos_renderer().TemplateResponse(
@@ -43,7 +40,6 @@ async def tpos(request: Request, tpos_id, lnaddress: Optional[str] = ""):
             "request": request,
             "tpos": tpos_clean.json(),
             "lnaddressparam": lnaddress,
-            "withdraw_pin_open": withdraw_pin_open,
             "withdraw_maximum": tpos.withdraw_maximum,
             "web_manifest": f"/tpos/manifest/{tpos_id}.webmanifest",
         },

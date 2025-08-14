@@ -46,7 +46,7 @@ async def lnurl_params(
 
     logger.debug(f"Amount to withdraw: {amount}")
     callback = parse_obj_as(
-        CallbackUrl, request.url_for("tpos.tposlnurlcharge.callback")
+        CallbackUrl, str(request.url_for("tpos.tposlnurlcharge.callback"))
     )
     return LnurlWithdrawResponse(
         callback=callback,

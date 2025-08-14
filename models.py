@@ -1,13 +1,16 @@
 from typing import Optional
 
-from fastapi import Query, Request
+from fastapi import Query
 from lnurl import Lnurl
-from lnurl import encode as lnurl_encode
 from pydantic import BaseModel, Field, validator
 
 
+class PayLnurlWData(BaseModel):
+    lnurl: str
+
+
 class CreateWithdrawPay(BaseModel):
-    pay_link: str
+    pay_link: Lnurl
 
 
 class CreateTposInvoice(BaseModel):
@@ -34,10 +37,8 @@ class CreateTposData(BaseModel):
     withdraw_time: int = Field(0)
     withdraw_between: int = Field(10, ge=1)
     withdraw_limit: Optional[int] = Field(None, ge=1)
-    withdraw_pin: Optional[int] = Field(None, ge=1)
     withdraw_time_option: Optional[str] = Field(None)
     withdraw_premium: Optional[float] = Field(None)
-    withdraw_pin_disabled: bool = Field(False)
     lnaddress: bool = Field(False)
     lnaddress_cut: Optional[int] = Field(0)
     enable_receipt_print: bool = Query(False)
@@ -45,12 +46,6 @@ class CreateTposData(BaseModel):
     business_address: Optional[str]
     business_vat_id: Optional[str]
     fiat_provider: Optional[str] = Field(None)
-
-    @validator("withdraw_pin", pre=True)
-    def empty_string_to_none(cls, v):
-        if v == "" or v is None:
-            return None
-        return v
 
 
 class TposClean(BaseModel):
@@ -64,7 +59,6 @@ class TposClean(BaseModel):
     withdraw_limit: Optional[int] = None
     withdraw_time_option: Optional[str] = None
     withdraw_premium: Optional[float] = None
-    withdraw_pin_disabled: Optional[bool] = None
     withdrawn_amount: int = 0
     lnaddress: Optional[bool] = None
     lnaddress_cut: int = 0
@@ -86,37 +80,13 @@ class TposClean(BaseModel):
 class Tpos(TposClean, BaseModel):
     wallet: str
     tip_wallet: Optional[str] = None
-    withdraw_pin: Optional[int] = None
 
 
 class LnurlCharge(BaseModel):
     id: str
     tpos_id: str
-    amount: int = Field(None)
-    claimed: bool = Field(False)
-
-    def lnurl(self, req: Request) -> Lnurl:
-        url = str(
-            req.url_for(
-                "tpos.tposlnurlcharge",
-                lnurlcharge_id=self.id,
-                amount=self.amount,
-            )
-        )
-        return lnurl_encode(url)
-
-
-class HashCheck(BaseModel):
-    hash: bool
-    lnurl: bool
-
-
-class PayLnurlWData(BaseModel):
-    lnurl: str
-
-
-class LNaddress(BaseModel):
-    lnaddress: str
+    amount: int = 0
+    claimed: bool = False
 
 
 class Item(BaseModel):
