@@ -47,6 +47,12 @@ async def api_tpos_atm_pin_check(
             "You do not have access to this TPoS wallet.",
         )
 
+    if not tpos.can_withdraw:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Withdrawals are not allowed at this time. Try again later.",
+        )
+
     charge = await create_lnurlcharge(tpos.id)
     return charge
 

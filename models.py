@@ -1,3 +1,4 @@
+from time import time
 from typing import Optional
 
 from fastapi import Query
@@ -75,6 +76,15 @@ class TposClean(BaseModel):
         if not self.withdraw_limit:
             return 0
         return self.withdraw_limit - self.withdrawn_amount
+
+    @property
+    def can_withdraw(self) -> bool:
+        seconds = (
+            self.withdraw_between * 60
+            if self.withdraw_time_option != "secs"
+            else self.withdraw_between
+        )
+        return self.withdraw_time + seconds > int(time())
 
 
 class Tpos(TposClean, BaseModel):

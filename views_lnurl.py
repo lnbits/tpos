@@ -1,3 +1,4 @@
+from time import time
 from typing import Optional
 
 from fastapi import APIRouter, Request
@@ -13,7 +14,6 @@ from loguru import logger
 from pydantic import parse_obj_as
 
 from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos
-from .models import LnurlCharge
 
 tpos_lnurl_router = APIRouter(prefix="/api/v1/lnurl", tags=["LNURL"])
 
@@ -91,16 +91,11 @@ async def lnurl_callback(
             )
         )
 
-    await update_lnurlcharge(
-        LnurlCharge(
-            id=k1,
-            tpos_id=lnurlcharge.tpos_id,
-            amount=int(lnurlcharge.amount),
-            claimed=True,
-        )
-    )
+    lnurlcharge.claimed = True
+    await update_lnurlcharge(lnurlcharge)
 
     tpos.withdrawn_amount = int(tpos.withdrawn_amount or 0) + int(lnurlcharge.amount)
+    tpos.withdraw_time = int(time())
     await update_tpos(tpos)
 
     try:
