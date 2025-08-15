@@ -7,12 +7,14 @@ from .crud import db
 from .tasks import wait_for_paid_invoices
 from .views import tpos_generic_router
 from .views_api import tpos_api_router
+from .views_atm import tpos_atm_router
 from .views_lnurl import tpos_lnurl_router
 
 tpos_ext = APIRouter(prefix="/tpos", tags=["TPoS"])
 tpos_ext.include_router(tpos_generic_router)
 tpos_ext.include_router(tpos_lnurl_router)
 tpos_ext.include_router(tpos_api_router)
+tpos_ext.include_router(tpos_atm_router)
 
 tpos_static_files = [
     {

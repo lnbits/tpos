@@ -51,12 +51,6 @@ window.app = Vue.createApp({
             field: 'withdraw_time_option'
           },
           {
-            name: 'withdraw_pin_disabled',
-            align: 'left',
-            label: 'atm pin disabled',
-            field: 'withdraw_pin_disabled'
-          },
-          {
             name: 'lnaddress',
             align: 'left',
             label: 'LNaddress',
@@ -86,11 +80,9 @@ window.app = Vue.createApp({
       formDialog: {
         show: false,
         data: {
-          withdraw_pin: null,
           tip_options: [],
           withdraw_between: 10,
           withdraw_time_option: '',
-          withdraw_pin_disabled: false,
           tax_inclusive: true,
           lnaddress: false,
           lnaddress_cut: 2,
@@ -189,14 +181,9 @@ window.app = Vue.createApp({
     }
   },
   methods: {
-    generatePIN() {
-      // random 6 digit PIN
-      return Math.floor(100000 + Math.random() * 900000)
-    },
     closeFormDialog() {
       this.formDialog.show = false
       this.formDialog.data = {
-        withdraw_pin: null,
         tip_options: [],
         withdraw_between: 10,
         tax_inclusive: true
@@ -235,7 +222,6 @@ window.app = Vue.createApp({
       }
       if (!this.formDialog.advanced.otc) {
         data.withdraw_limit = null
-        data.withdraw_pin = null
         data.withdraw_premium = null
       }
       const wallet = _.findWhere(this.g.user.wallets, {
@@ -260,9 +246,6 @@ window.app = Vue.createApp({
         this.formDialog.advanced.otc = true
       } else {
         this.formDialog.advanced.otc = false
-      }
-      if (!this.formDialog.data.withdraw_pin) {
-        this.formDialog.data.withdraw_pin = this.generatePIN()
       }
       this.formDialog.show = true
     },

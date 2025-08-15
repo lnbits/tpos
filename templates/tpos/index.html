@@ -4,10 +4,7 @@
   <div class="col-12 col-md-8 col-lg-7 q-gutter-y-md">
     <q-card>
       <q-card-section>
-        <q-btn
-          unelevated
-          color="primary"
-          @click="formDialog.show = true; formDialog.data.withdraw_pin = generatePIN()"
+        <q-btn unelevated color="primary" @click="formDialog.show = true"
           >New TPoS</q-btn
         >
       </q-card-section>
@@ -43,7 +40,6 @@
                 :key="col.name"
                 :props="props"
               ></q-th>
-              <q-th auto-width>Withdraw PIN</q-th>
               <q-th auto-width>Withdraw Limit</q-th>
               <q-th auto-width>Withdraw Premium</q-th>
             </q-tr>
@@ -113,17 +109,13 @@
               >
               </q-td>
               <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
-                <span v-text="props.row.withdraw_pin"></span>
-              </q-td>
-              <q-td v-else auto-width> N/A </q-td>
-              <q-td v-if="props.row.withdraw_limit >= 1" auto-width>
                 <span v-text="props.row.withdraw_limit"></span>
               </q-td>
-              <q-td v-else auto-width> N/A </q-td>
+              <q-td v-else auto-width>N/A</q-td>
               <q-td v-if="props.row.withdraw_premium > 0" auto-width>
                 <span v-text="`${props.row.withdraw_premium}%`"></span>
               </q-td>
-              <q-td v-else auto-width> 0 </q-td>
+              <q-td v-else auto-width>0</q-td>
             </q-tr>
             <q-tr v-show="props.expand" :props="props">
               <q-td colspan="100%">
@@ -462,26 +454,6 @@
             type="number"
             label="Max amount to be sold daily ({{LNBITS_DENOMINATION}}) *"
           ></q-input>
-
-          <div class="row">
-            <div class="col-8">
-              <q-input
-                filled
-                dense
-                v-model.number="formDialog.data.withdraw_pin"
-                type="number"
-                label="Withdraw PIN"
-                :disable="formDialog.data.withdraw_pin_disabled"
-              ></q-input>
-            </div>
-            <div class="col-4">
-              <q-toggle
-                v-model="formDialog.data.withdraw_pin_disabled"
-                color="primary"
-                label="disable"
-              ></q-toggle>
-            </div>
-          </div>
 
           <div class="row">
             <div class="col-8">
