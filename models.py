@@ -79,12 +79,14 @@ class TposClean(BaseModel):
 
     @property
     def can_withdraw(self) -> bool:
+        now = int(time())
         seconds = (
             self.withdraw_between * 60
             if self.withdraw_time_option != "secs"
             else self.withdraw_between
         )
-        return self.withdraw_time + seconds > int(time())
+        last_withdraw_time = self.withdraw_time - now
+        return last_withdraw_time < seconds
 
 
 class Tpos(TposClean, BaseModel):
