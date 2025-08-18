@@ -99,21 +99,19 @@ async def api_tpos_create_withdraw(charge_id: str, amount: str) -> LnurlCharge:
 async def api_tpos_atm_pay(
     request: Request, charge_id: str, amount: int, data: CreateWithdrawPay
 ) -> LnurlSuccessResponse:
-    if not data.pay_link.is_lud17:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Invalid pay link. Must be a valid LUD17 pay link.",
-        )
     try:
-        # TODO revisit on lnurl v0.7.0
-        res = await lnurl_handle(data.pay_link, user_agent="lnbits/tpos")
+        # TODO revisit on lnurl v0.7.3 (remove assert)
+        assert data.pay_link.bech32, "bech32 is not optional"
+        res = await lnurl_handle(
+            data.pay_link.lud17 or data.pay_link.bech32, user_agent="lnbits/tpos"
+        )
         if not isinstance(res, LnurlPayResponse):
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="Excepted LNURL pay reponse.",
             )
         res2 = await execute_pay_request(
-            res, msat=str(amount * 1000), user_agent="lnbits/tpos"
+            res, msat=amount * 1000, user_agent="lnbits/tpos"
         )
         callback_url = str(request.url_for("tpos.tposlnurlcharge.callback"))
         withdraw_res = LnurlWithdrawResponse(
