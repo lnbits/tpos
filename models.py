@@ -2,7 +2,6 @@ from time import time
 from typing import Optional
 
 from fastapi import Query
-from lnurl import Lnurl
 from pydantic import BaseModel, Field, validator
 
 
@@ -11,7 +10,7 @@ class PayLnurlWData(BaseModel):
 
 
 class CreateWithdrawPay(BaseModel):
-    pay_link: Lnurl
+    pay_link: str
 
 
 class CreateTposInvoice(BaseModel):

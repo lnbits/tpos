@@ -100,11 +100,7 @@ async def api_tpos_atm_pay(
     request: Request, charge_id: str, amount: int, data: CreateWithdrawPay
 ) -> LnurlSuccessResponse:
     try:
-        # TODO revisit on lnurl v0.7.3 (remove assert)
-        assert data.pay_link.bech32, "bech32 is not optional"
-        res = await lnurl_handle(
-            data.pay_link.lud17 or data.pay_link.bech32, user_agent="lnbits/tpos"
-        )
+        res = await lnurl_handle(data.pay_link, user_agent="lnbits/tpos")
         if not isinstance(res, LnurlPayResponse):
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
