@@ -10,7 +10,6 @@ window.app = Vue.createApp({
       payInFiat: false,
       atmPremium: tpos.withdraw_premium / 100,
       withdrawMaximum: 0,
-      withdrawPinOpen: null,
       tip_options: null,
       exchangeRateLoaded: false,
       exchangeRate: 1,
@@ -19,7 +18,6 @@ window.app = Vue.createApp({
       tipRounding: null,
       hasNFC: false,
       atmBox: false,
-      atmPin: null,
       hidePin: true,
       atmMode: false,
       atmToken: '',
@@ -404,22 +402,11 @@ window.app = Vue.createApp({
       }
       this.clearCart()
       this.cancelAddAmount()
-
       if (this.atmPremium > 0) {
         this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
       }
-      if (this.withdrawPinOpen != 0) {
-        this.atmPin = this.withdrawPinOpen
-        this.atmSubmit()
-        return
-      }
-      if (this.withdrawMaximum > 0) {
-        this.atmBox = true
-      }
-    },
-    atmSubmit() {
       LNbits.api
-        .request('GET', `/tpos/api/v1/atm/${this.tposId}/${this.atmPin}`)
+        .request('POST', `/tpos/api/v1/atm/${this.tposId}/create`)
         .then(res => {
           this.atmToken = res.data.id
           if (res.data.claimed == false) {
@@ -453,7 +440,6 @@ window.app = Vue.createApp({
         })
     },
     atmGetWithdraw() {
-      const dialog = this.invoiceDialog
       if (this.sat > this.withdrawMaximum) {
         Quasar.Notify.create({
           type: 'negative',
@@ -474,36 +460,22 @@ window.app = Vue.createApp({
             })
             return
           }
-          lnurl = res.data.lnurl
-          dialog.data = {payment_request: lnurl}
-          dialog.show = true
+          const url = `${window.location.origin}/tpos/api/v1/lnurl/${this.atmToken}/${this.sat}`
+          const bytes = new TextEncoder().encode(url)
+          const bech32 = NostrTools.nip19.encodeBytes('lnurl', bytes)
+          this.invoiceDialog.data = {payment_request: bech32.toUpperCase()}
+          this.invoiceDialog.show = true
           this.readNfcTag()
-          dialog.dismissMsg = Quasar.Notify.create({
+          this.invoiceDialog.dismissMsg = Quasar.Notify.create({
             timeout: 0,
             message: 'Withdraw...'
           })
-          if (location.protocol !== 'http:') {
-            this.withdrawUrl =
-              'wss://' +
-              document.domain +
-              ':' +
-              location.port +
-              '/api/v1/ws/' +
-              this.atmToken
-          } else {
-            this.withdrawUrl =
-              'ws://' +
-              document.domain +
-              ':' +
-              location.port +
-              '/api/v1/ws/' +
-              this.atmToken
-          }
-          this.connectionWithdraw = new WebSocket(this.withdrawUrl)
+          this.connectionWithdraw = new WebSocket(
+            `${websocketUrl}/${this.atmToken}`
+          )
           this.connectionWithdraw.onmessage = e => {
             if (e.data == 'paid') {
-              dialog.show = false
-              this.atmPin = null
+              this.invoiceDialog.show = false
               this.atmToken = ''
               this.showComplete()
               this.atmMode = false
@@ -762,12 +734,10 @@ window.app = Vue.createApp({
 
             //User feedback, show loader icon
             if (this.atmMode) {
-              const URL = lnurl.replace('lnurlp://', 'https://')
-              LNbits.api
-                .request('GET', `${lnurl.replace('lnurlw://', 'https://')}`)
-                .then(res => {
-                  this.makeWithdraw(res.data.payLink)
-                })
+              const url = lnurl.replace('lnurlp://', 'https://')
+              LNbits.api.request('GET', url).then(res => {
+                this.makeWithdraw(res.data.payLink)
+              })
             } else {
               this.payInvoice(lnurl)
             }
@@ -1029,7 +999,6 @@ window.app = Vue.createApp({
     this.tposId = tpos.id
     this.atmPremium = tpos.withdraw_premium / 100
     this.withdrawMaximum = withdraw_maximum
-    this.withdrawPinOpen = withdraw_pin_open
     this.pinDisabled = tpos.withdraw_pin_disabled
     this.taxInclusive = tpos.tax_inclusive
     this.taxDefault = tpos.tax_default
