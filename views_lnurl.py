@@ -1,5 +1,4 @@
 from time import time
-from typing import Optional
 
 from fastapi import APIRouter, Request
 from lnbits.core.services import pay_invoice, websocket_updater
@@ -59,8 +58,8 @@ async def lnurl_params(
 
 @tpos_lnurl_router.get("/cb", name="tpos.tposlnurlcharge.callback")
 async def lnurl_callback(
-    pr: Optional[str] = None,
-    k1: Optional[str] = None,
+    pr: str | None = None,
+    k1: str | None = None,
 ) -> LnurlErrorResponse | LnurlSuccessResponse:
     if not pr:
         return LnurlErrorResponse(reason="Payment request (pr) is required")
