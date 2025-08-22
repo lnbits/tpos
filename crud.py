@@ -1,5 +1,3 @@
-from typing import Optional, Union
-
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
@@ -15,7 +13,7 @@ async def create_tpos(data: CreateTposData) -> Tpos:
     return tpos
 
 
-async def get_tpos(tpos_id: str) -> Optional[Tpos]:
+async def get_tpos(tpos_id: str) -> Tpos | None:
     return await db.fetchone(
         "SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id}, Tpos
     )
@@ -28,7 +26,7 @@ async def create_lnurlcharge(tpos_id: str) -> LnurlCharge:
     return lnurlcharge
 
 
-async def get_lnurlcharge(lnurlcharge_id: str) -> Optional[LnurlCharge]:
+async def get_lnurlcharge(lnurlcharge_id: str) -> LnurlCharge | None:
     return await db.fetchone(
         "SELECT * FROM tpos.withdraws WHERE id = :id",
         {"id": lnurlcharge_id},
@@ -41,7 +39,7 @@ async def update_lnurlcharge(charge: LnurlCharge) -> LnurlCharge:
     return charge
 
 
-async def get_clean_tpos(tpos_id: str) -> Optional[TposClean]:
+async def get_clean_tpos(tpos_id: str) -> TposClean | None:
     return await db.fetchone(
         "SELECT * FROM tpos.pos WHERE id = :id", {"id": tpos_id}, TposClean
     )
@@ -52,7 +50,7 @@ async def update_tpos(tpos: Tpos) -> Tpos:
     return tpos
 
 
-async def get_tposs(wallet_ids: Union[str, list[str]]) -> list[Tpos]:
+async def get_tposs(wallet_ids: str | list[str]) -> list[Tpos]:
     if isinstance(wallet_ids, str):
         wallet_ids = [wallet_ids]
     q = ",".join([f"'{wallet_id}'" for wallet_id in wallet_ids])

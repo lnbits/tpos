@@ -1,5 +1,4 @@
 from time import time
-from typing import Optional
 
 from fastapi import Query
 from pydantic import BaseModel, Field, validator
@@ -15,37 +14,37 @@ class CreateWithdrawPay(BaseModel):
 
 class CreateTposInvoice(BaseModel):
     amount: int = Query(..., ge=1)
-    memo: Optional[str] = Query(None)
-    exchange_rate: Optional[float] = Query(None, ge=0.0)
-    details: Optional[dict] = Query(None)
-    tip_amount: Optional[int] = Query(None, ge=1)
-    user_lnaddress: Optional[str] = Query(None)
-    internal_memo: Optional[str] = Query(None, max_length=512)
+    memo: str | None = Query(None)
+    exchange_rate: float | None = Query(None, ge=0.0)
+    details: dict | None = Query(None)
+    tip_amount: int | None = Query(None, ge=1)
+    user_lnaddress: str | None = Query(None)
+    internal_memo: str | None = Query(None, max_length=512)
     pay_in_fiat: bool = Query(False)
-    amount_fiat: Optional[float] = Query(None, ge=0.0)
-    tip_amount_fiat: Optional[float] = Query(None, ge=0.0)
+    amount_fiat: float | None = Query(None, ge=0.0)
+    tip_amount_fiat: float | None = Query(None, ge=0.0)
 
 
 class CreateTposData(BaseModel):
-    wallet: Optional[str]
-    name: Optional[str]
-    currency: Optional[str]
+    wallet: str | None
+    name: str | None
+    currency: str | None
     tax_inclusive: bool = Field(True)
-    tax_default: float = Field(None)
+    tax_default: float = Field(0.0)
     tip_options: str = Field("[]")
     tip_wallet: str = Field("")
     withdraw_time: int = Field(0)
     withdraw_between: int = Field(10, ge=1)
-    withdraw_limit: Optional[int] = Field(None, ge=1)
-    withdraw_time_option: Optional[str] = Field(None)
-    withdraw_premium: Optional[float] = Field(None)
+    withdraw_limit: int | None = Field(None, ge=1)
+    withdraw_time_option: str | None = Field(None)
+    withdraw_premium: float | None = Field(None)
     lnaddress: bool = Field(False)
-    lnaddress_cut: Optional[int] = Field(0)
+    lnaddress_cut: int | None = Field(0)
     enable_receipt_print: bool = Query(False)
-    business_name: Optional[str]
-    business_address: Optional[str]
-    business_vat_id: Optional[str]
-    fiat_provider: Optional[str] = Field(None)
+    business_name: str | None
+    business_address: str | None
+    business_vat_id: str | None
+    fiat_provider: str | None = Field(None)
 
 
 class TposClean(BaseModel):
@@ -53,22 +52,22 @@ class TposClean(BaseModel):
     name: str
     currency: str
     tax_inclusive: bool
-    tax_default: Optional[float] = None
+    tax_default: float | None = None
     withdraw_time: int
     withdraw_between: int
-    withdraw_limit: Optional[int] = None
-    withdraw_time_option: Optional[str] = None
-    withdraw_premium: Optional[float] = None
+    withdraw_limit: int | None = None
+    withdraw_time_option: str | None = None
+    withdraw_premium: float | None = None
     withdrawn_amount: int = 0
-    lnaddress: Optional[bool] = None
+    lnaddress: bool | None = None
     lnaddress_cut: int = 0
-    items: Optional[str] = None
-    tip_options: Optional[str] = None
+    items: str | None = None
+    tip_options: str | None = None
     enable_receipt_print: bool
-    business_name: Optional[str] = None
-    business_address: Optional[str] = None
-    business_vat_id: Optional[str] = None
-    fiat_provider: Optional[str] = None
+    business_name: str | None = None
+    business_address: str | None = None
+    business_vat_id: str | None = None
+    fiat_provider: str | None = None
 
     @property
     def withdraw_maximum(self) -> int:
@@ -90,7 +89,7 @@ class TposClean(BaseModel):
 
 class Tpos(TposClean, BaseModel):
     wallet: str
-    tip_wallet: Optional[str] = None
+    tip_wallet: str | None = None
 
 
 class LnurlCharge(BaseModel):
@@ -101,13 +100,13 @@ class LnurlCharge(BaseModel):
 
 
 class Item(BaseModel):
-    image: Optional[str]
+    image: str | None
     price: float
     title: str
-    description: Optional[str]
-    tax: Optional[float] = Field(0, ge=0.0)
+    description: str | None
+    tax: float | None = Field(0, ge=0.0)
     disabled: bool = False
-    categories: Optional[list[str]] = []
+    categories: list[str] | None = []
 
     @validator("tax", pre=True, always=True)
     def set_default_tax(cls, v):

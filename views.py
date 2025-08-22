@@ -1,5 +1,4 @@
 from http import HTTPStatus
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from lnbits.core.models import User
@@ -26,7 +25,7 @@ async def index(request: Request, user: User = Depends(check_user_exists)):
 
 
 @tpos_generic_router.get("/{tpos_id}")
-async def tpos(request: Request, tpos_id, lnaddress: Optional[str] = ""):
+async def tpos(request: Request, tpos_id, lnaddress: str | None = ""):
     tpos = await get_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
