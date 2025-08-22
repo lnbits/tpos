@@ -209,22 +209,22 @@ async def api_tpos_pay_invoice(
                 lnurl_response = {"success": False, "detail": "Error loading"}
             else:
                 resp = r.json()
-                if resp["status"] == "ERROR":
+                if resp.get("status") == "ERROR":
                     lnurl_response = {
                         "success": False,
                         "detail": resp.get("reason", ""),
                     }
                     return lnurl_response
 
-                if resp["tag"] != "withdrawRequest":
+                if resp.get("tag") != "withdrawRequest":
                     lnurl_response = {"success": False, "detail": "Wrong tag type"}
                 else:
                     r2 = await client.get(
-                        resp["callback"],
+                        resp.get("callback", ""),
                         follow_redirects=True,
                         headers=headers,
                         params={
-                            "k1": resp["k1"],
+                            "k1": resp.get("k1", ""),
                             "pr": payment_request,
                         },
                     )
@@ -234,7 +234,7 @@ async def api_tpos_pay_invoice(
                             "success": False,
                             "detail": "Error loading callback",
                         }
-                    elif resp2["status"] == "ERROR":
+                    elif resp2.get("status") == "ERROR":
                         lnurl_response = {"success": False, "detail": resp2["reason"]}
                     else:
                         lnurl_response = {"success": True, "detail": resp2}

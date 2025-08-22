@@ -754,7 +754,15 @@ window.app = Vue.createApp({
           type: 'negative',
           message: error
             ? error.toString()
-            : 'An unexpected error has occurred.'
+            : 'An unexpected error has occurred.',
+          timeout: 0,
+          actions: [
+            {
+              icon: 'close',
+              color: 'white',
+              round: true
+            }
+          ]
         })
       }
     },
@@ -795,13 +803,12 @@ window.app = Vue.createApp({
         })
     },
     payInvoice(lnurl) {
+      const payment_request = this.invoiceDialog.data.payment_request
+        .toLowerCase()
+        .replace('lightning:', '')
       return axios
         .post(
-          '/tpos/api/v1/tposs/' +
-            this.tposId +
-            '/invoices/' +
-            this.invoiceDialog.data.payment_request +
-            '/pay',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${payment_request}/pay`,
           {
             lnurl: lnurl
           }
