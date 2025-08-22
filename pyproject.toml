@@ -27,18 +27,6 @@ init_typed = true
 warn_required_dynamic_aliases = true
 warn_untyped_fields = true
 
-[[tool.mypy.overrides]]
-module = [
-  "lnbits.*",
-  "lnurl.*",
-  "loguru.*",
-  "fastapi.*",
-  "pydantic.*",
-  "pyqrcode.*",
-  "shortuuid.*",
-  "httpx.*",
-]
-ignore_missing_imports = "True"
 
 [tool.pytest.ini_options]
 log_cli = false
