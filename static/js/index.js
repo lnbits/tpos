@@ -474,7 +474,14 @@ window.app = Vue.createApp({
       }
     },
     openUrlDialog(id) {
-      this.urlDialog.data = _.findWhere(this.tposs, {id})
+      if (this.tposs.stripe_card_payments) {
+        this.urlDialog.data = _.findWhere(this.tposs, {
+          id,
+          stripe_card_payments: true
+        })
+      } else {
+        this.urlDialog.data = _.findWhere(this.tposs, {id})
+      }
       this.urlDialog.show = true
     },
     formatAmount(amount, currency) {
