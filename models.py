@@ -22,6 +22,7 @@ class CreateTposInvoice(BaseModel):
     internal_memo: str | None = Query(None, max_length=512)
     pay_in_fiat: bool = Query(False)
     fiat_method: str | None = Query(None)
+    amount_fiat: float | None = Query(None, ge=0.0)
     tip_amount_fiat: float | None = Query(None, ge=0.0)
 
 
@@ -117,6 +118,7 @@ class Item(BaseModel):
 
 class CreateUpdateItemData(BaseModel):
     items: list[Item]
+
 
 class TapToPay(BaseModel):
     type: str = "tap_to_pay"

@@ -9,7 +9,7 @@ from lnbits.core.crud import (
     get_user,
 )
 from lnbits.core.models import CreateInvoice, Payment, WalletTypeInfo
-from lnbits.core.services import create_payment_request
+from lnbits.core.services import create_payment_request, websocket_updater
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
@@ -17,8 +17,7 @@ from lnbits.decorators import (
 from lnurl import LnurlPayResponse
 from lnurl import decode as decode_lnurl
 from lnurl import handle as lnurl_handle
-from lnbits.core.services import websocket_updater
-from loguru import logger
+
 from .crud import (
     create_tpos,
     delete_tpos,
@@ -31,8 +30,8 @@ from .models import (
     CreateTposInvoice,
     CreateUpdateItemData,
     PayLnurlWData,
+    TapToPay,
     Tpos,
-    TapToPay
 )
 
 tpos_api_router = APIRouter()
@@ -129,21 +128,16 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Paym
         amount = (data.amount_fiat or 0.0) + (data.tip_amount_fiat or 0.0)
 
     try:
-        invoice_data = CreateInvoice(
-            unit=currency,
-            out=False,
-            amount=amount,
-            memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
-            extra={
-                "tag": "tpos",
-                "tip_amount": data.tip_amount,
-                "tpos_id": tpos_id,
-                "amount": data.amount,
-                "exchangeRate": data.exchange_rate if data.exchange_rate else None,
-                "details": data.details if data.details else None,
-                "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
-                "internal_memo": data.internal_memo if data.internal_memo else None,
-            }
+        extra = {
+            "tag": "tpos",
+            "tip_amount": data.tip_amount,
+            "tpos_id": tpos_id,
+            "amount": data.amount,
+            "exchangeRate": data.exchange_rate if data.exchange_rate else None,
+            "details": data.details if data.details else None,
+            "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
+            "internal_memo": data.internal_memo if data.internal_memo else None,
+        }
         if data.pay_in_fiat and tpos.fiat_provider:
             extra["fiat_method"] = data.fiat_method if data.fiat_method else "checkout"
         invoice_data = CreateInvoice(
@@ -152,25 +146,22 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Paym
             amount=amount,
             memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
             extra=extra,
-            fiat_provider=tpos.fiat_provider if data.pay_in_fiat else None
+            fiat_provider=tpos.fiat_provider if data.pay_in_fiat else None,
         )
         payment = await create_payment_request(tpos.wallet, invoice_data)
         if (invoice_data.extra or {}).get("fiat_method") == "terminal":
             pi_id = payment.extra.get("fiat_checking_id")
             client_secret = payment.extra.get("fiat_payment_request")
             if pi_id and client_secret:
-                # Optional: amount in minor units (for display/logging on device)
-                # If you support non-2dp currencies, replace *100 with an exponent-aware helper.
-                amount_minor = int(round(amount * 100))
+                amount_minor = round(amount * 100)
                 payload = TapToPay(
                     payment_intent_id=pi_id,
                     client_secret=client_secret,
                     currency=invoice_data.unit.lower(),
                     amount=amount_minor,
                     tpos_id=tpos_id,
-                    payment_hash=payment.payment_hash
+                    payment_hash=payment.payment_hash,
                 )
-                logger.debug(f"TPoS websocket payload: {payload}")
                 await websocket_updater(tpos_id, str(payload))
         return payment
 

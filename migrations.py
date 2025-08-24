@@ -214,6 +214,7 @@ async def m014_addfiat(db: Database):
     """
     )
 
+
 async def m015_addfiat(db: Database):
     """
     Add fiat stripe_card_payments to tpos table
