@@ -21,7 +21,7 @@ class CreateTposInvoice(BaseModel):
     user_lnaddress: str | None = Query(None)
     internal_memo: str | None = Query(None, max_length=512)
     pay_in_fiat: bool = Query(False)
-    fiat_method: Optional[str] = Query(None)
+    fiat_method: str | None = Query(None)
     tip_amount_fiat: float | None = Query(None, ge=0.0)
 
 
@@ -45,7 +45,7 @@ class CreateTposData(BaseModel):
     business_address: str | None
     business_vat_id: str | None
     fiat_provider: str | None = Field(None)
-    stripe_card_payments: Optional[bool] = Query(None)
+    stripe_card_payments: bool = False
 
 
 class TposClean(BaseModel):
@@ -69,7 +69,7 @@ class TposClean(BaseModel):
     business_address: str | None = None
     business_vat_id: str | None = None
     fiat_provider: str | None = None
-    stripe_card_payments: Optional[bool] = Query(None)
+    stripe_card_payments: bool = False
 
     @property
     def withdraw_maximum(self) -> int:
@@ -120,10 +120,10 @@ class CreateUpdateItemData(BaseModel):
 
 class TapToPay(BaseModel):
     type: str = "tap_to_pay"
-    payment_intent_id: str
-    client_secret: str
+    payment_intent_id: str | None = None
+    client_secret: str | None = None
     amount: int = 0
-    currency: str
-    tpos_id: str
-    payment_hash: str
+    currency: str | None = None
+    tpos_id: str | None = None
+    payment_hash: str | None = None
     paid: bool = False
