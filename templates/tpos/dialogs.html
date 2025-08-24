@@ -9,39 +9,51 @@
       v-if="invoiceDialog.data"
       class="q-pa-lg q-pt-xl lnbits__dialog-card"
     >
-      <a
-        :href="invoiceDialog.data.payment_request"
-        target="_blank"
-        rel="noopener noreferrer"
+      <div
+        v-if="invoiceDialog.data.payment_request == 'tap_to_pay'"
+        class="text-center q-mb-xl"
       >
-        <lnbits-qrcode
-          :value="invoiceDialog.data.payment_request"
-          class="rounded-borders"
-        ></lnbits-qrcode>
-        <q-tooltip>Pay in wallet</q-tooltip>
-      </a>
-      <div class="text-center">
-        <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
-        <h5 class="q-mt-none q-mb-sm">
-          ${ amountFormatted }
-          <span v-show="tip_options" style="font-size: 0.75rem"
-            >(+ ${ tipAmountFormatted } tip)</span
-          >
-        </h5>
-        <q-chip v-if="nfcTagReading" square>
-          <q-avatar icon="nfc" color="positive" text-color="white"></q-avatar>
-          NFC supported
-        </q-chip>
-        <span v-else class="text-caption text-grey">NFC not supported</span>
-      </div>
-      <div class="row q-mt-lg">
-        <q-btn
-          outline
-          color="grey"
-          @click="copyText(invoiceDialog.data.payment_request)"
-          >Copy invoice</q-btn
-        >
+        <h3>Waiting for card…</h3>
+        <div class="q-mt-md text-grey">
+          <q-spinner size="24px" class="q-mr-sm" />
+        </div>
         <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+      </div>
+      <div v-else>
+        <a
+          :href="invoiceDialog.data.payment_request"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <lnbits-qrcode
+            :value="invoiceDialog.data.payment_request"
+            class="rounded-borders"
+          ></lnbits-qrcode>
+          <q-tooltip>Pay in wallet</q-tooltip>
+        </a>
+        <div class="text-center">
+          <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
+          <h5 class="q-mt-none q-mb-sm">
+            ${ amountFormatted }
+            <span v-show="tip_options" style="font-size: 0.75rem"
+              >(+ ${ tipAmountFormatted } tip)</span
+            >
+          </h5>
+          <q-chip v-if="nfcTagReading" square>
+            <q-avatar icon="nfc" color="positive" text-color="white"></q-avatar>
+            NFC supported
+          </q-chip>
+          <span v-else class="text-caption text-grey">NFC not supported</span>
+        </div>
+        <div class="row q-mt-lg">
+          <q-btn
+            outline
+            color="grey"
+            @click="copyText(invoiceDialog.data.payment_request)"
+            >Copy invoice</q-btn
+          >
+          <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+        </div>
       </div>
     </q-card>
   </q-dialog>
@@ -281,10 +293,18 @@
         <q-btn
           class="q-ma-lg"
           size="xl"
-          :label="currency"
+          :label="currency + ' QR'"
           color="secondary"
           rounded
           @click="selectPaymentMethod('fiat')"
+        ></q-btn>
+        <q-btn
+          class="q-ma-lg"
+          size="xl"
+          :label="currency + ' TAP'"
+          color="secondary"
+          rounded
+          @click="selectPaymentMethod('fiat_tap')"
         ></q-btn>
       </div>
     </q-card>

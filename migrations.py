@@ -213,3 +213,13 @@ async def m014_addfiat(db: Database):
         ALTER TABLE tpos.pos ADD fiat_provider TEXT NULL;
     """
     )
+
+async def m015_addfiat(db: Database):
+    """
+    Add fiat stripe_card_payments to tpos table
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD stripe_card_payments BOOLEAN DEFAULT false;
+    """
+    )
