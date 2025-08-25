@@ -8,6 +8,7 @@ window.app = Vue.createApp({
       currency: null,
       fiatProvider: null,
       payInFiat: false,
+      fiatMethod: 'checkout',
       atmPremium: tpos.withdraw_premium / 100,
       withdrawMaximum: 0,
       tip_options: null,
@@ -568,6 +569,10 @@ window.app = Vue.createApp({
     selectPaymentMethod(method) {
       this.currency_choice = false
       if (this._currencyResolver) {
+        if (method == 'fiat_tap') {
+          this.fiatMethod = 'terminal'
+          method = 'fiat'
+        }
         this._currencyResolver(method)
         this._currencyResolver = null
       }
@@ -578,7 +583,8 @@ window.app = Vue.createApp({
         memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
         exchange_rate: this.exchangeRate,
         internal_memo: this.invoiceDialog.internalMemo || null,
-        pay_in_fiat: this.payInFiat
+        pay_in_fiat: this.payInFiat,
+        fiat_method: this.fiatMethod
       }
       if (this.currency != LNBITS_DENOMINATION) {
         params.amount_fiat = this.total > 0 ? this.total : this.amount
@@ -626,9 +632,17 @@ window.app = Vue.createApp({
           null,
           params
         )
-        if (data.extra.fiat_payment_request) {
+        if (
+          data.extra.fiat_payment_request &&
+          !data.extra.fiat_payment_request.startsWith('pi_')
+        ) {
           this.invoiceDialog.data.payment_request =
             data.extra.fiat_payment_request
+        } else if (
+          data.extra.fiat_payment_request &&
+          data.extra.fiat_payment_request.startsWith('pi_')
+        ) {
+          this.invoiceDialog.data.payment_request = 'tap_to_pay'
         } else {
           this.invoiceDialog.data.payment_request =
             'lightning:' + data.bolt11.toUpperCase()
