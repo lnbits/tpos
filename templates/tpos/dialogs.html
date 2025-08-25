@@ -292,27 +292,29 @@
   <q-dialog v-model="currency_choice" persistent>
     <q-card class="q-pa-md">
       <div class="text-h6 q-mb-md">Payment Method</div>
-      <div class="row q-gutter-sm justify-center">
+      <div class="column q-gutter-y-sm">
         <q-btn
-          class="q-ma-lg"
+          class="q-ma-sm"
           size="xl"
-          label="BTC"
+          label="Bitcoin"
           color="primary"
           rounded
           @click="selectPaymentMethod('btc')"
         >
         </q-btn>
+      </div>
+      <div class="row q-gutter-sm q-pt-md justify-center">
         <q-btn
-          class="q-ma-lg"
-          size="xl"
+          class="q-ma-sm"
+          size="lg"
           :label="currency + ' QR'"
           color="secondary"
           rounded
           @click="selectPaymentMethod('fiat')"
         ></q-btn>
         <q-btn
-          class="q-ma-lg"
-          size="xl"
+          class="q-ma-sm"
+          size="lg"
           :label="currency + ' TAP'"
           color="secondary"
           rounded
