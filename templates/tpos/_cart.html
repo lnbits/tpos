@@ -215,24 +215,26 @@
         v-for="item in filteredItems"
         :key="item.id"
       >
-        <q-card class="full-height" flat bordered>
-          <q-img
-            :src="item.image || null"
-            :ratio="4/3"
-            fit="contain"
-            :style="$q.screen.gt.sm ? 'height: 200px' : 'height: 100px'"
-          >
-          </q-img>
+        <q-card class="full-height" flat bordered v-ripple>
+          <div @click="addToCart(item)">
+            <q-img
+              :src="item.image || null"
+              :ratio="4/3"
+              fit="contain"
+              :style="$q.screen.gt.sm ? 'height: 200px' : 'height: 100px'"
+            >
+            </q-img>
 
-          <q-card-section>
-            <div class="text-subtitle1 text-weight-bold ellipsis">
-              <span v-text="item.title"></span>
-            </div>
-            <div class="text-caption text-grey ellipsis">
-              <span v-text="item.description"></span>
-            </div>
-          </q-card-section>
-          <q-separator></q-separator>
+            <q-card-section>
+              <div class="text-subtitle1 text-weight-bold ellipsis">
+                <span v-text="item.title"></span>
+              </div>
+              <div class="text-caption text-grey ellipsis">
+                <span v-text="item.description"></span>
+              </div>
+            </q-card-section>
+            <q-separator></q-separator>
+          </div>
 
           <q-card-actions class="q-pa-md">
             <span>
@@ -278,7 +280,7 @@
     </div>
     <!-- Items List Small -->
     <q-list v-else class="col-12">
-      <q-item v-for="item in filteredItems" :key="item.id">
+      <q-item v-for="item in filteredItems" :key="item.id" v-ripple>
         <q-item-section avatar @click="addToCart(item)">
           <q-avatar rounded>
             <q-img
