@@ -817,7 +817,18 @@ window.app = Vue.createApp({
           if (!response.data.success) {
             Quasar.Notify.create({
               type: 'negative',
-              message: response.data.detail
+              message: response.data.detail,
+              timeout: 0,
+              actions: [
+                {
+                  icon: 'close',
+                  color: 'white',
+                  round: true,
+                  handler: () => {
+                    this.readNfcTag()
+                  }
+                }
+              ]
             })
           }
         })
