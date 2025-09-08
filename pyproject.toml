@@ -17,6 +17,9 @@ dev-dependencies = [
     "ruff",
 ]
 
+[tool.poetry]
+package-mode = false
+
 [tool.mypy]
 exclude = "(nostr/*)"
 plugins = ["pydantic.mypy"]
