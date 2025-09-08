@@ -729,15 +729,19 @@ window.app = Vue.createApp({
               })
               return
             }
-
             const lnurl = textDecoder.decode(record.data)
 
             //User feedback, show loader icon
             if (this.atmMode) {
-              const url = lnurl.replace('lnurlp://', 'https://')
-              LNbits.api.request('GET', url).then(res => {
-                this.makeWithdraw(res.data.payLink)
-              })
+              const url = lnurl.replace(/^lnurl[wp]:\/\//, 'https://')
+              LNbits.api
+                .request('GET', url)
+                .then(res => {
+                  this.makeWithdraw(res.data.payLink)
+                })
+                .catch(e => {
+                  LNbits.utils.notifyApiError(e)
+                })
             } else {
               this.payInvoice(lnurl)
             }
@@ -799,7 +803,7 @@ window.app = Vue.createApp({
           }
         })
         .catch(e => {
-          console.error(e)
+          LNbits.utils.notifyApiError(e)
         })
     },
     payInvoice(lnurl) {
