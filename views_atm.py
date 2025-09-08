@@ -5,11 +5,11 @@ from lnbits.core.crud import (
     get_wallet,
 )
 from lnbits.core.models import User
+from lnbits.core.models.misc import SimpleStatus
 from lnbits.decorators import check_user_exists
 from lnurl import (
     CallbackUrl,
     LnurlPayResponse,
-    LnurlSuccessResponse,
     LnurlWithdrawResponse,
     MilliSatoshi,
     execute_pay_request,
@@ -98,7 +98,7 @@ async def api_tpos_create_withdraw(charge_id: str, amount: str) -> LnurlCharge:
 @tpos_atm_router.post("/withdraw/{charge_id}/{amount}/pay", status_code=HTTPStatus.OK)
 async def api_tpos_atm_pay(
     request: Request, charge_id: str, amount: int, data: CreateWithdrawPay
-) -> LnurlSuccessResponse:
+) -> SimpleStatus:
     try:
         res = await lnurl_handle(data.pay_link, user_agent="lnbits/tpos")
         if not isinstance(res, LnurlPayResponse):
@@ -117,7 +117,7 @@ async def api_tpos_atm_pay(
             minWithdrawable=MilliSatoshi(amount * 1000),
         )
         _ = await execute_withdraw(withdraw_res, res2.pr, user_agent="lnbits/tpos")
-        return LnurlSuccessResponse()
+        return SimpleStatus(success=True, message="Withdraw processed successfully.")
     except Exception as exc:
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
