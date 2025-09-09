@@ -9,17 +9,10 @@
       v-if="invoiceDialog.data"
       class="q-pa-lg q-pt-xl lnbits__dialog-card"
     >
-      <a
+      <lnbits-qrcode
+        :value="invoiceDialog.data.payment_request"
         :href="invoiceDialog.data.payment_request"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <lnbits-qrcode
-          :value="invoiceDialog.data.payment_request"
-          class="rounded-borders"
-        ></lnbits-qrcode>
-        <q-tooltip>Pay in wallet</q-tooltip>
-      </a>
+      ></lnbits-qrcode>
       <div class="text-center">
         <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
         <h5 class="q-mt-none q-mb-sm">
@@ -105,12 +98,9 @@
 
   <q-dialog v-model="urlDialog.show" position="top">
     <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
-      <q-responsive :ratio="1" class="q-mx-xl q-mb-md">
-        <lnbits-qrcode
-          value="{{ request.url }}"
-          class="rounded-borders"
-        ></lnbits-qrcode>
-      </q-responsive>
+      <lnbits-qrcode
+        value="{{ request.url }}"
+      ></lnbits-qrcode>
       <div class="text-center q-mb-xl">
         <p style="word-break: break-all">
           <strong>{{ tpos.name }}</strong><br />{{ request.url }}
