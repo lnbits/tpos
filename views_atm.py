@@ -5,11 +5,12 @@ from lnbits.core.crud import (
     get_wallet,
 )
 from lnbits.core.models import User
+from lnbits.core.models.misc import SimpleStatus
 from lnbits.decorators import check_user_exists
 from lnurl import (
     CallbackUrl,
+    LnurlErrorResponse,
     LnurlPayResponse,
-    LnurlSuccessResponse,
     LnurlWithdrawResponse,
     MilliSatoshi,
     execute_pay_request,
@@ -98,7 +99,7 @@ async def api_tpos_create_withdraw(charge_id: str, amount: str) -> LnurlCharge:
 @tpos_atm_router.post("/withdraw/{charge_id}/{amount}/pay", status_code=HTTPStatus.OK)
 async def api_tpos_atm_pay(
     request: Request, charge_id: str, amount: int, data: CreateWithdrawPay
-) -> LnurlSuccessResponse:
+) -> SimpleStatus:
     try:
         res = await lnurl_handle(data.pay_link, user_agent="lnbits/tpos")
         if not isinstance(res, LnurlPayResponse):
@@ -106,9 +107,19 @@ async def api_tpos_atm_pay(
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="Excepted LNURL pay reponse.",
             )
+        if isinstance(res, LnurlErrorResponse):
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail=f"Error processing lnurl pay link: {res.reason}",
+            )
         res2 = await execute_pay_request(
             res, msat=amount * 1000, user_agent="lnbits/tpos"
         )
+        if isinstance(res2, LnurlErrorResponse):
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail=f"Error processing pay request: {res2.reason}",
+            )
         callback_url = str(request.url_for("tpos.tposlnurlcharge.callback"))
         withdraw_res = LnurlWithdrawResponse(
             k1=charge_id,
@@ -116,8 +127,15 @@ async def api_tpos_atm_pay(
             maxWithdrawable=MilliSatoshi(amount * 1000),
             minWithdrawable=MilliSatoshi(amount * 1000),
         )
-        _ = await execute_withdraw(withdraw_res, res2.pr, user_agent="lnbits/tpos")
-        return LnurlSuccessResponse()
+        res3 = await execute_withdraw(withdraw_res, res2.pr, user_agent="lnbits/tpos")
+        if isinstance(res3, LnurlErrorResponse):
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail=f"Error processing withdraw: {res3.reason}",
+            )
+
+        return SimpleStatus(success=True, message="Withdraw processed successfully.")
+
     except Exception as exc:
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
