@@ -98,9 +98,7 @@
 
   <q-dialog v-model="urlDialog.show" position="top">
     <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
-      <lnbits-qrcode
-        value="{{ request.url }}"
-      ></lnbits-qrcode>
+      <lnbits-qrcode value="{{ request.url }}"></lnbits-qrcode>
       <div class="text-center q-mb-xl">
         <p style="word-break: break-all">
           <strong>{{ tpos.name }}</strong><br />{{ request.url }}
