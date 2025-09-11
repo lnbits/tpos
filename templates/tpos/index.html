@@ -339,7 +339,7 @@
             >
               <q-tooltip>
                 <span
-                  v-text="'If enabled, the tpos can be funded with a LNaddress in the public page.'"
+                  v-text="'If enabled, invoices can be paid by tapping a card.'"
                 ></span
               ></q-tooltip>
             </q-checkbox>
@@ -378,18 +378,6 @@
               ></q-tooltip>
             </q-input>
           </div>
-          <!-- <div class="col" v-if="hasFiatProvider">
-            <q-checkbox
-              v-model="formDialog.data.fiat"
-              label="Fiat invoicing"
-            >
-              <q-tooltip>
-                <span
-                  v-text="'If enabled, tpos will fetch fiat invoices. Server admin needs to have fiat invoicing enabled.'"
-                ></span
-              ></q-tooltip>
-            </q-checkbox>
-          </div> -->
         </div>
         <div class="row">
           <div class="col">
