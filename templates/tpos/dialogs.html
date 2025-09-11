@@ -18,36 +18,12 @@
           <q-spinner size="24px" class="q-mr-sm" />
         </div>
         <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
-      <lnbits-qrcode
-        :value="invoiceDialog.data.payment_request"
-        :href="invoiceDialog.data.payment_request"
-      ></lnbits-qrcode>
-      <div class="text-center">
-        <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
-        <h5 class="q-mt-none q-mb-sm">
-          ${ amountFormatted }
-          <span v-show="tip_options" style="font-size: 0.75rem"
-            >(+ ${ tipAmountFormatted } tip)</span
-          >
-        </h5>
-        <q-chip v-if="nfcTagReading" square>
-          <q-avatar icon="nfc" color="positive" text-color="white"></q-avatar>
-          NFC supported
-        </q-chip>
-        <span v-else class="text-caption text-grey">NFC not supported</span>
       </div>
       <div v-else>
-        <a
+        <lnbits-qrcode
+          :value="invoiceDialog.data.payment_request"
           :href="invoiceDialog.data.payment_request"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <lnbits-qrcode
-            :value="invoiceDialog.data.payment_request"
-            class="rounded-borders"
-          ></lnbits-qrcode>
-          <q-tooltip>Pay in wallet</q-tooltip>
-        </a>
+        ></lnbits-qrcode>
         <div class="text-center">
           <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
           <h5 class="q-mt-none q-mb-sm">
