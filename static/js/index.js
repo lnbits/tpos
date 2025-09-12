@@ -87,7 +87,8 @@ window.app = Vue.createApp({
           lnaddress: false,
           lnaddress_cut: 2,
           enable_receipt_print: false,
-          fiat: false
+          fiat: false,
+          stripe_card_payments: false
         },
         advanced: {
           tips: false,
@@ -186,8 +187,15 @@ window.app = Vue.createApp({
       this.formDialog.data = {
         tip_options: [],
         withdraw_between: 10,
-        tax_inclusive: true
+        withdraw_time_option: '',
+        tax_inclusive: true,
+        lnaddress: false,
+        lnaddress_cut: 2,
+        enable_receipt_print: false,
+        fiat: false,
+        stripe_card_payments: false
       }
+      this.formDialog.advanced = {tips: false, otc: false}
     },
     getTposs() {
       LNbits.api
@@ -474,7 +482,14 @@ window.app = Vue.createApp({
       }
     },
     openUrlDialog(id) {
-      this.urlDialog.data = _.findWhere(this.tposs, {id})
+      if (this.tposs.stripe_card_payments) {
+        this.urlDialog.data = _.findWhere(this.tposs, {
+          id,
+          stripe_card_payments: true
+        })
+      } else {
+        this.urlDialog.data = _.findWhere(this.tposs, {id})
+      }
       this.urlDialog.show = true
     },
     formatAmount(amount, currency) {

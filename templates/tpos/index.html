@@ -328,6 +328,28 @@
             />
           </template>
         </q-select>
+        <div
+          v-if="(formDialog.data.fiat_provider || []).includes('stripe')"
+          class="row"
+        >
+          <div class="col">
+            <q-checkbox
+              v-model="formDialog.data.stripe_card_payments"
+              label="Allow Stripe card payments"
+            >
+              <q-tooltip>
+                <span
+                  v-text="'If enabled, invoices can be paid by tapping a card.'"
+                ></span
+              ></q-tooltip>
+            </q-checkbox>
+          </div>
+          <div class="col">
+            <small>
+              After saving use the QR code button to create the pairing code.
+            </small>
+          </div>
+        </div>
         <div class="row">
           <div class="col">
             <q-checkbox
@@ -356,18 +378,6 @@
               ></q-tooltip>
             </q-input>
           </div>
-          <!-- <div class="col" v-if="hasFiatProvider">
-            <q-checkbox
-              v-model="formDialog.data.fiat"
-              label="Fiat invoicing"
-            >
-              <q-tooltip>
-                <span
-                  v-text="'If enabled, tpos will fetch fiat invoices. Server admin needs to have fiat invoicing enabled.'"
-                ></span
-              ></q-tooltip>
-            </q-checkbox>
-          </div> -->
         </div>
         <div class="row">
           <div class="col">
@@ -629,12 +639,42 @@
   </q-dialog>
   <q-dialog v-model="urlDialog.show" position="top">
     <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
-      <lnbits-qrcode :value="urlDialog.data.shareUrl"></lnbits-qrcode>
+      <lnbits-qrcode
+        :value="urlDialog.data.shareUrl + '?pos=' + urlDialog.data.posLocation + '&auth=' + urlDialog.data.auth"
+      ></lnbits-qrcode>
       <div class="text-center q-mb-xl">
         <p style="word-break: break-all">
           <strong v-text="urlDialog.data.name"></strong><br />
           <span v-text="urlDialog.data.shareUrl"></span>
         </p>
+      </div>
+      <div v-if="urlDialog.data.stripe_card_payments">
+        <div class="row q-mt-lg">
+          <div class="col">
+            <q-input
+              v-model="urlDialog.data.posLocation"
+              label="PoS Stripe Location"
+            >
+            </q-input>
+          </div>
+          <div class="col">
+            <small>
+              Create a new location and copy the ID here
+              https://dashboard.stripe.com/terminal
+            </small>
+          </div>
+        </div>
+        <div class="row q-mt-lg">
+          <div class="col">
+            <q-input v-model="urlDialog.data.auth" label="ACL Token"> </q-input>
+          </div>
+          <div class="col">
+            <small>
+              Go to /account and set a new auth token with /fiat read and write
+              permissions.
+            </small>
+          </div>
+        </div>
       </div>
       <div class="row q-mt-lg">
         <q-btn
