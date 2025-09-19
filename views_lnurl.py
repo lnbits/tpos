@@ -1,7 +1,6 @@
 from time import time
 
 from fastapi import APIRouter, Request
-from lnbits.core.services import pay_invoice, websocket_updater
 from lnurl import (
     CallbackUrl,
     LnurlErrorResponse,
@@ -12,9 +11,32 @@ from lnurl import (
 from loguru import logger
 from pydantic import parse_obj_as
 
+from lnbits.core.services import get_pr_from_lnurl, pay_invoice, websocket_updater
+
 from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos
 
 tpos_lnurl_router = APIRouter(prefix="/api/v1/lnurl", tags=["LNURL"])
+
+
+async def pay_tribute(
+    withdraw_amount: int, wallet_id: str, percent: float = 0.5
+) -> None:
+    try:
+        tribute = int(percent * (withdraw_amount / 100))
+        try:
+            pr = await get_pr_from_lnurl("lnbits@nostr.com", tribute * 1000)
+        except Exception:
+            logger.warning("Error fetching tribute invoice")
+            return
+        await pay_invoice(
+            wallet_id=wallet_id,
+            payment_request=pr,
+            max_sat=tribute,
+            description="Tribute to help support LNbits",
+        )
+    except Exception:
+        logger.warning("Error paying tribute")
+    return
 
 
 @tpos_lnurl_router.get("/{lnurlcharge_id}/{amount}", name="tpos.tposlnurlcharge")
@@ -105,6 +127,11 @@ async def lnurl_callback(
             extra={"tag": "TPoSWithdraw", "tpos_id": lnurlcharge.tpos_id},
         )
         await websocket_updater(k1, "paid")
+
+        # pay tribute to help support LNbits
+        await pay_tribute(
+            withdraw_amount=int(lnurlcharge.amount), wallet_id=tpos.wallet
+        )
     except Exception as exc:
         return LnurlErrorResponse(reason=f"withdraw not working. {exc!s}")
 
