@@ -23,8 +23,13 @@ async def pay_tribute(
 ) -> None:
     try:
         tribute = int(percent * (withdraw_amount / 100))
+        tribute = max(1, tribute)
         try:
-            pr = await get_pr_from_lnurl("lnbits@nostr.com", tribute * 1000)
+            pr = await get_pr_from_lnurl(
+                "lnbits@nostr.com",
+                tribute * 1000,
+                comment="LNbits TPoS tribute",
+            )
         except Exception:
             logger.warning("Error fetching tribute invoice")
             return
