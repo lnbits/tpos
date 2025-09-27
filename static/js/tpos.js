@@ -441,7 +441,7 @@ window.app = Vue.createApp({
         })
     },
     isLNURL(link) {
-      return link.substring(0, 5) == "LNURL"
+      return link.substring(0, 5) == 'LNURL'
     },
     atmGetWithdraw() {
       if (this.sat > this.withdrawMaximum) {
@@ -469,7 +469,8 @@ window.app = Vue.createApp({
           const bech32 = NostrTools.nip19.encodeBytes('lnurl', bytes)
           this.invoiceDialog.data = {
             payment_request: bech32.toUpperCase(),
-            fallback: window.location.hostname + '?lightning=' + bech32.toUpperCase()
+            fallback:
+              window.location.hostname + '?lightning=' + bech32.toUpperCase()
           }
           this.invoiceDialog.show = true
           this.readNfcTag()
