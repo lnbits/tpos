@@ -440,6 +440,9 @@ window.app = Vue.createApp({
           LNbits.utils.notifyApiError(errorMessage)
         })
     },
+    isLNURL(link) {
+      return link.substring(0, 5) == "LNURL"
+    },
     atmGetWithdraw() {
       if (this.sat > this.withdrawMaximum) {
         Quasar.Notify.create({
@@ -464,9 +467,10 @@ window.app = Vue.createApp({
           const url = `${window.location.origin}/tpos/api/v1/lnurl/${this.atmToken}/${this.sat}`
           const bytes = new TextEncoder().encode(url)
           const bech32 = NostrTools.nip19.encodeBytes('lnurl', bytes)
-          const fallback =
-            window.location.hostname + '?lightning=' + bech32.toUpperCase()
-          this.invoiceDialog.data = {payment_request: fallback}
+          this.invoiceDialog.data = {
+            payment_request: bech32.toUpperCase(),
+            fallback: window.location.hostname + '?lightning=' + bech32.toUpperCase()
+          }
           this.invoiceDialog.show = true
           this.readNfcTag()
           this.invoiceDialog.dismissMsg = Quasar.Notify.create({

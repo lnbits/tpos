@@ -21,7 +21,10 @@
       </div>
       <div v-else>
         <lnbits-qrcode
-          :value="invoiceDialog.data.payment_request"
+          :show-buttons="false"
+          :value="isLNURL(invoiceDialog.data.payment_request) 
+          ? invoiceDialog.data.fallback 
+          : invoiceDialog.data.payment_request"
           :href="invoiceDialog.data.payment_request"
         ></lnbits-qrcode>
         <div class="text-center">
