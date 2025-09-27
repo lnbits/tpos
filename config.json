@@ -49,6 +49,6 @@
   "description_md": "https://raw.githubusercontent.com/lnbits/tpos/main/description.md",
   "terms_and_conditions_md": "https://raw.githubusercontent.com/lnbits/tpos/main/toc.md",
   "license": "MIT",
-  "paid": false,
+  "paid": "paid/free",
   "paid_free_tooltip": "Free to use all the PoS features, apart from 0.5% charge for ATM withdraws to help maintain development."
 }
