@@ -464,7 +464,8 @@ window.app = Vue.createApp({
           const url = `${window.location.origin}/tpos/api/v1/lnurl/${this.atmToken}/${this.sat}`
           const bytes = new TextEncoder().encode(url)
           const bech32 = NostrTools.nip19.encodeBytes('lnurl', bytes)
-          const fallback = window.location.hostname + "?lightning=" + bech32.toUpperCase()
+          const fallback =
+            window.location.hostname + '?lightning=' + bech32.toUpperCase()
           this.invoiceDialog.data = {payment_request: fallback}
           this.invoiceDialog.show = true
           this.readNfcTag()
