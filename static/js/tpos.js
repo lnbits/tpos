@@ -121,6 +121,7 @@ window.app = Vue.createApp({
       receiptData: null,
       currency_choice: false,
       _currencyResolver: null,
+      _withdrawing: false,
       headerElement: null
     }
   },
@@ -791,6 +792,11 @@ window.app = Vue.createApp({
         })
         return
       }
+      if (this._withdrawing) {
+        console.debug('Withdraw already in progress; ignoring duplicate.')
+        return
+      }
+      this._withdrawing = true
       LNbits.api
         .request(
           'POST',
@@ -817,6 +823,9 @@ window.app = Vue.createApp({
         })
         .catch(e => {
           LNbits.utils.notifyApiError(e)
+        })
+        .finally(() => {
+          this._withdrawing = false
         })
     },
     payInvoice(lnurl) {
