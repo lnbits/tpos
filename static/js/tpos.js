@@ -702,45 +702,47 @@ window.app = Vue.createApp({
           return
         }
 
-        const ndef = new NDEFReader()
+        // Don’t start a new scan if one is active
+        if (this.nfcTagReading) {
+          console.debug(
+            'NFC scan already in progress; ignoring duplicate call.'
+          )
+          return
+        }
 
+        const ndef = new NDEFReader()
         const readerAbortController = new AbortController()
-        readerAbortController.signal.onabort = event => {
+        readerAbortController.signal.onabort = () => {
           console.debug('All NFC Read operations have been aborted.')
         }
 
         this.nfcTagReading = true
         Quasar.Notify.create({
           message: this.atmMode
-            ? 'Tap your NFC tag to withdraw with LNURLp.'
-            : 'Tap your NFC tag to pay this invoice with LNURLw.'
+            ? 'Tap your NFC tag to withdraw with LNURLw.'
+            : 'Tap your NFC tag to pay this invoice with LNURLp.'
         })
 
         return ndef.scan({signal: readerAbortController.signal}).then(() => {
           ndef.onreadingerror = event => {
             this.nfcTagReading = false
-
             Quasar.Notify.create({
               type: 'negative',
               message: 'There was an error reading this NFC tag.',
               caption: event.message || 'Please try again.'
             })
-
             readerAbortController.abort()
           }
 
           ndef.onreading = ({message}) => {
-            // Abort scan immediately to prevent duplicate reads
+            // stop scanning immediately to avoid duplicate reads
             readerAbortController.abort()
-
             this.nfcTagReading = false
 
-            //Decode NDEF data from tag
             const textDecoder = new TextDecoder('utf-8')
-
             const record = message.records.find(el => {
               const payload = textDecoder.decode(el.data)
-              return payload.toUpperCase().indexOf('LNURL') !== -1
+              return payload.toUpperCase().includes('LNURL')
             })
 
             if (!record) {
@@ -750,19 +752,15 @@ window.app = Vue.createApp({
               })
               return
             }
+
             const lnurl = textDecoder.decode(record.data)
 
-            //User feedback, show loader icon
             if (this.atmMode) {
               const url = lnurl.replace(/^lnurl[wp]:\/\//, 'https://')
               LNbits.api
                 .request('GET', url)
-                .then(res => {
-                  this.makeWithdraw(res.data.payLink)
-                })
-                .catch(e => {
-                  LNbits.utils.notifyApiError(e)
-                })
+                .then(res => this.makeWithdraw(res.data.payLink))
+                .catch(e => LNbits.utils.notifyApiError(e))
             } else {
               this.payInvoice(lnurl)
             }
@@ -781,13 +779,7 @@ window.app = Vue.createApp({
             ? error.toString()
             : 'An unexpected error has occurred.',
           timeout: 0,
-          actions: [
-            {
-              icon: 'close',
-              color: 'white',
-              round: true
-            }
-          ]
+          actions: [{icon: 'close', color: 'white', round: true}]
         })
       }
     },
