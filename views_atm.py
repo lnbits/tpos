@@ -17,6 +17,7 @@ from lnurl import (
     execute_withdraw,
 )
 from lnurl import handle as lnurl_handle
+from loguru import logger
 from pydantic import parse_obj_as
 
 from .crud import (
@@ -128,7 +129,9 @@ async def api_tpos_atm_pay(
             minWithdrawable=MilliSatoshi(amount * 1000),
         )
         try:
-            res3 = await execute_withdraw(withdraw_res, res2.pr, user_agent="lnbits/tpos")
+            res3 = await execute_withdraw(
+                withdraw_res, res2.pr, user_agent="lnbits/tpos"
+            )
             if isinstance(res3, LnurlErrorResponse):
                 raise HTTPException(
                     status_code=HTTPStatus.BAD_REQUEST,
