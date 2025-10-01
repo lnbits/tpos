@@ -280,6 +280,23 @@
           {% include "tpos/_tpos.html" %}
         </q-list>
       </q-card-section>
+      <q-card-section v-if="anyRecordsWithFiat">
+        <b>TO USE FIAT TAP-TO-PAY</b> <br />
+        * Your LNbits install must have a Stripe key/webhook in the "fiat
+        provider" area in settings, the key must have permissions for all
+        "checkout" and "payment_intents".<br />
+        * Install latest release for
+        <a href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper"
+          >TPoS-Wrapper</a
+        >
+        apk (Android only).<br />
+        * Create a location for a terminal in Stripe.<br />
+        * Create an ACL token in LNbits with permissions for "fiat"
+        <a href="/account">Access Control List</a>.<br />
+        * Click the QR for the PoS record and add a Stripe terminal location ID
+        and ACL token.<br />
+        * Scan the QR in the TPoS Wrapper app.<br />
+      </q-card-section>
     </q-card>
   </div>
 
