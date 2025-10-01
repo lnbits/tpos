@@ -817,7 +817,7 @@ window.app = Vue.createApp({
             this.total = 0.0
             Quasar.Notify.create({
               type: 'positive',
-              message: 'Topup successful!'
+              message: 'Withdraw successful!'
             })
           }
         })
