@@ -131,12 +131,12 @@ async def lnurl_callback(
             extra={"tag": "TPoSWithdraw", "tpos_id": lnurlcharge.tpos_id},
         )
         await websocket_updater(k1, "paid")
-
-        # pay tribute to help support LNbits
-        await pay_tribute(
-            withdraw_amount=int(lnurlcharge.amount), wallet_id=tpos.wallet
-        )
     except Exception as exc:
         return LnurlErrorResponse(reason=f"withdraw not working. {exc!s}")
+
+    # pay tribute to help support LNbits
+    await pay_tribute(
+        withdraw_amount=int(lnurlcharge.amount), wallet_id=tpos.wallet
+    )
 
     return LnurlSuccessResponse()
