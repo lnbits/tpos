@@ -135,8 +135,6 @@ async def lnurl_callback(
         return LnurlErrorResponse(reason=f"withdraw not working. {exc!s}")
 
     # pay tribute to help support LNbits
-    await pay_tribute(
-        withdraw_amount=int(lnurlcharge.amount), wallet_id=tpos.wallet
-    )
+    await pay_tribute(withdraw_amount=int(lnurlcharge.amount), wallet_id=tpos.wallet)
 
     return LnurlSuccessResponse()
