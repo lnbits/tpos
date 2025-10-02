@@ -161,6 +161,9 @@ window.app = Vue.createApp({
     }
   },
   computed: {
+    anyRecordsWithFiat() {
+      return this.tposs.some(t => !!t.stripe_card_payments)
+    },
     categoryList() {
       return Array.from(
         new Set(
