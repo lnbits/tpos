@@ -5,13 +5,13 @@
   <!-- Badges -->
   <p>
     <a href="https://opensats.org" target="_blank">
-      <img alt="OpenSats Supported" src="https://img.shields.io/badge/OpenSats-Supported-4D4DFF?logo=bitcoin&logoColor=white">
+      <img alt="OpenSats Supported" src="https://img.shields.io/badge/OpenSats-Supported-orange?logo=bitcoin&logoColor=white">
     </a>
     <a href="./LICENSE">
       <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-success?logo=open-source-initiative&logoColor=white">
     </a>
     <a href="https://github.com/lnbits/lnbits" target="_blank">
-      <img alt="Built for LNbits" src="https://img.shields.io/badge/Built%20for-LNbits-orange?logo=lightning&logoColor=white">
+      <img alt="Built for LNbits" src="https://img.shields.io/badge/Built%20for-LNbits-4D4DFF?logo=lightning&logoColor=white">
     </a>
     <a href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper" target="_blank">
       <img alt="Stripe Tap-to-Pay Wrapper" src="https://img.shields.io/badge/Stripe%20Tap--to--Pay-Wrapper-635BFF?logo=stripe&logoColor=white&labelColor=312E81">
