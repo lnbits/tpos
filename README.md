@@ -13,6 +13,11 @@
     <a href="https://github.com/lnbits/lnbits" target="_blank">
       <img alt="Built for LNbits" src="https://img.shields.io/badge/Built%20for-LNbits-4D4DFF?logo=lightning&logoColor=white">
     </a>
+    <a href="https://extensions.lnbits.com/tpos/" target="_blank" style="margin: 0 10px;">
+  <img
+    src="https://img.shields.io/badge/Explore-LNbits%20TPoS-10B981?logo=puzzle-piece&logoColor=white&labelColor=065F46"
+    alt="TPoS Extension">
+</a>
     <a href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper" target="_blank">
       <img alt="Stripe Tap-to-Pay Wrapper" src="https://img.shields.io/badge/Stripe%20Tap--to--Pay-Wrapper-635BFF?logo=stripe&logoColor=white&labelColor=312E81">
     </a>
