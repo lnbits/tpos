@@ -42,6 +42,15 @@
 
 
 
+<h2>Features</h2>
+<ul>
+  <li><strong>Create invoices</strong> &mdash; instant Lightning QR invoices</li>
+  <li><strong>Tipping</strong> &mdash; percentages or rounding, split to a tip wallet</li>
+  <li><strong>Item management</strong> &mdash; products, cart, JSON import/export</li>
+  <li><strong>OTC ATM</strong> &mdash; LNURL Withdraw with PIN, limits, cooldown</li>
+  <li><strong>Stripe Fiat payment integration</strong> &mdash; accept tap-to-pay via Stripe</li>
+  <li><strong>Tax settings</strong> &mdash; global/per-item, inclusive or exclusive</li>
+</ul>
 
 <h2>Overview</h2>
 
