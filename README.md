@@ -45,8 +45,6 @@
 
 </div>
 
-
-
 <h2>Features</h2>
 <ul>
   <li><strong>Create invoices</strong> &mdash; instant Lightning QR invoices</li>
@@ -68,8 +66,6 @@
   <img src="https://github.com/user-attachments/assets/68b875c8-95fd-45eb-acf4-3ad5a7af3cd7" alt="Create TPoS" width="520">
 </div>
 
-
-
 <h2>Usage</h2>
 
 <ol>
@@ -90,8 +86,6 @@
     </div>
   </li>
 </ol>
-
-
 
 <h2>Receiving Tips</h2>
 
@@ -134,8 +128,6 @@
     </div>
   </li>
 </ol>
-
-
 
 <h2>Adding Items to PoS</h2>
 
@@ -196,8 +188,6 @@
 </div>
 </p>
 
-
-
 <h2>OTC ATM Functionality</h2>
 
 <ol>
@@ -230,8 +220,6 @@
     </div>
   </li>
 </ol>
-
-
 
 <h2>Tax Settings</h2>
 
