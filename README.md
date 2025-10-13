@@ -69,6 +69,7 @@ TPoS lets you take Lightning payments right from the browser. Every TPoS runs is
    <img src="https://github.com/user-attachments/assets/02d4f3d7-ddfb-46a7-a33d-cbc3f3768278" alt="Enable tips" width="720">
 
 2. Fill in:
+
    - Wallet to receive tips
    - Tip percentages (press Enter after each)
    - If no values are set, a default **Rounding** option is available
@@ -102,6 +103,7 @@ You can add items to a TPoS and use an item list for sales.
    <img src="https://i.imgur.com/V468a7q.png" alt="Expand items" width="720">
 
    Then you can:
+
    - Add items
    - Delete all items
    - Import or export items via JSON
