@@ -33,8 +33,6 @@ _For video content about the TPoS extension, watch the [official demo](https://w
 - [OTC ATM Functionality](#otc-atm-functionality)
 - [Tax Settings](#tax-settings)
 
-
-
 ## Features
 
 - **Create invoices** — instant Lightning QR invoices
@@ -43,8 +41,6 @@ _For video content about the TPoS extension, watch the [official demo](https://w
 - **OTC ATM** — LNURL withdraw limits and cooldown
 - **Stripe fiat payment integration** — accept tap-to-pay via Stripe
 - **Tax settings** — global/per-item, inclusive or exclusive
-
-
 
 ## Overview
 
@@ -65,8 +61,6 @@ TPoS lets you take Lightning payments right from the browser. Every TPoS runs is
 4. **Present** the invoice QR to the customer.
 
    <img src="https://github.com/user-attachments/assets/1d5341e2-cfba-45d5-b2c5-99f61a3d07a4" alt="Invoice QR" width="720">
-
-
 
 ## Receiving Tips
 
@@ -99,8 +93,6 @@ TPoS lets you take Lightning payments right from the browser. Every TPoS runs is
 
    <img src="https://github.com/user-attachments/assets/b8fa8344-f164-4bd8-869d-6ca8d342ef9a" alt="Tip distribution" width="720">
 
-
-
 ## Adding Items to PoS
 
 You can add items to a TPoS and use an item list for sales.
@@ -121,20 +113,20 @@ You can add items to a TPoS and use an item list for sales.
 3. Or import a JSON with your products using this format:
 
 ```json
-   [
-     {
-       "image": "https://image.url",
-       "price": 1.99,
-       "title": "Item 1",
-       "tax": 3.5,
-       "disabled": false
-     },
-     {
-       "price": 0.99,
-       "title": "Item 2",
-       "description": "My cool Item #2"
-     }
-   ]
+[
+  {
+    "image": "https://image.url",
+    "price": 1.99,
+    "title": "Item 1",
+    "tax": 3.5,
+    "disabled": false
+  },
+  {
+    "price": 0.99,
+    "title": "Item 2",
+    "description": "My cool Item #2"
+  }
+]
 ```
 
 After adding products, the TPoS defaults to the **Items View** (PoS view):
@@ -151,14 +143,11 @@ Click **Pay** to show the invoice for the customer. To use the regular keypad TP
 
 <img src="https://i.imgur.com/DSOusVA.png" alt="Add custom value" width="720">
 
-
-
 ## OTC ATM Functionality
 
 1. Create or edit a TPoS and activate **Enable selling bitcoin**. Configure:
-
-   * Maximum withdrawable per day
-   * Cooldown between withdrawals (min. 1 minute)
+   - Maximum withdrawable per day
+   - Cooldown between withdrawals (min. 1 minute)
 
 <img src="https://github.com/user-attachments/assets/6772311f-6bb3-42cd-b2eb-6b9db971e174" alt="ATM settings" width="520">
 
@@ -182,19 +171,17 @@ Click **Pay** to show the invoice for the customer. To use the regular keypad TP
 > [!NOTE]
 > OTC ATM requires a signed-in account. When sharing a TPoS, be signed in or have the login details ready.
 
-* **Today:** If you are not signed in, you will see a **Not logged in** error.
-* **Coming soon:** A feedback dialog will appear and prompt you to sign in.
+- **Today:** If you are not signed in, you will see a **Not logged in** error.
+- **Coming soon:** A feedback dialog will appear and prompt you to sign in.
 
 <img src="https://github.com/user-attachments/assets/b7e29f99-de21-474f-bf57-e0170cec15e9" alt="Not logged in feedback" width="520">
-
-
 
 ## Tax Settings
 
 By default, tax is included in price. Set a default tax rate (%) (e.g., 13). Items can override this with their own tax value.
 
-* **Tax Exclusive** — tax is applied on top of the unit price.
-* **Tax Inclusive** — unit price already includes tax.
+- **Tax Exclusive** — tax is applied on top of the unit price.
+- **Tax Inclusive** — unit price already includes tax.
 
 In the keypad PoS, the default tax is used and is always included in the value.
 
@@ -206,9 +193,7 @@ In the keypad PoS, the default tax is used and is always included in the value.
 
 LNbits empowers developers and merchants with modular, open-source tools for building Bitcoin-based systems — fast, free, and extendable.
 
-[![Visit LNbits Shop](https://img.shields.io/badge/Visit-LNbits%20Shop-7C3AED?logo=shopping-cart\&logoColor=white\&labelColor=5B21B6)](https://shop.lnbits.com/)
-[![Try myLNbits SaaS](https://img.shields.io/badge/Try-myLNbits%20SaaS-2563EB?logo=lightning\&logoColor=white\&labelColor=1E40AF)](https://my.lnbits.com/login)
-[![Read LNbits News](https://img.shields.io/badge/Read-LNbits%20News-F97316?logo=rss\&logoColor=white\&labelColor=C2410C)](https://news.lnbits.com/)
-[![Explore LNbits Extensions](https://img.shields.io/badge/Explore-LNbits%20Extensions-10B981?logo=puzzle-piece\&logoColor=white\&labelColor=065F46)](https://extensions.lnbits.com/)
-
-
+[![Visit LNbits Shop](https://img.shields.io/badge/Visit-LNbits%20Shop-7C3AED?logo=shopping-cart&logoColor=white&labelColor=5B21B6)](https://shop.lnbits.com/)
+[![Try myLNbits SaaS](https://img.shields.io/badge/Try-myLNbits%20SaaS-2563EB?logo=lightning&logoColor=white&labelColor=1E40AF)](https://my.lnbits.com/login)
+[![Read LNbits News](https://img.shields.io/badge/Read-LNbits%20News-F97316?logo=rss&logoColor=white&labelColor=C2410C)](https://news.lnbits.com/)
+[![Explore LNbits Extensions](https://img.shields.io/badge/Explore-LNbits%20Extensions-10B981?logo=puzzle-piece&logoColor=white&labelColor=065F46)](https://extensions.lnbits.com/)
