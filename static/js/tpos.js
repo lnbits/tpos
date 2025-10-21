@@ -718,11 +718,6 @@ window.app = Vue.createApp({
         }
 
         this.nfcTagReading = true
-        Quasar.Notify.create({
-          message: this.atmMode
-            ? 'Tap your NFC tag to withdraw with LNURLw.'
-            : 'Tap your NFC tag to pay this invoice with LNURLp.'
-        })
 
         return ndef.scan({signal: readerAbortController.signal}).then(() => {
           ndef.onreadingerror = event => {
