@@ -119,6 +119,7 @@ window.app = Vue.createApp({
       addedAmount: 0,
       enablePrint: false,
       receiptData: null,
+      paymentDetails: null,
       currency_choice: false,
       _currencyResolver: null,
       _withdrawing: false,
@@ -962,6 +963,29 @@ window.app = Vue.createApp({
       this.complete.show = true
       if (this.$q.screen.lt.lg && this.cartDrawer) {
         this.cartDrawer = false
+      }
+    },
+    async showDetails(paymentHash) {
+      this.paymentDetails = null
+      try {
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
+        )
+        if (data.extra && data.extra.details) {
+          this.paymentDetails = {}
+          this.paymentDetails.items = data.extra.details.items || []
+          this.paymentDetails.currency = data.extra.details.currency
+          this.paymentDetails.exchangeRate = data.extra.details.exchangeRate
+        }
+        console.log(this.paymentDetails)
+        return
+      } catch (error) {
+        console.error('Error fetching receipt data:', error)
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Error fetching receipt data.'
+        })
       }
     },
     async printReceipt(paymentHash) {
