@@ -7,9 +7,9 @@
 
 [![OpenSats Supported](https://img.shields.io/badge/OpenSats-Supported-orange?logo=bitcoin&logoColor=white)](https://opensats.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-success?logo=open-source-initiative&logoColor=white)](./LICENSE)
-[![Built for LNbits](https://img.shields.io/badge/Built%20for-LNbits-4D4DFF?logo=lightning&logoColor=white)](https://github.com/lnbits/lnbits)  [![tip-hero](https://img.shields.io/badge/TipJar-LNBits%20Hero-9b5cff?labelColor=6b7280&logo=lightning&logoColor=white)](https://demo.lnbits.com/tipjar/DwaUiE4kBX6mUW6pj3X5Kg)
+[![Built for LNbits](https://img.shields.io/badge/Built%20for-LNbits-4D4DFF?logo=lightning&logoColor=white)](https://github.com/lnbits/lnbits) [![tip-hero](https://img.shields.io/badge/TipJar-LNBits%20Hero-9b5cff?labelColor=6b7280&logo=lightning&logoColor=white)](https://demo.lnbits.com/tipjar/DwaUiE4kBX6mUW6pj3X5Kg)
 [![Explore LNbits TPoS](https://img.shields.io/badge/Explore-LNbits%20TPoS-10B981?logo=puzzle-piece&logoColor=white&labelColor=065F46)](https://extensions.lnbits.com/tpos/)
-[![Stripe Tap-to-Pay Wrapper](https://img.shields.io/badge/Stripe%20Tap--to--Pay-Wrapper-635BFF?logo=stripe&logoColor=white&labelColor=312E81)](https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper)  
+[![Stripe Tap-to-Pay Wrapper](https://img.shields.io/badge/Stripe%20Tap--to--Pay-Wrapper-635BFF?logo=stripe&logoColor=white&labelColor=312E81)](https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper)
 
 # TPoS — _[LNbits](https://lnbits.com) extension_
 
@@ -26,13 +26,13 @@ _For video content about the TPoS extension, watch the [official demo](https://w
 
 ### Quick Links
 
-- [Overview](#overview)  
-- [Usage](#usage)  
-- [Receiving Tips](#receiving-tips)  
-- [LN Address Funding](#ln-address-funding)  
+- [Overview](#overview)
+- [Usage](#usage)
+- [Receiving Tips](#receiving-tips)
+- [LN Address Funding](#ln-address-funding)
 - [Adding Items to PoS](#adding-items-to-pos)
-- [OTC ATM Functionality](#otc-atm-functionality)  
-- [Tax Settings](#tax-settings)  
+- [OTC ATM Functionality](#otc-atm-functionality)
+- [Tax Settings](#tax-settings)
 - [Powered by LNbits](#powered-by-lnbits)
 
 ## Features
@@ -95,7 +95,7 @@ TPoS lets you take Lightning payments right from the browser. Every TPoS runs is
 7. After payment the tip is sent to the defined wallet (e.g., employee wallet) and the rest to the main wallet.
 
    <img src="https://github.com/user-attachments/assets/b8fa8344-f164-4bd8-869d-6ca8d342ef9a" alt="Tip distribution" width="720">
-   
+
 ## LN Address Funding
 
 Some deployments require sharing revenue from every payment made through a TPoS.  
@@ -116,7 +116,7 @@ In these cases, the function helps identify the **initial TPoS initiator** and f
 3. Enter:
    - **Lightning Address** of the recipient (e.g., `alice@yourdomain.com`)
    - **Percentage share** (e.g., `10` for 10%)  
-<img width="504" height="426" alt="Bildschirmfoto 2025-11-25 um 04 02 20" src="https://github.com/user-attachments/assets/4e4eb317-96bc-4094-9a9d-8dea69748d55" />
+     <img width="504" height="426" alt="Bildschirmfoto 2025-11-25 um 04 02 20" src="https://github.com/user-attachments/assets/4e4eb317-96bc-4094-9a9d-8dea69748d55" />
 
 When a customer pays:
 
@@ -230,4 +230,4 @@ LNbits empowers developers and merchants with modular, open-source tools for bui
 [![Visit LNbits Shop](https://img.shields.io/badge/Visit-LNbits%20Shop-7C3AED?logo=shopping-cart&logoColor=white&labelColor=5B21B6)](https://shop.lnbits.com/)
 [![Try myLNbits SaaS](https://img.shields.io/badge/Try-myLNbits%20SaaS-2563EB?logo=lightning&logoColor=white&labelColor=1E40AF)](https://my.lnbits.com/login)
 [![Read LNbits News](https://img.shields.io/badge/Read-LNbits%20News-F97316?logo=rss&logoColor=white&labelColor=C2410C)](https://news.lnbits.com/)
-[![Explore LNbits Extensions](https://img.shields.io/badge/Explore-LNbits%20Extensions-10B981?logo=puzzle-piece&logoColor=white&labelColor=065F46)](https://extensions.lnbits.com/)  [![tip-hero](https://img.shields.io/badge/TipJar-LNBits%20Hero-9b5cff?labelColor=7c3aed&logo=lightning&logoColor=white)](https://demo.lnbits.com/tipjar/DwaUiE4kBX6mUW6pj3X5Kg)
+[![Explore LNbits Extensions](https://img.shields.io/badge/Explore-LNbits%20Extensions-10B981?logo=puzzle-piece&logoColor=white&labelColor=065F46)](https://extensions.lnbits.com/) [![tip-hero](https://img.shields.io/badge/TipJar-LNBits%20Hero-9b5cff?labelColor=7c3aed&logo=lightning&logoColor=white)](https://demo.lnbits.com/tipjar/DwaUiE4kBX6mUW6pj3X5Kg)
