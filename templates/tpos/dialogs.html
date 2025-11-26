@@ -158,6 +158,7 @@
           group="paymentList"
           v-for="(payment, idx) in lastPaymentsDialog.data"
           :key="idx"
+          dense
         >
           <template v-slot:header>
             <q-item-section>
@@ -195,7 +196,7 @@
           </template>
           <q-card class="q-ma-md">
             <q-card-section v-if="paymentDetails && paymentDetails.items">
-              <q-list separator>
+              <q-list separator dense>
                 <q-item
                   v-for="(item, index) in paymentDetails.items"
                   :key="index"
