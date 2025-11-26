@@ -3,6 +3,10 @@ from http import HTTPStatus
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
+from lnurl import LnurlPayResponse
+from lnurl import decode as decode_lnurl
+from lnurl import handle as lnurl_handle
+
 from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
@@ -14,9 +18,6 @@ from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
-from lnurl import LnurlPayResponse
-from lnurl import decode as decode_lnurl
-from lnurl import handle as lnurl_handle
 
 from .crud import (
     create_tpos,
@@ -174,24 +175,22 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Paym
 @tpos_api_router.get("/api/v1/tposs/{tpos_id}/invoices")
 async def api_tpos_get_latest_invoices(tpos_id: str):
     payments = await get_latest_payments_by_extension(ext_name="tpos", ext_id=tpos_id)
-
-    details = payments[0].extra.get("details", None)
-    exchange_rate = None
-    currency = None
-    if details:
-        exchange_rate = details.get("exchange_rate", None)
+    result = []
+    for payment in payments:
+        details = payment.extra.get("details", {})
         currency = details.get("currency", None)
-    return [
-        {
-            "checking_id": payment.checking_id,
-            "amount": payment.amount,
-            "time": payment.time,
-            "pending": payment.pending,
-            "currency": currency,
-            "exchange_rate": exchange_rate,
-        }
-        for payment in payments
-    ]
+        exchange_rate = details.get("exchangeRate") or payment.extra.get("exchangeRate")
+        result.append(
+            {
+                "checking_id": payment.checking_id,
+                "amount": payment.amount,
+                "time": payment.time,
+                "pending": payment.pending,
+                "currency": currency,
+                "exchange_rate": exchange_rate,
+            }
+        )
+    return result
 
 
 @tpos_api_router.post(
