@@ -886,7 +886,11 @@ window.app = Vue.createApp({
               obj.dateFrom = moment(obj.time).fromNow()
               if (obj.currency != LNBITS_DENOMINATION) {
                 obj.amountFiat = this.formatAmount(
-                  obj.amount / 1000 / this.exchangeRate,
+                  obj.amount / 1000 / (obj.exchange_rate || this.exchangeRate),
+                  this.currency
+                )
+                obj.amountFiatNow = this.formatAmount(
+                  Math.abs(obj.amount) / 1000 / this.exchangeRate,
                   this.currency
                 )
               }
@@ -966,19 +970,18 @@ window.app = Vue.createApp({
       }
     },
     async showDetails(paymentHash) {
-      this.paymentDetails = null
       try {
         const {data} = await LNbits.api.request(
           'GET',
           `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
         )
+        this.receiptData = data
         if (data.extra && data.extra.details) {
           this.paymentDetails = {}
           this.paymentDetails.items = data.extra.details.items || []
           this.paymentDetails.currency = data.extra.details.currency
           this.paymentDetails.exchangeRate = data.extra.details.exchangeRate
         }
-        console.log(this.paymentDetails)
         return
       } catch (error) {
         console.error('Error fetching receipt data:', error)
@@ -989,13 +992,14 @@ window.app = Vue.createApp({
       }
     },
     async printReceipt(paymentHash) {
-      this.receiptData = null
       try {
-        const {data} = await LNbits.api.request(
-          'GET',
-          `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
-        )
-        this.receiptData = data
+        if (!this.receiptData) {
+          const {data} = await LNbits.api.request(
+            'GET',
+            `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
+          )
+          this.receiptData = data
+        }
 
         this.$q
           .dialog({
