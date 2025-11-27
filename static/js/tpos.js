@@ -961,7 +961,7 @@ window.app = Vue.createApp({
       }
     },
     formatDate(timestamp) {
-      return LNbits.utils.formatDate(timestamp / 1000)
+      return LNbits.utils.formatTimestamp(timestamp / 1000)
     },
     showComplete() {
       this.complete.show = true
