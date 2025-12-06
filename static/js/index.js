@@ -121,6 +121,13 @@ window.app = Vue.createApp({
             field: ''
           },
           {
+            name: 'id',
+            align: 'left',
+            label: 'ID',
+            field: 'id',
+            format: (val) => val ? val.split(':')[1] : ''
+          },
+          {
             name: 'title',
             align: 'left',
             label: 'Title',
@@ -182,6 +189,17 @@ window.app = Vue.createApp({
         !data.wallet ||
         (this.formDialog.advanced.otc && !data.withdraw_limit)
       )
+    },
+    // Mobile-responsive columns for items table
+    itemsTableColumns() {
+      const isMobile = this.$q.screen.lt.sm
+      if (isMobile) {
+        // On mobile: hide id, tax, and disabled columns to prevent overflow
+        return this.itemsTable.columns.filter(col => 
+          !['id', 'tax', 'disabled'].includes(col.name)
+        )
+      }
+      return this.itemsTable.columns
     }
   },
   methods: {

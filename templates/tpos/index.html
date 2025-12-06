@@ -197,7 +197,7 @@
                                 dense
                                 :rows="itemsArray(props.row.id)"
                                 row-key="id"
-                                :columns="itemsTable.columns"
+                                :columns="itemsTableColumns"
                                 :pagination.sync="itemsTable.pagination"
                               >
                                 <template v-slot:header="props">
@@ -230,25 +230,18 @@
                                         icon="edit"
                                       ></q-btn>
                                     </q-td>
-                                    <q-td key="id" :props="props">
-                                      <span
-                                        v-text="props.row.id.split(':')[1]"
-                                      ></span>
-                                    </q-td>
-                                    <q-td key="title" :props="props">
-                                      <span v-text="props.row.title"></span>
-                                    </q-td>
-                                    <q-td key="price" :props="props">
-                                      <span
-                                        v-text="itemFormatPrice(props.row.price, props.row.id)"
-                                      ></span>
-                                    </q-td>
-                                    <q-td key="tax" :props="props">
-                                      <span v-text="`${props.row.tax}%`"></span>
-                                    </q-td>
-                                    <q-td key="disabled" :props="props">
-                                      <span v-text="props.row.disabled"></span>
-                                    </q-td>
+                                    <template v-for="col in props.cols" :key="col.name">
+                                      <q-td 
+                                        v-if="col.name !== 'delete' && col.name !== 'edit'"
+                                        :props="props"
+                                      >
+                                        <span v-if="col.name === 'id'" v-text="props.row.id.split(':')[1]"></span>
+                                        <span v-else-if="col.name === 'title'" v-text="props.row.title"></span>
+                                        <span v-else-if="col.name === 'price'" v-text="itemFormatPrice(props.row.price, props.row.id)"></span>
+                                        <span v-else-if="col.name === 'tax'" v-text="`${props.row.tax}%`"></span>
+                                        <span v-else-if="col.name === 'disabled'" v-text="props.row.disabled"></span>
+                                      </q-td>
+                                    </template>
                                   </q-tr>
                                 </template>
                               </q-table>
@@ -754,6 +747,25 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    
+    /* Ensure items table fits on mobile without horizontal scroll */
+    .q-table {
+      width: 100%;
+      table-layout: auto;
+    }
+    .q-table thead th,
+    .q-table tbody td {
+      padding: 8px 4px;
+      font-size: 0.875rem;
+    }
+    /* Truncate long text in table cells on mobile */
+    .q-table tbody td span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
     }
   }
 </style>
