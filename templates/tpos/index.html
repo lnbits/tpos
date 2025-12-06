@@ -742,6 +742,21 @@
     </q-card>
   </q-dialog>
 </div>
+{% endblock %}
+{% block styles %}
+<style>
+  /* Fix wallet field overflow on mobile - only truncate when text overflows */
+  @media screen and (max-width: 600px) {
+    /* Only apply to wallet select fields when content overflows */
+    .q-select[label*="Wallet"] .q-field__native,
+    .q-select[label*="Wallet"] .q-field__input {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+</style>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
 <script>
   const DENOMINATION = '{{ LNBITS_DENOMINATION }}'
