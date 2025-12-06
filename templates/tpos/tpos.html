@@ -94,7 +94,7 @@
           </div>
         </div>
       </q-page-sticky>
-      <q-page-sticky position="top-right" :offset="[18, 18]">
+      <q-page-sticky position="top-right" :offset="$q.screen.lt.sm ? [8, 8] : [18, 18]">
         {% include "tpos/_options_fab.html" %}
       </q-page-sticky>
     </template>
@@ -153,6 +153,32 @@
     padding: 8px;
     text-align: left;
   }
+  
+  /* Fix FAB button overlap on mobile */
+  /* Matches Quasar's lt.sm breakpoint (< 600px) */
+  @media screen and (max-width: 600px) {
+    .q-fab-mobile .q-fab__actions {
+      gap: 12px;
+    }
+    .q-fab-mobile .q-fab__actions .q-fab__action {
+      margin-bottom: 0;
+      position: relative;
+      z-index: auto;
+    }
+    .q-fab-mobile .q-fab__actions .q-fab__action .q-btn__wrapper {
+      position: relative;
+      z-index: 1;
+    }
+    /* Hide external labels on mobile to prevent overlap and save space */
+    .q-fab-mobile .q-fab__action .q-fab__label {
+      display: none !important;
+    }
+    /* Ensure buttons don't overlap */
+    .q-fab-mobile .q-fab__actions .q-fab__action + .q-fab__action {
+      margin-top: 8px;
+    }
+  }
+  
   @media screen {
     .receipt {
       display: none;
