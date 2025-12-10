@@ -131,6 +131,44 @@
                     <q-tab-panels v-model="tab">
                       <q-tab-panel name="items">
                         <div>
+                          <div class="row items-center q-mb-md">
+                            <div class="col-12 col-md-6">
+                              <q-option-group
+                                inline
+                                dense
+                                :model-value="props.row.use_inventory"
+                                :options="inventoryModeOptions"
+                                @update:model-value="onInventoryModeChange(props.row, $event)"
+                              >
+                                <q-tooltip
+                                  v-if="!inventoryStatus.enabled"
+                                  class="q-pa-sm"
+                                >
+                                  inventory extension must be enabled.
+                                </q-tooltip>
+                              </q-option-group>
+                            </div>
+                            <div
+                              class="col-12 col-md-6"
+                              v-if="props.row.use_inventory"
+                            >
+                              <q-select
+                                filled
+                                dense
+                                multiple
+                                emit-value
+                                map-options
+                                use-input
+                                use-chips
+                                hide-dropdown-icon
+                                v-model="props.row.inventory_tags"
+                                :options="inventoryTagOptions"
+                                label="Inventory tags"
+                                :disable="!inventoryStatus.enabled"
+                                @update:model-value="onInventoryTagsChange(props.row, $event)"
+                              ></q-select>
+                            </div>
+                          </div>
                           <div class="row items-center no-wrap q-mb-md">
                             <div class="col-12 q-pr-lg">
                               <q-btn
@@ -138,6 +176,7 @@
                                 unelevated
                                 @click="openItemDialog(props.row.id)"
                                 class="float-left q-my-sm"
+                                :disable="props.row.use_inventory"
                                 >Add Item</q-btn
                               >
                               <q-btn
@@ -146,6 +185,7 @@
                                 unelevated
                                 @click="deleteAllItems(props.row.id)"
                                 class="float-left q-my-sm q-ml-sm"
+                                :disable="props.row.use_inventory"
                                 >Delete All</q-btn
                               >
                               <q-btn-dropdown
@@ -153,6 +193,7 @@
                                 outline
                                 color="primary"
                                 label="Import/Export"
+                                :disable="props.row.use_inventory"
                               >
                                 <q-list>
                                   <q-item
@@ -190,6 +231,16 @@
                               </q-btn-dropdown>
                             </div>
                           </div>
+                          <div v-if="props.row.use_inventory" class="q-mb-md">
+                            <q-banner
+                              dense
+                              rounded
+                              class="bg-grey-2 text-dark"
+                            >
+                              Using items from the Inventory extension. Tags
+                              control which products appear in PoS.
+                            </q-banner>
+                          </div>
                           <div class="row items-center no-wrap q-mb-md">
                             <div class="col-12">
                               <q-table
@@ -213,23 +264,25 @@
                                 <template v-slot:body="props">
                                   <q-tr :props="props">
                                     <q-td auto-width>
-                                      <q-btn
-                                        size="sm"
-                                        color="pink"
-                                        dense
-                                        @click="deleteItem(props.row.id)"
-                                        icon="delete"
-                                      ></q-btn>
-                                    </q-td>
-                                    <q-td auto-width>
-                                      <q-btn
-                                        size="sm"
-                                        color="accent"
-                                        dense
-                                        @click="openItemDialog(props.row.id)"
-                                        icon="edit"
-                                      ></q-btn>
-                                    </q-td>
+                                    <q-btn
+                                      size="sm"
+                                      color="pink"
+                                      dense
+                                      @click="deleteItem(props.row.id)"
+                                      icon="delete"
+                                      :disable="props.row.use_inventory"
+                                    ></q-btn>
+                                  </q-td>
+                                  <q-td auto-width>
+                                    <q-btn
+                                      size="sm"
+                                      color="accent"
+                                      dense
+                                      @click="openItemDialog(props.row.id)"
+                                      icon="edit"
+                                      :disable="props.row.use_inventory"
+                                    ></q-btn>
+                                  </q-td>
                                     <q-td key="id" :props="props">
                                       <span
                                         v-text="props.row.id.split(':')[1]"

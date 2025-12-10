@@ -188,6 +188,10 @@
   const tpos = JSON.parse({{ tpos | tojson | safe }})
   tpos.items = tpos.items !== null ? JSON.parse(tpos.items) : []
   tpos.tip_options = tpos.tip_options ? JSON.parse(tpos.tip_options) : []
+  tpos.inventory_tags = tpos.inventory_tags
+    ? tpos.inventory_tags.split(',').filter(Boolean)
+    : []
+  tpos.use_inventory = Boolean(tpos.use_inventory)
   if (tpos.withdraw_maximum) {
     tpos.withdraw_premium = Number(tpos.withdraw_maximum / 100)
   }

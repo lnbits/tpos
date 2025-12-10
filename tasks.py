@@ -13,6 +13,70 @@ from loguru import logger
 from .crud import get_tpos
 
 
+async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> None:
+    if not (
+        inventory_get_items_by_ids
+        and inventory_update_item
+        and create_inventory_update_log
+        and CreateInventoryUpdateLog
+        and UpdateSource
+    ):
+        return
+
+    inventory_id = inventory_payload.get("inventory_id")
+    sold_items = inventory_payload.get("items") or []
+    if not inventory_id or not sold_items:
+        return
+
+    item_ids = [item.get("id") for item in sold_items if item.get("id")]
+    inventory_items = await inventory_get_items_by_ids(inventory_id, item_ids)
+    inventory_map = {item.id: item for item in inventory_items}
+
+    for sold in sold_items:
+        item_id = sold.get("id")
+        quantity = sold.get("quantity") or 1
+        item = inventory_map.get(item_id)
+        if not item or item.quantity_in_stock is None:
+            continue
+
+        quantity_before = item.quantity_in_stock
+        deduction = min(quantity, quantity_before)
+        quantity_after = quantity_before - deduction
+        item.quantity_in_stock = quantity_after
+
+        try:
+            await inventory_update_item(item)
+            await create_inventory_update_log(
+                CreateInventoryUpdateLog(
+                    inventory_id=inventory_id,
+                    item_id=item.id,
+                    quantity_change=-deduction,
+                    quantity_before=quantity_before,
+                    quantity_after=quantity_after,
+                    source=UpdateSource.SYSTEM,
+                    idempotency_key=f"{payment.payment_hash}:{item.id}",
+                )
+            )
+        except Exception as exc:  # pragma: no cover - log and continue
+            logger.warning(
+                f"tpos: failed to update inventory for item {item_id}: {exc!s}"
+            )
+
+try:  # inventory extension is optional
+    from ..inventory.crud import (
+        create_inventory_update_log,
+        get_items_by_ids as inventory_get_items_by_ids,
+        update_item as inventory_update_item,
+    )
+    from ..inventory.models import CreateInventoryUpdateLog, UpdateSource
+except Exception:  # pragma: no cover
+    inventory_get_items_by_ids = None
+    inventory_update_item = None
+    create_inventory_update_log = None
+    CreateInventoryUpdateLog = None
+    UpdateSource = None
+
+
 async def wait_for_paid_invoices():
     invoice_queue = asyncio.Queue()
     register_invoice_listener(invoice_queue, "ext_tpos")
@@ -63,6 +127,10 @@ async def on_invoice_paid(payment: Payment) -> None:
             logger.debug(f"tpos: LNaddress paid cut: {paid_payment.checking_id}")
 
     await websocket_updater(tpos_id, str(stripped_payment))
+
+    inventory_payload = payment.extra.get("inventory")
+    if inventory_payload:
+        await _deduct_inventory_stock(payment, inventory_payload)
 
     if not tip_amount:
         # no tip amount

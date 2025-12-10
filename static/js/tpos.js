@@ -56,6 +56,12 @@ window.app = Vue.createApp({
       moreBtn: false,
       total: 0.0,
       cartTax: 0.0,
+      items: [],
+      categories: [],
+      usingInventory: false,
+      inventoryTags: [],
+      inventoryId: null,
+      inventoryLoading: false,
       itemsTable: {
         filter: '',
         columns: [
@@ -245,6 +251,21 @@ window.app = Vue.createApp({
       this.stack = []
     },
     addToCart(item, quantity = 1) {
+      if (
+        this.usingInventory &&
+        item.quantity_in_stock !== null &&
+        item.quantity_in_stock !== undefined
+      ) {
+        const inCart = this.itemCartQty(item.id)
+        if (inCart >= item.quantity_in_stock) {
+          Quasar.Notify.create({
+            type: 'warning',
+            message: 'Not enough stock available.'
+          })
+          return
+        }
+        quantity = Math.min(quantity, item.quantity_in_stock - inCart)
+      }
       if (this.cart.has(item.id)) {
         this.cart.set(item.id, {
           ...this.cart.get(item.id),
@@ -302,6 +323,42 @@ window.app = Vue.createApp({
       this.total = 0.0
       this.addedAmount = 0.0
       this.cartDrawer = false
+    },
+    formatAndSetItems(items, keepIds = false) {
+      this.items = (items || []).map((item, idx) => {
+        const parsed = {...item}
+        parsed.tax = item.tax || 0
+        parsed.formattedPrice = this.formatAmount(item.price, this.currency)
+        parsed.id = keepIds ? item.id : idx
+        parsed.categories = parsed.categories || []
+        parsed.disabled = Boolean(parsed.disabled)
+        return parsed
+      })
+      if (this.items.length > 0) {
+        this.showPoS = false
+        this.categories = this.extractCategories(this.items)
+      }
+    },
+    async loadInventoryItems() {
+      if (!this.inventoryId) return
+      this.inventoryLoading = true
+      try {
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/tpos/api/v1/tposs/${this.tposId}/inventory-items`
+        )
+        this.formatAndSetItems(
+          data.map(item => ({
+            ...item,
+            tax: item.tax ?? this.taxDefault
+          })),
+          true
+        )
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+      } finally {
+        this.inventoryLoading = false
+      }
     },
     holdCart() {
       if (!this.cart.size) {
@@ -606,6 +663,7 @@ window.app = Vue.createApp({
           currency: this.currency,
           exchangeRate: this.exchangeRate,
           items: [...this.cart.values()].map(item => ({
+            id: item.id,
             price: item.price,
             formattedPrice: item.formattedPrice,
             quantity: item.quantity,
@@ -618,6 +676,16 @@ window.app = Vue.createApp({
       }
       if (this.lnaddress) {
         params.user_lnaddress = this.lnaddressDialog.lnaddress
+      }
+      if (this.usingInventory && this.cart.size) {
+        params.inventory = {
+          inventory_id: this.inventoryId,
+          tags: this.inventoryTags,
+          items: [...this.cart.values()].map(item => ({
+            id: item.id,
+            quantity: item.quantity
+          }))
+        }
       }
       return params
     },
@@ -1052,15 +1120,14 @@ window.app = Vue.createApp({
       this.tip_options.push('Round')
     }
 
-    this.items = tpos.items
-    this.items.forEach((item, id) => {
-      item.formattedPrice = this.formatAmount(item.price, this.currency)
-      item.id = id
-      return item
-    })
-    if (this.items.length > 0) {
-      this.showPoS = false
-      this.categories = this.extractCategories(this.items)
+    this.usingInventory = Boolean(tpos.use_inventory)
+    this.inventoryTags = tpos.inventory_tags || []
+    this.inventoryId = tpos.inventory_id
+
+    if (this.usingInventory && this.inventoryId) {
+      await this.loadInventoryItems()
+    } else {
+      this.formatAndSetItems(tpos.items)
     }
     this.exchangeRate = await this.getRates()
     this.heldCarts = JSON.parse(
