@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Awaitable, Callable
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from lnbits.core.models import Payment
 from lnbits.core.services import (
@@ -13,6 +13,9 @@ from lnbits.tasks import register_invoice_listener
 from loguru import logger
 
 from .crud import get_tpos
+
+if TYPE_CHECKING:  # pragma: no cover
+    pass
 
 inventory_get_items_by_ids: Callable[[str, list[str]], Awaitable[list[Any]]] | None = (
     None
@@ -81,22 +84,23 @@ async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> 
             )
 
 
-try:  # inventory extension is optional
-    from ..inventory.crud import (
-        create_inventory_update_log,  # type: ignore[assignment]
-    )
-    from ..inventory.crud import (
-        get_items_by_ids as inventory_get_items_by_ids,  # type: ignore[assignment]
-    )
-    from ..inventory.crud import (
-        update_item as inventory_update_item,  # type: ignore[assignment]
-    )
-    from ..inventory.models import (
-        CreateInventoryUpdateLog,  # type: ignore[assignment]
-        UpdateSource,  # type: ignore[assignment]
-    )
-except Exception:  # pragma: no cover
-    pass
+if not TYPE_CHECKING:
+    try:  # inventory extension is optional
+        from ..inventory.crud import (  # pyright: ignore[reportMissingImports]
+            create_inventory_update_log,
+        )
+        from ..inventory.crud import (
+            get_items_by_ids as inventory_get_items_by_ids,
+        )
+        from ..inventory.crud import (
+            update_item as inventory_update_item,
+        )
+        from ..inventory.models import (  # pyright: ignore[reportMissingImports]
+            CreateInventoryUpdateLog,
+            UpdateSource,
+        )
+    except Exception:  # pragma: no cover
+        pass
 
 
 async def wait_for_paid_invoices():

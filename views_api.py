@@ -1,7 +1,7 @@
 import json
 from collections.abc import Awaitable, Callable
 from http import HTTPStatus
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -48,16 +48,19 @@ CreateInventoryUpdateLog: type | None = None
 InventoryItem: type | None = None
 UpdateSource: type | None = None
 
-try:  # inventory extension is optional
-    from ..inventory.crud import db as inventory_db  # type: ignore[assignment]
-    from ..inventory.crud import (
-        get_inventories as get_user_inventories,  # type: ignore[assignment]
-    )
-    from ..inventory.models import (
-        Item as InventoryItem,  # type: ignore[assignment]
-    )
-except Exception:  # pragma: no cover - guard when inventory extension is absent
-    pass
+if not TYPE_CHECKING:
+    try:  # inventory extension is optional
+        from ..inventory.crud import (
+            db as inventory_db,
+        )  # pyright: ignore[reportMissingImports]
+        from ..inventory.crud import (  # pyright: ignore[reportMissingImports]
+            get_inventories as get_user_inventories,
+        )
+        from ..inventory.models import (
+            Item as InventoryItem,
+        )
+    except Exception:  # pragma: no cover - guard when inventory extension is absent
+        pass
 
 tpos_api_router = APIRouter()
 
