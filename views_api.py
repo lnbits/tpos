@@ -77,6 +77,38 @@ def _inventory_tags_to_string(raw_tags: str | list[str] | None) -> str | None:
     return ",".join([tag for tag in raw_tags if tag])
 
 
+def _first_image(images: str | list[str] | None) -> str | None:
+    if not images:
+        return None
+    if isinstance(images, list):
+        return _normalize_image(images[0]) if images else None
+    raw = str(images).strip()
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list) and parsed:
+            return _normalize_image(parsed[0])
+    except Exception:
+        pass
+    if "|||" in raw:
+        return _normalize_image(raw.split("|||")[0])
+    if "," in raw:
+        return _normalize_image(raw.split(",")[0])
+    return _normalize_image(raw)
+
+
+def _normalize_image(val: str | None) -> str | None:
+    if not val:
+        return None
+    val = str(val).strip()
+    if not val:
+        return None
+    if val.startswith("http") or val.startswith("/api/") or val.startswith("data:"):
+        return val
+    return f"/api/v1/assets/{val}/binary"
+
+
 async def _get_default_inventory_id(user_id: str) -> str | None:
     if not get_user_inventories:
         return None
@@ -528,7 +560,7 @@ async def api_tpos_inventory_items(tpos_id: str):
             "description": item.description,
             "price": item.price,
             "tax": item.tax_rate,
-            "image": item.images.split(",")[0] if item.images else None,
+            "image": _first_image(item.images),
             "categories": _inventory_tags_to_list(item.tags),
             "quantity_in_stock": item.quantity_in_stock,
             "disabled": (not item.is_active)
