@@ -221,6 +221,8 @@
               :src="item.image || null"
               :ratio="4/3"
               fit="contain"
+              loading="lazy"
+              spinner-color="white"
               :style="$q.screen.gt.sm ? 'height: 200px' : 'height: 100px'"
             >
             </q-img>
@@ -289,6 +291,8 @@
               :ratio="1"
               :src="item.image"
               fit="contain"
+              loading="lazy"
+              spinner-color="white"
             ></q-img>
             <q-icon
               v-else
