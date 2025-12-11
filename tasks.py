@@ -1,4 +1,6 @@
 import asyncio
+from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 from lnbits.core.models import Payment
 from lnbits.core.services import (
@@ -12,16 +14,32 @@ from loguru import logger
 
 from .crud import get_tpos
 
+inventory_get_items_by_ids: Callable[[str, list[str]], Awaitable[list[Any]]] | None = (
+    None
+)
+inventory_update_item: Callable[[Any], Awaitable[Any]] | None = None
+create_inventory_update_log: Callable[[Any], Awaitable[Any]] | None = None
+CreateInventoryUpdateLog: type | None = None
+UpdateSource: type | None = None
+
 
 async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> None:
-    if not (
-        inventory_get_items_by_ids
-        and inventory_update_item
-        and create_inventory_update_log
-        and CreateInventoryUpdateLog
-        and UpdateSource
+    if (
+        inventory_get_items_by_ids is None
+        or inventory_update_item is None
+        or create_inventory_update_log is None
+        or CreateInventoryUpdateLog is None
+        or UpdateSource is None
     ):
         return
+
+    item_fetcher = cast(
+        Callable[[str, list[str]], Awaitable[list[Any]]], inventory_get_items_by_ids
+    )
+    update_item_fn = cast(Callable[[Any], Awaitable[Any]], inventory_update_item)
+    create_log_fn = cast(Callable[[Any], Awaitable[Any]], create_inventory_update_log)
+    log_model = cast(type, CreateInventoryUpdateLog)
+    update_source = cast(Any, UpdateSource)
 
     inventory_id = inventory_payload.get("inventory_id")
     sold_items = inventory_payload.get("items") or []
@@ -29,7 +47,7 @@ async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> 
         return
 
     item_ids = [item.get("id") for item in sold_items if item.get("id")]
-    inventory_items = await inventory_get_items_by_ids(inventory_id, item_ids)
+    inventory_items = await item_fetcher(inventory_id, item_ids)
     inventory_map = {item.id: item for item in inventory_items}
 
     for sold in sold_items:
@@ -45,15 +63,15 @@ async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> 
         item.quantity_in_stock = quantity_after
 
         try:
-            await inventory_update_item(item)
-            await create_inventory_update_log(
-                CreateInventoryUpdateLog(
+            await update_item_fn(item)
+            await create_log_fn(
+                log_model(
                     inventory_id=inventory_id,
                     item_id=item.id,
                     quantity_change=-deduction,
                     quantity_before=quantity_before,
                     quantity_after=quantity_after,
-                    source=UpdateSource.SYSTEM,
+                    source=update_source.SYSTEM,
                     idempotency_key=f"{payment.payment_hash}:{item.id}",
                 )
             )
@@ -62,19 +80,23 @@ async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> 
                 f"tpos: failed to update inventory for item {item_id}: {exc!s}"
             )
 
+
 try:  # inventory extension is optional
     from ..inventory.crud import (
-        create_inventory_update_log,
-        get_items_by_ids as inventory_get_items_by_ids,
-        update_item as inventory_update_item,
+        create_inventory_update_log,  # type: ignore[assignment]
     )
-    from ..inventory.models import CreateInventoryUpdateLog, UpdateSource
+    from ..inventory.crud import (
+        get_items_by_ids as inventory_get_items_by_ids,  # type: ignore[assignment]
+    )
+    from ..inventory.crud import (
+        update_item as inventory_update_item,  # type: ignore[assignment]
+    )
+    from ..inventory.models import (
+        CreateInventoryUpdateLog,  # type: ignore[assignment]
+        UpdateSource,  # type: ignore[assignment]
+    )
 except Exception:  # pragma: no cover
-    inventory_get_items_by_ids = None
-    inventory_update_item = None
-    create_inventory_update_log = None
-    CreateInventoryUpdateLog = None
-    UpdateSource = None
+    pass
 
 
 async def wait_for_paid_invoices():

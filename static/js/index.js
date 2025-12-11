@@ -276,8 +276,8 @@ window.app = Vue.createApp({
         tip_options:
           this.formDialog.advanced.tips && this.formDialog.data.tip_options
             ? JSON.stringify(
-              this.formDialog.data.tip_options.map(str => parseInt(str))
-            )
+                this.formDialog.data.tip_options.map(str => parseInt(str))
+              )
             : JSON.stringify([]),
         tip_wallet:
           (this.formDialog.advanced.tips && this.formDialog.data.tip_wallet) ||
@@ -356,8 +356,7 @@ window.app = Vue.createApp({
       if (!wallet) return
       const payload = {
         use_inventory: this.inventoryStatus.enabled && tpos.use_inventory,
-        inventory_id:
-          tpos.inventory_id || this.inventoryStatus.inventory_id,
+        inventory_id: tpos.inventory_id || this.inventoryStatus.inventory_id,
         inventory_tags: tpos.inventory_tags || []
       }
       if (payload.use_inventory && !payload.inventory_id) {

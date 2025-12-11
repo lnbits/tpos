@@ -232,11 +232,7 @@
                             </div>
                           </div>
                           <div v-if="props.row.use_inventory" class="q-mb-md">
-                            <q-banner
-                              dense
-                              rounded
-                              class="bg-grey-2 text-dark"
-                            >
+                            <q-banner dense rounded class="bg-grey-2 text-dark">
                               Using items from the Inventory extension. Tags
                               control which products appear in PoS.
                             </q-banner>
@@ -264,25 +260,25 @@
                                 <template v-slot:body="props">
                                   <q-tr :props="props">
                                     <q-td auto-width>
-                                    <q-btn
-                                      size="sm"
-                                      color="pink"
-                                      dense
-                                      @click="deleteItem(props.row.id)"
-                                      icon="delete"
-                                      :disable="props.row.use_inventory"
-                                    ></q-btn>
-                                  </q-td>
-                                  <q-td auto-width>
-                                    <q-btn
-                                      size="sm"
-                                      color="accent"
-                                      dense
-                                      @click="openItemDialog(props.row.id)"
-                                      icon="edit"
-                                      :disable="props.row.use_inventory"
-                                    ></q-btn>
-                                  </q-td>
+                                      <q-btn
+                                        size="sm"
+                                        color="pink"
+                                        dense
+                                        @click="deleteItem(props.row.id)"
+                                        icon="delete"
+                                        :disable="props.row.use_inventory"
+                                      ></q-btn>
+                                    </q-td>
+                                    <q-td auto-width>
+                                      <q-btn
+                                        size="sm"
+                                        color="accent"
+                                        dense
+                                        @click="openItemDialog(props.row.id)"
+                                        icon="edit"
+                                        :disable="props.row.use_inventory"
+                                      ></q-btn>
+                                    </q-td>
                                     <q-td key="id" :props="props">
                                       <span
                                         v-text="props.row.id.split(':')[1]"

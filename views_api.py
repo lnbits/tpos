@@ -1,5 +1,7 @@
 import json
+from collections.abc import Awaitable, Callable
 from http import HTTPStatus
+from typing import Any, cast
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,6 +12,7 @@ from lnbits.core.crud import (
 )
 from lnbits.core.models import CreateInvoice, Payment, User, WalletTypeInfo
 from lnbits.core.services import create_payment_request, websocket_updater
+from lnbits.db import Database
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
@@ -17,7 +20,6 @@ from lnbits.decorators import (
 from lnurl import LnurlPayResponse
 from lnurl import decode as decode_lnurl
 from lnurl import handle as lnurl_handle
-from loguru import logger
 
 from .crud import (
     create_tpos,
@@ -36,27 +38,26 @@ from .models import (
     Tpos,
 )
 
+get_user_inventories: Callable[[str], Awaitable[Any]] | None = None
+inventory_db: Database | None = None
+inventory_get_items_by_ids: Callable[[str, list[str]], Awaitable[list[Any]]] | None = (
+    None
+)
+inventory_update_item: Callable[[Any], Awaitable[Any]] | None = None
+CreateInventoryUpdateLog: type | None = None
+InventoryItem: type | None = None
+UpdateSource: type | None = None
+
 try:  # inventory extension is optional
+    from ..inventory.crud import db as inventory_db  # type: ignore[assignment]
     from ..inventory.crud import (
-        create_inventory_update_log,
-        db as inventory_db,
-        get_inventories as get_user_inventories,
-        get_items_by_ids as inventory_get_items_by_ids,
-        update_item as inventory_update_item,
+        get_inventories as get_user_inventories,  # type: ignore[assignment]
     )
     from ..inventory.models import (
-        CreateInventoryUpdateLog,
-        Item as InventoryItem,
-        UpdateSource,
+        Item as InventoryItem,  # type: ignore[assignment]
     )
 except Exception:  # pragma: no cover - guard when inventory extension is absent
-    get_user_inventories = None
-    inventory_db = None
-    inventory_get_items_by_ids = None
-    inventory_update_item = None
-    CreateInventoryUpdateLog = None
-    InventoryItem = None
-    UpdateSource = None
+    pass
 
 tpos_api_router = APIRouter()
 
@@ -110,16 +111,16 @@ def _normalize_image(val: str | None) -> str | None:
 
 
 async def _get_default_inventory_id(user_id: str) -> str | None:
-    if not get_user_inventories:
+    if get_user_inventories is None:
         return None
     inventory = await get_user_inventories(user_id)
     return inventory.id if inventory else None
 
 
 async def _get_inventory_tags(inventory_id: str) -> list[str]:
-    if not inventory_db:
+    if inventory_db is None:
         return []
-    rows = await inventory_db.fetchall(
+    rows: list[Any] = await inventory_db.fetchall(
         """
         SELECT tags FROM inventory.items
         WHERE inventory_id = :inventory_id
@@ -137,9 +138,12 @@ async def _get_inventory_tags(inventory_id: str) -> list[str]:
 
 async def _get_inventory_items_for_tpos(
     inventory_id: str, tags: str | list[str] | None
-) -> list[InventoryItem]:
-    if not inventory_db or not InventoryItem:
+) -> list[Any]:
+    if inventory_db is None or InventoryItem is None:
         return []
+
+    db = cast(Database, inventory_db)
+    model_cls = cast(type, InventoryItem)
 
     tag_list = _inventory_tags_to_list(tags)
     where = [
@@ -160,7 +164,7 @@ async def _get_inventory_items_for_tpos(
         SELECT * FROM inventory.items
         WHERE {' AND '.join(where)}
     """
-    items = await inventory_db.fetchall(query, params, model=InventoryItem)
+    items: list[Any] = await db.fetchall(query, params, model=model_cls)
     # hide items with no stock when stock tracking is enabled
     return [
         item
@@ -169,10 +173,10 @@ async def _get_inventory_items_for_tpos(
     ]
 
 
-def _inventory_available_for_user(user: User) -> bool:
+def _inventory_available_for_user(user: User | None) -> bool:
     return bool(
-        get_user_inventories
-        and user
+        get_user_inventories is not None
+        and user is not None
         and getattr(user, "extensions", None)
         and "inventory" in user.extensions
     )
@@ -297,16 +301,15 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Paym
                 detail="Inventory is not enabled for this TPoS.",
             )
         inventory_payload.tags = _inventory_tags_to_list(inventory_payload.tags)
-        if (
-            tpos.inventory_id
-            and inventory_payload.inventory_id != tpos.inventory_id
-        ):
+        if tpos.inventory_id and inventory_payload.inventory_id != tpos.inventory_id:
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="Mismatched inventory selection.",
             )
         allowed_tags = set(_inventory_tags_to_list(tpos.inventory_tags))
-        if allowed_tags and any(tag not in allowed_tags for tag in inventory_payload.tags):
+        if allowed_tags and any(
+            tag not in allowed_tags for tag in inventory_payload.tags
+        ):
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="Provided tags are not allowed for this TPoS.",
