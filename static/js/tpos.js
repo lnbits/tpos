@@ -340,7 +340,7 @@ window.app = Vue.createApp({
       }
     },
     async loadInventoryItems() {
-      if (!this.inventoryId) return
+      if (!this.usingInventory) return
       this.inventoryLoading = true
       try {
         const {data} = await LNbits.api.request(

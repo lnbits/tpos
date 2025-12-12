@@ -191,6 +191,9 @@
   tpos.inventory_tags = tpos.inventory_tags
     ? tpos.inventory_tags.split(',').filter(Boolean)
     : []
+  tpos.inventory_omit_tags = tpos.inventory_omit_tags
+    ? tpos.inventory_omit_tags.split(',').filter(Boolean)
+    : []
   tpos.use_inventory = Boolean(tpos.use_inventory)
   if (tpos.withdraw_maximum) {
     tpos.withdraw_premium = Number(tpos.withdraw_maximum / 100)

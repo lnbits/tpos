@@ -47,6 +47,7 @@ class CreateTposData(BaseModel):
     use_inventory: bool = Field(False)
     inventory_id: str | None = None
     inventory_tags: list[str] | None = None
+    inventory_omit_tags: list[str] | None = None
     tax_inclusive: bool = Field(True)
     tax_default: float | None = Field(0.0)
     tip_options: str = Field("[]")
@@ -88,6 +89,7 @@ class TposClean(BaseModel):
     use_inventory: bool = False
     inventory_id: str | None = None
     inventory_tags: str | None = None
+    inventory_omit_tags: str | None = None
     tip_options: str | None = None
     enable_receipt_print: bool
     business_name: str | None = None

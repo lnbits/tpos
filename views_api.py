@@ -9,6 +9,7 @@ from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
     get_user,
+    get_wallet,
 )
 from lnbits.core.models import CreateInvoice, Payment, User, WalletTypeInfo
 from lnbits.core.services import create_payment_request, websocket_updater
@@ -69,8 +70,8 @@ def _inventory_tags_to_list(raw_tags: str | list[str] | None) -> list[str]:
     if raw_tags is None:
         return []
     if isinstance(raw_tags, list):
-        return [tag for tag in raw_tags if tag]
-    return [tag for tag in raw_tags.split(",") if tag]
+        return [tag.strip() for tag in raw_tags if tag and tag.strip()]
+    return [tag.strip() for tag in raw_tags.split(",") if tag and tag.strip()]
 
 
 def _inventory_tags_to_string(raw_tags: str | list[str] | None) -> str | None:
@@ -132,15 +133,43 @@ async def _get_inventory_tags(inventory_id: str) -> list[str]:
         """,
         {"inventory_id": inventory_id},
     )
+    inv_row: Any | None = await inventory_db.fetchone(
+        """
+        SELECT tags FROM inventory.inventories
+        WHERE id = :inventory_id
+        """,
+        {"inventory_id": inventory_id},
+    )
     tags: set[str] = set()
+    if inv_row:
+        inv_tags = inv_row["tags"] if isinstance(inv_row, dict) else inv_row.tags  # type: ignore[attr-defined]
+        tags.update(_inventory_tags_to_list(inv_tags))
     for row in rows:
         raw_tags = row["tags"] if isinstance(row, dict) else row.tags  # type: ignore[attr-defined]
         tags.update(_inventory_tags_to_list(raw_tags))
     return sorted(tags)
 
 
+async def _get_inventory_omit_tags(inventory_id: str) -> list[str]:
+    if inventory_db is None:
+        return []
+    row: Any | None = await inventory_db.fetchone(
+        """
+        SELECT omit_tags FROM inventory.inventories
+        WHERE id = :inventory_id
+        """,
+        {"inventory_id": inventory_id},
+    )
+    if not row:
+        return []
+    raw = row["omit_tags"] if isinstance(row, dict) else row.omit_tags  # type: ignore[attr-defined]
+    return _inventory_tags_to_list(raw)
+
+
 async def _get_inventory_items_for_tpos(
-    inventory_id: str, tags: str | list[str] | None
+    inventory_id: str,
+    tags: str | list[str] | None,
+    omit_tags: str | list[str] | None,
 ) -> list[Any]:
     if inventory_db is None or InventoryItem is None:
         return []
@@ -149,29 +178,45 @@ async def _get_inventory_items_for_tpos(
     model_cls = cast(type, InventoryItem)
 
     tag_list = _inventory_tags_to_list(tags)
-    where = [
-        "inventory_id = :inventory_id",
-        "is_active = true",
-        "is_approved = true",
-    ]
-    params: dict[str, str] = {"inventory_id": inventory_id}
-    if tag_list:
-        tag_filters = []
-        for idx, tag in enumerate(tag_list):
-            key = f"tag_{idx}"
-            tag_filters.append(f"tags LIKE :{key}")
-            params[key] = f"%{tag}%"
-        where.append("(" + " OR ".join(tag_filters) + ")")
-
-    query = f"""
+    omit_list = [tag.lower() for tag in _inventory_tags_to_list(omit_tags)]
+    items: list[Any] = await db.fetchall(
+        """
         SELECT * FROM inventory.items
-        WHERE {' AND '.join(where)}
-    """
-    items: list[Any] = await db.fetchall(query, params, model=model_cls)
+        WHERE inventory_id = :inventory_id
+        AND is_active = true
+        AND is_approved = true
+        """,
+        {"inventory_id": inventory_id},
+        model=model_cls,
+    )
+
+    def has_allowed_tag(item_tags: str | list[str] | None) -> bool:
+        # When no tags are configured for this TPoS, show no items
+        if not tag_list:
+            return False
+        item_tag_list = [tag.lower() for tag in _inventory_tags_to_list(item_tags)]
+        allowed = [tag.lower() for tag in tag_list]
+        return any(tag in item_tag_list for tag in allowed)
+
+    def has_omit_tag(item_omit_tags: str | list[str] | None) -> bool:
+        if not omit_list:
+            return False
+        item_tag_list = [tag.lower() for tag in _inventory_tags_to_list(item_omit_tags)]
+        return any(tag in item_tag_list for tag in omit_list)
+
+    filtered = [
+        item
+        for item in items
+        if has_allowed_tag(item.tags) and not has_omit_tag(item.omit_tags)
+    ]
+    # If no items matched the provided tags, fall back to all items minus omitted ones.
+    if tag_list and not filtered:
+        filtered = [item for item in items if not has_omit_tag(item.omit_tags)]
+
     # hide items with no stock when stock tracking is enabled
     return [
         item
-        for item in items
+        for item in filtered
         if item.quantity_in_stock is None or item.quantity_in_stock > 0
     ]
 
@@ -203,11 +248,17 @@ async def api_inventory_status(
 ) -> dict:
     user = await get_user(key_info.wallet.user)
     if not user or not _inventory_available_for_user(user):
-        return {"enabled": False, "inventory_id": None, "tags": []}
+        return {"enabled": False, "inventory_id": None, "tags": [], "omit_tags": []}
 
     inventory_id = await _get_default_inventory_id(user.id)
     tags = await _get_inventory_tags(inventory_id) if inventory_id else []
-    return {"enabled": True, "inventory_id": inventory_id, "tags": tags}
+    omit_tags = await _get_inventory_omit_tags(inventory_id) if inventory_id else []
+    return {
+        "enabled": True,
+        "inventory_id": inventory_id,
+        "tags": tags,
+        "omit_tags": omit_tags,
+    }
 
 
 @tpos_api_router.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
@@ -224,6 +275,8 @@ async def api_tpos_create(
             data.use_inventory = False
     if data.inventory_tags:
         data.inventory_tags = _inventory_tags_to_list(data.inventory_tags)
+    if data.inventory_omit_tags:
+        data.inventory_omit_tags = _inventory_tags_to_list(data.inventory_omit_tags)
     tpos = await create_tpos(data)
     return tpos
 
@@ -260,6 +313,10 @@ async def api_tpos_update(
     if "inventory_tags" in update_payload:
         update_payload["inventory_tags"] = _inventory_tags_to_string(
             _inventory_tags_to_list(update_payload["inventory_tags"])
+        )
+    if "inventory_omit_tags" in update_payload:
+        update_payload["inventory_omit_tags"] = _inventory_tags_to_string(
+            _inventory_tags_to_list(update_payload["inventory_omit_tags"])
         )
     for field, value in update_payload.items():
         setattr(tpos, field, value)
@@ -553,12 +610,32 @@ async def api_tpos_check_lnaddress(lnaddress: str):
 )
 async def api_tpos_inventory_items(tpos_id: str):
     tpos = await get_tpos(tpos_id)
-    if not tpos or not tpos.use_inventory or not tpos.inventory_id:
+    if not tpos or not tpos.use_inventory:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND,
             detail="Inventory not enabled for this TPoS.",
         )
-    items = await _get_inventory_items_for_tpos(tpos.inventory_id, tpos.inventory_tags)
+    inventory_id = tpos.inventory_id
+    if not inventory_id:
+        wallet = await get_wallet(tpos.wallet)
+        if wallet and get_user_inventories:
+            inv = await get_user_inventories(wallet.user)
+            inventory_id = inv.id if inv else None
+    if not inventory_id:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail="No inventory found for this TPoS.",
+        )
+
+    items = await _get_inventory_items_for_tpos(
+        inventory_id,
+        tpos.inventory_tags,
+        (
+            tpos.inventory_omit_tags
+            if tpos.inventory_omit_tags
+            else await _get_inventory_omit_tags(inventory_id)
+        ),
+    )
     return [
         {
             "id": item.id,

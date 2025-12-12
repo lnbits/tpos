@@ -16,6 +16,11 @@ const mapTpos = obj => {
   const tagString =
     obj.inventory_tags === 'null' ? '' : obj.inventory_tags || ''
   obj.inventory_tags = tagString ? tagString.split(',').filter(Boolean) : []
+  const omitTagString =
+    obj.inventory_omit_tags === 'null' ? '' : obj.inventory_omit_tags || ''
+  obj.inventory_omit_tags = omitTagString
+    ? omitTagString.split(',').filter(Boolean)
+    : []
   obj.itemsMap = new Map()
   obj.items.forEach((item, idx) => {
     let id = `${obj.id}:${idx + 1}`
@@ -36,7 +41,8 @@ window.app = Vue.createApp({
       inventoryStatus: {
         enabled: false,
         inventory_id: null,
-        tags: []
+        tags: [],
+        omit_tags: []
       },
       tpossTable: {
         columns: [
@@ -207,11 +213,16 @@ window.app = Vue.createApp({
       ]
     },
     inventoryTagOptions() {
-      const tags = new Set(this.inventoryStatus.tags)
-      this.tposs.forEach(tpos =>
-        (tpos.inventory_tags || []).forEach(tag => tags.add(tag))
-      )
-      return Array.from(tags).map(tag => ({label: tag, value: tag}))
+      return (this.inventoryStatus.tags || []).map(tag => ({
+        label: tag,
+        value: tag
+      }))
+    },
+    inventoryOmitTagOptions() {
+      return (this.inventoryStatus.omit_tags || []).map(tag => ({
+        label: tag,
+        value: tag
+      }))
     }
   },
   methods: {
@@ -222,6 +233,9 @@ window.app = Vue.createApp({
         inventory_id: this.inventoryStatus.inventory_id,
         inventory_tags: this.inventoryStatus.enabled
           ? [...this.inventoryStatus.tags]
+          : [],
+        inventory_omit_tags: this.inventoryStatus.enabled
+          ? [...this.inventoryStatus.omit_tags]
           : [],
         tip_options: [],
         withdraw_between: 10,
@@ -265,6 +279,7 @@ window.app = Vue.createApp({
           this.formDialog.data.use_inventory = true
           this.formDialog.data.inventory_id = data.inventory_id
           this.formDialog.data.inventory_tags = [...data.tags]
+          this.formDialog.data.inventory_omit_tags = [...data.omit_tags]
         }
       } catch (error) {
         console.error(error)
@@ -354,10 +369,16 @@ window.app = Vue.createApp({
     saveInventorySettings(tpos) {
       const wallet = _.findWhere(this.g.user.wallets, {id: tpos.wallet})
       if (!wallet) return
+      const resolvedInventoryId =
+        this.inventoryStatus.inventory_id || tpos.inventory_id
       const payload = {
         use_inventory: this.inventoryStatus.enabled && tpos.use_inventory,
-        inventory_id: tpos.inventory_id || this.inventoryStatus.inventory_id,
-        inventory_tags: tpos.inventory_tags || []
+        inventory_id:
+          this.inventoryStatus.enabled && tpos.use_inventory
+            ? resolvedInventoryId
+            : null,
+        inventory_tags: tpos.inventory_tags || [],
+        inventory_omit_tags: tpos.inventory_omit_tags || []
       }
       if (payload.use_inventory && !payload.inventory_id) {
         Quasar.Notify.create({
@@ -382,16 +403,25 @@ window.app = Vue.createApp({
     onInventoryModeChange(tpos, value) {
       tpos.use_inventory = value
       if (value && this.inventoryStatus.enabled) {
-        tpos.inventory_id =
-          tpos.inventory_id || this.inventoryStatus.inventory_id
+        tpos.inventory_id = this.inventoryStatus.inventory_id
         if (!tpos.inventory_tags.length && this.inventoryStatus.tags.length) {
           tpos.inventory_tags = [...this.inventoryStatus.tags]
+        }
+        if (
+          !tpos.inventory_omit_tags.length &&
+          this.inventoryStatus.omit_tags
+        ) {
+          tpos.inventory_omit_tags = [...this.inventoryStatus.omit_tags]
         }
       }
       this.saveInventorySettings(tpos)
     },
     onInventoryTagsChange(tpos, tags) {
       tpos.inventory_tags = tags || []
+      this.saveInventorySettings(tpos)
+    },
+    onInventoryOmitTagsChange(tpos, tags) {
+      tpos.inventory_omit_tags = tags || []
       this.saveInventorySettings(tpos)
     },
     deleteTpos(tposId) {

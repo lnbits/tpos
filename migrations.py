@@ -245,3 +245,14 @@ async def m016_add_inventory_settings(db: Database):
         ALTER TABLE tpos.pos ADD inventory_tags TEXT NULL;
     """
     )
+
+
+async def m017_add_inventory_omit_tags(db: Database):
+    """
+    Add inventory omit tags column
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD inventory_omit_tags TEXT NULL;
+    """
+    )
