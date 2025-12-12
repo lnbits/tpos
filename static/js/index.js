@@ -229,14 +229,10 @@ window.app = Vue.createApp({
     closeFormDialog() {
       this.formDialog.show = false
       this.formDialog.data = {
-        use_inventory: this.inventoryStatus.enabled,
+        use_inventory: false,
         inventory_id: this.inventoryStatus.inventory_id,
-        inventory_tags: this.inventoryStatus.enabled
-          ? [...this.inventoryStatus.tags]
-          : [],
-        inventory_omit_tags: this.inventoryStatus.enabled
-          ? [...this.inventoryStatus.omit_tags]
-          : [],
+        inventory_tags: [...(this.inventoryStatus.tags || [])],
+        inventory_omit_tags: [...(this.inventoryStatus.omit_tags || [])],
         tip_options: [],
         withdraw_between: 10,
         withdraw_time_option: '',
@@ -271,12 +267,8 @@ window.app = Vue.createApp({
           this.g.user.wallets[0].adminkey
         )
         this.inventoryStatus = data
-        if (!data.enabled) {
-          this.formDialog.data.use_inventory = false
-          return
-        }
+        // Default remains "Use TPoS items"; keep inventory info available without auto-enabling.
         if (!this.formDialog.data.inventory_id) {
-          this.formDialog.data.use_inventory = true
           this.formDialog.data.inventory_id = data.inventory_id
           this.formDialog.data.inventory_tags = [...data.tags]
           this.formDialog.data.inventory_omit_tags = [...data.omit_tags]

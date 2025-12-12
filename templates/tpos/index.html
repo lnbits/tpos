@@ -122,8 +122,6 @@
                 <div class="row items-center q-mb-lg q-mt-lg">
                   <div class="col-12 col-md-4">
                     <q-option-group
-                      inline
-                      dense
                       :model-value="props.row.use_inventory"
                       :options="inventoryModeOptions"
                       @update:model-value="onInventoryModeChange(props.row, $event)"
@@ -136,7 +134,7 @@
                       </q-tooltip>
                     </q-option-group>
                   </div>
-                  <div class="col-12 col-md-4" v-if="props.row.use_inventory">
+                  <div class="col-12 col-md-6" v-if="props.row.use_inventory">
                     <q-select
                       filled
                       dense
@@ -153,8 +151,6 @@
                       :disable="!inventoryStatus.enabled"
                       @update:model-value="onInventoryTagsChange(props.row, $event)"
                     ></q-select>
-                  </div>
-                  <div class="col-12 col-md-4">
                     <q-select
                       filled
                       dense
@@ -168,7 +164,6 @@
                       :options="inventoryOmitTagOptions"
                       label="Omit tags"
                       hint="Exclude products carrying these tags"
-                      class="q-ml-md"
                       :disable="!inventoryStatus.enabled"
                       @update:model-value="onInventoryOmitTagsChange(props.row, $event)"
                     ></q-select>
