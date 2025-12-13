@@ -128,7 +128,18 @@ window.app = Vue.createApp({
       currency_choice: false,
       _currencyResolver: null,
       _withdrawing: false,
-      headerElement: null
+      headerElement: null,
+      pastelColors: [
+        'blue-5',
+        'green-5',
+        'cyan-5',
+        'purple-5',
+        'deep-purple-5',
+        'indigo-5',
+        'pink-5',
+        'amber-5',
+        'orange-5'
+      ]
     }
   },
   watch: {
@@ -240,6 +251,14 @@ window.app = Vue.createApp({
     }
   },
   methods: {
+    setColor(category) {
+      let hash = 0
+      for (let i = 0; i < category.length; i++) {
+        hash = category.charCodeAt(i) + ((hash << 5) - hash)
+      }
+
+      return this.pastelColors[Math.abs(hash) % this.pastelColors.length]
+    },
     addAmount() {
       this.addedAmount += this.amount
       this.total = +(this.total + this.amount).toFixed(2)
