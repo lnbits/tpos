@@ -129,6 +129,8 @@ window.app = Vue.createApp({
       _currencyResolver: null,
       _withdrawing: false,
       headerElement: null,
+      categoryColors: {},
+      categoryColorIndex: 0,
       pastelColors: [
         'blue-5',
         'green-5',
@@ -252,12 +254,18 @@ window.app = Vue.createApp({
   },
   methods: {
     setColor(category) {
-      let hash = 0
-      for (let i = 0; i < category.length; i++) {
-        hash = category.charCodeAt(i) + ((hash << 5) - hash)
+      if (!category || category.toLowerCase() === 'all') {
+        return 'primary'
       }
-
-      return this.pastelColors[Math.abs(hash) % this.pastelColors.length]
+      const key = category.toLowerCase()
+      if (this.categoryColors[key]) {
+        return this.categoryColors[key]
+      }
+      const color =
+        this.pastelColors[this.categoryColorIndex % this.pastelColors.length]
+      this.categoryColors[key] = color
+      this.categoryColorIndex += 1
+      return color
     },
     addAmount() {
       this.addedAmount += this.amount
@@ -355,6 +363,8 @@ window.app = Vue.createApp({
       })
       if (this.items.length > 0) {
         this.showPoS = false
+        this.categoryColors = {}
+        this.categoryColorIndex = 0
         this.categories = this.extractCategories(this.items)
       }
     },

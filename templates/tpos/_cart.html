@@ -177,7 +177,7 @@
             <q-img :src="item.image || null" :ratio="4/3" fit="contain">
             </q-img>
 
-            <span dense v-text="item.title"></span>
+            <span class="item-grid-title" dense v-text="item.title"></span>
 
             <q-separator
               class="q-pt-xs"
@@ -199,14 +199,17 @@
               :src="item.image"
               fit="contain"
             ></q-img>
+            
             <q-icon
               v-else
               name="sell"
               size="xs"
               class="absolute-center text-grey"
             ></q-icon>
+            <q-badge floating :color="setColor(item.categories[0])"></q-badge>
           </q-avatar>
         </q-item-section>
+
         <q-item-section @click="addToCart(item)">
           <q-item-label
             class="text-subtitle1 ellipsis"
