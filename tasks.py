@@ -1,4 +1,5 @@
 import asyncio
+from time import time
 import httpx
 from lnbits.helpers import create_access_token
 from lnbits.core.models import Payment
@@ -15,29 +16,32 @@ from loguru import logger
 
 from .crud import get_tpos
 
-async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> None:
-    wallet = await get_wallet(payment.wallet_id)
+async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:
+    wallet = await get_wallet(wallet_id)
     if not wallet:
         return
     inventory_id = inventory_payload.get("inventory_id")
-    if not inventory_id:
+    items = inventory_payload.get("items") or []
+    if not inventory_id or not items:
         return
-    access = create_access_token({"usr": wallet.user}, token_expire_minutes=1)
+    ids: list[str] = []
+    quantities: list[int] = []
+    for item in items:
+        item_id = item.get("id")
+        qty = item.get("quantity") or 0
+        if not item_id or qty <= 0:
+            continue
+        ids.append(item_id)
+        quantities.append(int(qty))
+    if not ids:
+        return
+
+    access = create_access_token({"sub": "", "usr": wallet.user}, token_expire_minutes=1)
     async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            url=f"http://{settings.host}:{settings.port}/inventory/api/v1/item?item_id={inventory_id}",
+        await client.patch(
+            url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/quantities",
             headers={"Authorization": f"Bearer {access}"},
-        )
-        resp.raise_for_status()
-        item = resp.json()
-        if not item["quantity_in_stock"] or item["quantity_in_stock"] <= 0:
-            return
-        new_quantity = item["quantity_in_stock"] - 1
-        update_data = {"item_id": inventory_id, "quantity_in_stock": new_quantity}
-        await client.put(
-            url=f"http://{settings.host}:{settings.port}/inventory/api/v1/item/{inventory_id}",
-            headers={"Authorization": f"Bearer {access}"},
-            json=update_data,
+            params={"ids": ids, "quantities": quantities},
         )
     return
 
@@ -94,7 +98,7 @@ async def on_invoice_paid(payment: Payment) -> None:
 
     inventory_payload = payment.extra.get("inventory")
     if inventory_payload:
-        await _deduct_inventory_stock(payment, inventory_payload)
+        await _deduct_inventory_stock(payment.wallet_id, inventory_payload)
 
     if not tip_amount:
         # no tip amount
