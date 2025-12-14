@@ -124,6 +124,7 @@ async def _get_inventory_items_for_tpos(
         resp = await client.get(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/paginated",
             headers={"Authorization": f"Bearer {access}"},
+            params={"limit": 500, "offset": 0, "is_active": True},
         )
         payload = resp.json()
         items = payload.get("data", []) if isinstance(payload, dict) else payload
