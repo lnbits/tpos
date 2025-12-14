@@ -574,11 +574,7 @@ async def api_tpos_inventory_items(tpos_id: str):
         wallet.user,
         inventory_id,
         tpos.inventory_tags,
-        (
-            tpos.inventory_omit_tags
-            if tpos.inventory_omit_tags
-            else (inventory_data or {}).get("omit_tags")
-        ),
+        tpos.inventory_omit_tags,
     )
     return [
         {
