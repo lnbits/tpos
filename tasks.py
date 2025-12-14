@@ -1,8 +1,9 @@
 import asyncio
-from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Any, cast
+import httpx
 
 from lnbits.core.models import Payment
+from lnbits.core.crud import get_wallet
+from lnbits.settings import settings
 from lnbits.core.services import (
     create_invoice,
     get_pr_from_lnurl,
@@ -14,94 +15,30 @@ from loguru import logger
 
 from .crud import get_tpos
 
-if TYPE_CHECKING:  # pragma: no cover
-    pass
-
-inventory_get_items_by_ids: Callable[[str, list[str]], Awaitable[list[Any]]] | None = (
-    None
-)
-inventory_update_item: Callable[[Any], Awaitable[Any]] | None = None
-create_inventory_update_log: Callable[[Any], Awaitable[Any]] | None = None
-CreateInventoryUpdateLog: type | None = None
-UpdateSource: type | None = None
-
-
 async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> None:
-    if (
-        inventory_get_items_by_ids is None
-        or inventory_update_item is None
-        or create_inventory_update_log is None
-        or CreateInventoryUpdateLog is None
-        or UpdateSource is None
-    ):
+    wallet = await get_wallet(payment.wallet_id)
+    if not wallet:
         return
-
-    item_fetcher = cast(
-        Callable[[str, list[str]], Awaitable[list[Any]]], inventory_get_items_by_ids
-    )
-    update_item_fn = cast(Callable[[Any], Awaitable[Any]], inventory_update_item)
-    create_log_fn = cast(Callable[[Any], Awaitable[Any]], create_inventory_update_log)
-    log_model = cast(type, CreateInventoryUpdateLog)
-    update_source = cast(Any, UpdateSource)
-
     inventory_id = inventory_payload.get("inventory_id")
-    sold_items = inventory_payload.get("items") or []
-    if not inventory_id or not sold_items:
+    if not inventory_id:
         return
-
-    item_ids = [item.get("id") for item in sold_items if item.get("id")]
-    inventory_items = await item_fetcher(inventory_id, item_ids)
-    inventory_map = {item.id: item for item in inventory_items}
-
-    for sold in sold_items:
-        item_id = sold.get("id")
-        quantity = sold.get("quantity") or 1
-        item = inventory_map.get(item_id)
-        if not item or item.quantity_in_stock is None:
-            continue
-
-        quantity_before = item.quantity_in_stock
-        deduction = min(quantity, quantity_before)
-        quantity_after = quantity_before - deduction
-        item.quantity_in_stock = quantity_after
-
-        try:
-            await update_item_fn(item)
-            await create_log_fn(
-                log_model(
-                    inventory_id=inventory_id,
-                    item_id=item.id,
-                    quantity_change=-deduction,
-                    quantity_before=quantity_before,
-                    quantity_after=quantity_after,
-                    source=update_source.SYSTEM,
-                    idempotency_key=f"{payment.payment_hash}:{item.id}",
-                )
-            )
-        except Exception as exc:  # pragma: no cover - log and continue
-            logger.warning(
-                f"tpos: failed to update inventory for item {item_id}: {exc!s}"
-            )
-
-
-if not TYPE_CHECKING:
-    try:  # inventory extension is optional
-        from ..inventory.crud import (  # pyright: ignore[reportMissingImports]
-            create_inventory_update_log,
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            url=f"http://{settings.host}:{settings.port}/inventory/api/v1/item?item_id={inventory_id}",
+            headers={"X-API-KEY": wallet.adminkey},
         )
-        from ..inventory.crud import (
-            get_items_by_ids as inventory_get_items_by_ids,
+        resp.raise_for_status()
+        item = resp.json()
+        if not item["quantity_in_stock"] or item["quantity_in_stock"] <= 0:
+            return
+        new_quantity = item["quantity_in_stock"] - 1
+        update_data = {"item_id": inventory_id, "quantity_in_stock": new_quantity}
+        await client.put(
+            url=f"http://{settings.host}:{settings.port}/inventory/api/v1/item/{inventory_id}",
+            headers={"X-API-KEY": wallet.adminkey},
+            json=update_data,
         )
-        from ..inventory.crud import (
-            update_item as inventory_update_item,
-        )
-        from ..inventory.models import (  # pyright: ignore[reportMissingImports]
-            CreateInventoryUpdateLog,
-            UpdateSource,
-        )
-    except Exception:  # pragma: no cover
-        pass
-
+    return
 
 async def wait_for_paid_invoices():
     invoice_queue = asyncio.Queue()
