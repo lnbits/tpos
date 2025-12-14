@@ -44,7 +44,7 @@ async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> No
         await client.patch(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/quantities",
             headers={"Authorization": f"Bearer {access}"},
-            params={"ids": ids, "quantities": quantities},
+            params={"source": "tpos", "ids": ids, "quantities": quantities},
         )
     return
 
