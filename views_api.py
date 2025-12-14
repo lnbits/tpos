@@ -92,14 +92,13 @@ def _normalize_image(val: str | None) -> str | None:
 
 
 async def _get_default_inventory(user_id: str) -> dict[str, Any] | None:
-    access = create_access_token({"usr": user_id}, token_expire_minutes=1)
+    access = create_access_token({"sub": "", "usr": user_id}, token_expire_minutes=1)
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1",
             headers={"Authorization": f"Bearer {access}"},
         )
         inventory = resp.json()
-        logger.debug(inventory)
     if not inventory:
         return None
     if isinstance(inventory, list):
@@ -112,7 +111,7 @@ async def _get_default_inventory(user_id: str) -> dict[str, Any] | None:
 
 
 async def _get_inventory_items_for_tpos(
-    adminkey: str,
+    user_id: str,
     inventory_id: str,
     tags: str | list[str] | None,
     omit_tags: str | list[str] | None,
@@ -121,14 +120,15 @@ async def _get_inventory_items_for_tpos(
     tag_list = _inventory_tags_to_list(tags)
     omit_list = [tag.lower() for tag in _inventory_tags_to_list(omit_tags)]
     allowed_tags = [tag.lower() for tag in tag_list]
-    logger.debug(adminkey)
+    logger.debug(user_id)
+    access = create_access_token({"sub": "", "usr": user_id}, token_expire_minutes=1)
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/paginated",
-            headers={"X-API-KEY": adminkey},
+            headers={"Authorization": f"Bearer {access}"},
         )
-        resp.raise_for_status()
-        items = resp.json()
+        payload = resp.json()
+        items = payload.get("data", []) if isinstance(payload, dict) else payload
 
     def has_allowed_tag(item_tags: str | list[str] | None) -> bool:
         # When no tags are configured for this TPoS, show no items
@@ -571,7 +571,7 @@ async def api_tpos_inventory_items(tpos_id: str):
         )
 
     items = await _get_inventory_items_for_tpos(
-        wallet.adminkey,
+        wallet.user,
         inventory_id,
         tpos.inventory_tags,
         (
