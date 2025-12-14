@@ -1,7 +1,6 @@
 import json
-from collections.abc import Awaitable, Callable
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +10,7 @@ from lnbits.core.crud import (
     get_user,
     get_wallet,
 )
+from lnbits.settings import settings
 from lnbits.core.models import CreateInvoice, Payment, User, WalletTypeInfo
 from lnbits.core.services import create_payment_request, websocket_updater
 from lnbits.db import Database
@@ -38,30 +38,6 @@ from .models import (
     TapToPay,
     Tpos,
 )
-
-get_user_inventories: Callable[[str], Awaitable[Any]] | None = None
-inventory_db: Database | None = None
-inventory_get_items_by_ids: Callable[[str, list[str]], Awaitable[list[Any]]] | None = (
-    None
-)
-inventory_update_item: Callable[[Any], Awaitable[Any]] | None = None
-CreateInventoryUpdateLog: type | None = None
-InventoryItem: type | None = None
-UpdateSource: type | None = None
-
-if not TYPE_CHECKING:
-    try:  # inventory extension is optional
-        from ..inventory.crud import (
-            db as inventory_db,
-        )  # pyright: ignore[reportMissingImports]
-        from ..inventory.crud import (  # pyright: ignore[reportMissingImports]
-            get_inventories as get_user_inventories,
-        )
-        from ..inventory.models import (
-            Item as InventoryItem,
-        )
-    except Exception:  # pragma: no cover - guard when inventory extension is absent
-        pass
 
 tpos_api_router = APIRouter()
 
@@ -114,81 +90,33 @@ def _normalize_image(val: str | None) -> str | None:
     return f"/api/v1/assets/{val}/binary"
 
 
-async def _get_default_inventory_id(user_id: str) -> str | None:
-    if get_user_inventories is None:
-        return None
-    inventory = await get_user_inventories(user_id)
-    return inventory.id if inventory else None
-
-
-async def _get_inventory_tags(inventory_id: str) -> list[str]:
-    if inventory_db is None:
-        return []
-    rows: list[Any] = await inventory_db.fetchall(
-        """
-        SELECT tags FROM inventory.items
-        WHERE inventory_id = :inventory_id
-        AND tags IS NOT NULL AND tags != ''
-        AND is_active = true AND is_approved = true
-        """,
-        {"inventory_id": inventory_id},
-    )
-    inv_row: Any | None = await inventory_db.fetchone(
-        """
-        SELECT tags FROM inventory.inventories
-        WHERE id = :inventory_id
-        """,
-        {"inventory_id": inventory_id},
-    )
-    tags: set[str] = set()
-    if inv_row:
-        inv_tags = inv_row["tags"] if isinstance(inv_row, dict) else inv_row.tags  # type: ignore[attr-defined]
-        tags.update(_inventory_tags_to_list(inv_tags))
-    for row in rows:
-        raw_tags = row["tags"] if isinstance(row, dict) else row.tags  # type: ignore[attr-defined]
-        tags.update(_inventory_tags_to_list(raw_tags))
-    return sorted(tags)
-
-
-async def _get_inventory_omit_tags(inventory_id: str) -> list[str]:
-    if inventory_db is None:
-        return []
-    row: Any | None = await inventory_db.fetchone(
-        """
-        SELECT omit_tags FROM inventory.inventories
-        WHERE id = :inventory_id
-        """,
-        {"inventory_id": inventory_id},
-    )
-    if not row:
-        return []
-    raw = row["omit_tags"] if isinstance(row, dict) else row.omit_tags  # type: ignore[attr-defined]
-    return _inventory_tags_to_list(raw)
+async def _get_default_inventory(user_id: str) -> str | None:
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            url=f"http://{settings.host}:{settings.port}/inventory/api/v1",
+            headers={"X-API-KEY": user_id},
+        )
+        resp.raise_for_status()
+        inventory = resp.json()
+    return inventory
 
 
 async def _get_inventory_items_for_tpos(
+    user_id: str,
     inventory_id: str,
     tags: str | list[str] | None,
     omit_tags: str | list[str] | None,
 ) -> list[Any]:
-    if inventory_db is None or InventoryItem is None:
-        return []
-
-    db = cast(Database, inventory_db)
-    model_cls = cast(type, InventoryItem)
 
     tag_list = _inventory_tags_to_list(tags)
     omit_list = [tag.lower() for tag in _inventory_tags_to_list(omit_tags)]
-    items: list[Any] = await db.fetchall(
-        """
-        SELECT * FROM inventory.items
-        WHERE inventory_id = :inventory_id
-        AND is_active = true
-        AND is_approved = true
-        """,
-        {"inventory_id": inventory_id},
-        model=model_cls,
-    )
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/paginated",
+            headers={"X-API-KEY": user_id},
+        )
+        resp.raise_for_status()
+        items = resp.json()
 
     def has_allowed_tag(item_tags: str | list[str] | None) -> bool:
         # When no tags are configured for this TPoS, show no items
@@ -223,10 +151,7 @@ async def _get_inventory_items_for_tpos(
 
 def _inventory_available_for_user(user: User | None) -> bool:
     return bool(
-        get_user_inventories is not None
-        and user is not None
-        and getattr(user, "extensions", None)
-        and "inventory" in user.extensions
+        "inventory" in user.extensions
     )
 
 
@@ -250,12 +175,12 @@ async def api_inventory_status(
     if not user or not _inventory_available_for_user(user):
         return {"enabled": False, "inventory_id": None, "tags": [], "omit_tags": []}
 
-    inventory_id = await _get_default_inventory_id(user.id)
-    tags = await _get_inventory_tags(inventory_id) if inventory_id else []
-    omit_tags = await _get_inventory_omit_tags(inventory_id) if inventory_id else []
+    inventory = await _get_default_inventory(user.id)
+    tags = inventory["tags"] if inventory and "tags" in inventory else []
+    omit_tags = inventory["omit_tags"] if inventory and "omit_tags" in inventory else []
     return {
         "enabled": True,
-        "inventory_id": inventory_id,
+        "inventory_id": inventory["id"] if inventory and "id" in inventory else None,
         "tags": tags,
         "omit_tags": omit_tags,
     }
@@ -270,13 +195,13 @@ async def api_tpos_create(
     if data.use_inventory and not _inventory_available_for_user(user):
         data.use_inventory = False
     if data.use_inventory and not data.inventory_id:
-        data.inventory_id = await _get_default_inventory_id(key_type.wallet.user)
-        if not data.inventory_id:
+        inventory = await _get_default_inventory(key_type.wallet.user)
+        if not inventory:
             data.use_inventory = False
-    if data.inventory_tags:
-        data.inventory_tags = _inventory_tags_to_list(data.inventory_tags)
-    if data.inventory_omit_tags:
-        data.inventory_omit_tags = _inventory_tags_to_list(data.inventory_omit_tags)
+        else:
+            data.inventory_id = inventory["id"]
+            data.inventory_tags = inventory["tags"]
+            data.inventory_omit_tags = inventory["omit_tags"]
     tpos = await create_tpos(data)
     return tpos
 
@@ -297,9 +222,9 @@ async def api_tpos_update(
     user = await get_user(wallet.wallet.user)
     update_payload = data.dict(exclude_unset=True)
     if update_payload.get("use_inventory") and not update_payload.get("inventory_id"):
-        default_inventory_id = await _get_default_inventory_id(wallet.wallet.user)
-        if default_inventory_id:
-            update_payload["inventory_id"] = default_inventory_id
+        inventory = await _get_default_inventory(wallet.wallet.user)
+        if inventory:
+            update_payload["inventory_id"] = inventory["id"]
         else:
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
@@ -628,6 +553,7 @@ async def api_tpos_inventory_items(tpos_id: str):
         )
 
     items = await _get_inventory_items_for_tpos(
+        tpos.user_id,
         inventory_id,
         tpos.inventory_tags,
         (
