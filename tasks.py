@@ -1,6 +1,6 @@
 import asyncio
 import httpx
-
+from lnbits.helpers import create_access_token
 from lnbits.core.models import Payment
 from lnbits.core.crud import get_wallet
 from lnbits.settings import settings
@@ -22,10 +22,11 @@ async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> 
     inventory_id = inventory_payload.get("inventory_id")
     if not inventory_id:
         return
+    access = create_access_token({"usr": wallet.user}, token_expire_minutes=1)
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/item?item_id={inventory_id}",
-            headers={"X-API-KEY": wallet.adminkey},
+            headers={"Authorization": f"Bearer {access}"},
         )
         resp.raise_for_status()
         item = resp.json()
@@ -35,7 +36,7 @@ async def _deduct_inventory_stock(payment: Payment, inventory_payload: dict) -> 
         update_data = {"item_id": inventory_id, "quantity_in_stock": new_quantity}
         await client.put(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/item/{inventory_id}",
-            headers={"X-API-KEY": wallet.adminkey},
+            headers={"Authorization": f"Bearer {access}"},
             json=update_data,
         )
     return

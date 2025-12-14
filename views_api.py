@@ -10,6 +10,8 @@ from lnbits.core.crud import (
     get_user,
     get_wallet,
 )
+from loguru import logger
+from lnbits.helpers import create_access_token
 from lnbits.settings import settings
 from lnbits.core.models import CreateInvoice, Payment, User, WalletTypeInfo
 from lnbits.core.services import create_payment_request, websocket_updater
@@ -90,13 +92,14 @@ def _normalize_image(val: str | None) -> str | None:
 
 
 async def _get_default_inventory(user_id: str) -> dict[str, Any] | None:
+    access = create_access_token({"usr": user_id}, token_expire_minutes=1)
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1",
-            headers={"X-API-KEY": user_id},
+            headers={"Authorization": f"Bearer {access}"},
         )
-        resp.raise_for_status()
         inventory = resp.json()
+        logger.debug(inventory)
     if not inventory:
         return None
     if isinstance(inventory, list):
@@ -109,7 +112,7 @@ async def _get_default_inventory(user_id: str) -> dict[str, Any] | None:
 
 
 async def _get_inventory_items_for_tpos(
-    user_id: str,
+    adminkey: str,
     inventory_id: str,
     tags: str | list[str] | None,
     omit_tags: str | list[str] | None,
@@ -118,10 +121,11 @@ async def _get_inventory_items_for_tpos(
     tag_list = _inventory_tags_to_list(tags)
     omit_list = [tag.lower() for tag in _inventory_tags_to_list(omit_tags)]
     allowed_tags = [tag.lower() for tag in tag_list]
+    logger.debug(adminkey)
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/paginated",
-            headers={"X-API-KEY": user_id},
+            headers={"X-API-KEY": adminkey},
         )
         resp.raise_for_status()
         items = resp.json()
@@ -174,12 +178,12 @@ async def api_tposs(
 
 @tpos_api_router.get("/api/v1/inventory/status", status_code=HTTPStatus.OK)
 async def api_inventory_status(
-    key_info: WalletTypeInfo = Depends(require_admin_key),
+    wallet: WalletTypeInfo = Depends(require_admin_key),
 ) -> dict:
-    user = await get_user(key_info.wallet.user)
+    user = await get_user(wallet.wallet.user)
     if not user or not _inventory_available_for_user(user):
         return {"enabled": False, "inventory_id": None, "tags": [], "omit_tags": []}
-
+    logger.debug(wallet.wallet.adminkey)
     inventory = await _get_default_inventory(user.id)
     tags = _inventory_tags_to_list(inventory.get("tags")) if inventory else []
     omit_tags = _inventory_tags_to_list(inventory.get("omit_tags")) if inventory else []
@@ -193,14 +197,14 @@ async def api_inventory_status(
 
 @tpos_api_router.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
 async def api_tpos_create(
-    data: CreateTposData, key_type: WalletTypeInfo = Depends(require_admin_key)
+    data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
 ):
-    data.wallet = key_type.wallet.id
-    user = await get_user(key_type.wallet.user)
+    data.wallet = wallet.wallet.id
+    user = await get_user(wallet.wallet.user)
     if data.use_inventory and not _inventory_available_for_user(user):
         data.use_inventory = False
     if data.use_inventory and not data.inventory_id:
-        inventory = await _get_default_inventory(key_type.wallet.user)
+        inventory = await _get_default_inventory(user.id)
         if not inventory:
             data.use_inventory = False
         else:
@@ -227,7 +231,7 @@ async def api_tpos_update(
     user = await get_user(wallet.wallet.user)
     update_payload = data.dict(exclude_unset=True)
     if update_payload.get("use_inventory") and not update_payload.get("inventory_id"):
-        inventory = await _get_default_inventory(wallet.wallet.user)
+        inventory = await _get_default_inventory(user.id)
         if inventory:
             update_payload["inventory_id"] = inventory.get("id")
         else:
@@ -567,7 +571,7 @@ async def api_tpos_inventory_items(tpos_id: str):
         )
 
     items = await _get_inventory_items_for_tpos(
-        wallet.user,
+        wallet.adminkey,
         inventory_id,
         tpos.inventory_tags,
         (
