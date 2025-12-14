@@ -10,14 +10,14 @@ from lnbits.core.crud import (
     get_user,
     get_wallet,
 )
-from lnbits.helpers import create_access_token
-from lnbits.settings import settings
 from lnbits.core.models import CreateInvoice, Payment, User, WalletTypeInfo
 from lnbits.core.services import create_payment_request, websocket_updater
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
+from lnbits.helpers import create_access_token
+from lnbits.settings import settings
 from lnurl import LnurlPayResponse
 from lnurl import decode as decode_lnurl
 from lnurl import handle as lnurl_handle
@@ -178,7 +178,8 @@ async def api_tposs(
 async def api_inventory_status(
     wallet: WalletTypeInfo = Depends(require_admin_key),
 ) -> dict:
-    if not _inventory_available_for_user(wallet.wallet.user):
+    user = await get_user(wallet.wallet.user)
+    if not _inventory_available_for_user(user):
         return {"enabled": False, "inventory_id": None, "tags": [], "omit_tags": []}
     inventory = await _get_default_inventory(wallet.wallet.user)
     tags = _inventory_tags_to_list(inventory.get("tags")) if inventory else []
@@ -196,7 +197,8 @@ async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
 ):
     data.wallet = wallet.wallet.id
-    if data.use_inventory and not _inventory_available_for_user(wallet.wallet.user):
+    user = await get_user(wallet.wallet.user)
+    if data.use_inventory and not _inventory_available_for_user(user):
         data.use_inventory = False
     if data.use_inventory and not data.inventory_id:
         inventory = await _get_default_inventory(wallet.wallet.user)
@@ -223,6 +225,7 @@ async def api_tpos_update(
         )
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
+    user = await get_user(wallet.wallet.user)
     update_payload = data.dict(exclude_unset=True)
     if update_payload.get("use_inventory") and not update_payload.get("inventory_id"):
         inventory = await _get_default_inventory(wallet.wallet.user)
@@ -233,7 +236,7 @@ async def api_tpos_update(
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="No inventory found for this user.",
             )
-    if update_payload.get("use_inventory") and not _inventory_available_for_user(wallet.wallet.user):
+    if update_payload.get("use_inventory") and not _inventory_available_for_user(user):
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Inventory extension must be enabled to use it.",

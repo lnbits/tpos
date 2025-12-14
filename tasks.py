@@ -1,20 +1,21 @@
 import asyncio
-from time import time
+
 import httpx
-from lnbits.helpers import create_access_token
-from lnbits.core.models import Payment
 from lnbits.core.crud import get_wallet
-from lnbits.settings import settings
+from lnbits.core.models import Payment
 from lnbits.core.services import (
     create_invoice,
     get_pr_from_lnurl,
     pay_invoice,
     websocket_updater,
 )
+from lnbits.helpers import create_access_token
+from lnbits.settings import settings
 from lnbits.tasks import register_invoice_listener
 from loguru import logger
 
 from .crud import get_tpos
+
 
 async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:
     wallet = await get_wallet(wallet_id)
@@ -36,7 +37,9 @@ async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> No
     if not ids:
         return
 
-    access = create_access_token({"sub": "", "usr": wallet.user}, token_expire_minutes=1)
+    access = create_access_token(
+        {"sub": "", "usr": wallet.user}, token_expire_minutes=1
+    )
     async with httpx.AsyncClient() as client:
         await client.patch(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/quantities",
@@ -44,6 +47,7 @@ async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> No
             params={"ids": ids, "quantities": quantities},
         )
     return
+
 
 async def wait_for_paid_invoices():
     invoice_queue = asyncio.Queue()
