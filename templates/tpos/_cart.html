@@ -131,8 +131,10 @@
       </div>
     </div>
   </q-drawer>
-  <div class="flex flex-center q-pa-md">
+  <div class="row items-center q-pt-md q-pl-md q-pr-md q-pb-xs q-gutter-sm">
+    <!-- left: don't stretch -->
     <q-btn
+      class="col-auto self-center"
       round
       padding="sm"
       color="primary"
@@ -140,7 +142,13 @@
       @click="isGridView = !isGridView"
     ></q-btn>
     <q-space></q-space>
-    <q-input v-model="searchTerm" label="Filter" dense>
+    <!-- middle: grows -->
+    <q-input
+      class="col-6 col-sm-4 col-md-3 col-lg-2"
+      v-model="searchTerm"
+      label="Filter"
+      dense
+    >
       <q-icon
         v-if="searchTerm !== ''"
         name="close"
@@ -148,12 +156,16 @@
         class="cursor-pointer"
       ></q-icon>
     </q-input>
+    <div class="col-auto lt-md">{% include "tpos/_options_fab.html" %}</div>
+
+    <!-- categories: drop under on xs -->
     <div
-      class="flex justify-center q-pa-md q-gutter-md"
+      class="col-12 col-sm-auto row wrap justify-center q-pa-sm q-gutter-md"
       v-if="categories && categories.length"
     >
       <template v-for="category in Array.from(categories.values())">
         <q-btn
+          class="q-ml-xs"
           :color="setColor(category)"
           :label="category"
           @click="handleCategoryBtn(category)"
@@ -161,13 +173,15 @@
       </template>
     </div>
     <q-space></q-space>
-    {% include "tpos/_options_fab.html" %}
+    <!-- right: don't stretch -->
+    <div class="col-auto gt-sm">{% include "tpos/_options_fab.html" %}</div>
   </div>
 
   <div :class="{'dimmed': moreBtn}">
     <!-- Items List Large -->
     <div v-if="isGridView" class="row q-col-gutter-md q-pa-md">
       <div
+        class="q-pa-xs"
         style="height: 150px; width: 150px"
         v-for="item in filteredItems"
         :key="item.id"
@@ -199,7 +213,7 @@
               :src="item.image"
               fit="contain"
             ></q-img>
-            
+
             <q-icon
               v-else
               name="sell"
