@@ -160,7 +160,7 @@
 
     <!-- categories: drop under on xs -->
     <div
-      class="col-12 col-sm-auto row wrap justify-center q-pa-sm q-gutter-md"
+      class="col-12 col-sm-auto row wrap justify-center q-pa-sm q-mx-md"
       v-if="categories && categories.length"
     >
       <template v-for="category in Array.from(categories.values())">
@@ -177,11 +177,10 @@
     <div class="col-auto gt-sm">{% include "tpos/_options_fab.html" %}</div>
   </div>
 
-  <div :class="{'dimmed': moreBtn}">
+  <div class="q-mx-auto q-pa-md" :class="{'dimmed': moreBtn}">
     <!-- Items List Large -->
-    <div v-if="isGridView" class="row q-col-gutter-md q-pa-md">
+    <div v-if="isGridView" class="flex justify-center q-col-gutter-sm q-mt-md">
       <div
-        class="q-pa-xs"
         style="height: 150px; width: 150px"
         v-for="item in filteredItems"
         :key="item.id"
