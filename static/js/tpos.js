@@ -349,7 +349,9 @@ window.app = Vue.createApp({
       this.cartTax = 0.0
       this.total = 0.0
       this.addedAmount = 0.0
-      this.cartDrawer = false
+      if (this.$q.screen.lt.md) {
+        this.cartDrawer = false
+      }
     },
     formatAndSetItems(items, keepIds = false) {
       this.items = (items || []).map((item, idx) => {
