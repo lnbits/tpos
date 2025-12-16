@@ -36,7 +36,7 @@ async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> No
         quantities.append(int(qty))
     if not ids:
         return
-
+    # Needed to accomodate admin users, as using user ID is not possible
     access = create_access_token(
         {"sub": "", "usr": wallet.user}, token_expire_minutes=1
     )
