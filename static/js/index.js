@@ -11,6 +11,16 @@ const mapTpos = obj => {
     obj.tpos
   ].join('')
   obj.items = obj.items ? JSON.parse(obj.items) : []
+  obj.use_inventory = Boolean(obj.use_inventory)
+  obj.inventory_id = obj.inventory_id || null
+  const tagString =
+    obj.inventory_tags === 'null' ? '' : obj.inventory_tags || ''
+  obj.inventory_tags = tagString ? tagString.split(',').filter(Boolean) : []
+  const omitTagString =
+    obj.inventory_omit_tags === 'null' ? '' : obj.inventory_omit_tags || ''
+  obj.inventory_omit_tags = omitTagString
+    ? omitTagString.split(',').filter(Boolean)
+    : []
   obj.itemsMap = new Map()
   obj.items.forEach((item, idx) => {
     let id = `${obj.id}:${idx + 1}`
@@ -28,6 +38,12 @@ window.app = Vue.createApp({
       currencyOptions: [],
       hasFiatProvider: false,
       fiatProviders: null,
+      inventoryStatus: {
+        enabled: false,
+        inventory_id: null,
+        tags: [],
+        omit_tags: []
+      },
       tpossTable: {
         columns: [
           {name: 'name', align: 'left', label: 'Name', field: 'name'},
@@ -80,6 +96,9 @@ window.app = Vue.createApp({
       formDialog: {
         show: false,
         data: {
+          use_inventory: false,
+          inventory_id: null,
+          inventory_tags: [],
           tip_options: [],
           withdraw_between: 10,
           withdraw_time_option: '',
@@ -182,12 +201,38 @@ window.app = Vue.createApp({
         !data.wallet ||
         (this.formDialog.advanced.otc && !data.withdraw_limit)
       )
+    },
+    inventoryModeOptions() {
+      return [
+        {
+          label: 'Use inventory extension',
+          value: true,
+          disable: !this.inventoryStatus.enabled
+        },
+        {label: 'Use TPoS items', value: false}
+      ]
+    },
+    inventoryTagOptions() {
+      return (this.inventoryStatus.tags || []).map(tag => ({
+        label: tag,
+        value: tag
+      }))
+    },
+    inventoryOmitTagOptions() {
+      return (this.inventoryStatus.omit_tags || []).map(tag => ({
+        label: tag,
+        value: tag
+      }))
     }
   },
   methods: {
     closeFormDialog() {
       this.formDialog.show = false
       this.formDialog.data = {
+        use_inventory: false,
+        inventory_id: this.inventoryStatus.inventory_id,
+        inventory_tags: [...(this.inventoryStatus.tags || [])],
+        inventory_omit_tags: [...(this.inventoryStatus.omit_tags || [])],
         tip_options: [],
         withdraw_between: 10,
         withdraw_time_option: '',
@@ -213,6 +258,25 @@ window.app = Vue.createApp({
           })
         })
     },
+    async loadInventoryStatus() {
+      if (!this.g.user.wallets.length) return
+      try {
+        const {data} = await LNbits.api.request(
+          'GET',
+          '/tpos/api/v1/inventory/status',
+          this.g.user.wallets[0].adminkey
+        )
+        this.inventoryStatus = data
+        // Default remains "Use TPoS items"; keep inventory info available without auto-enabling.
+        if (!this.formDialog.data.inventory_id) {
+          this.formDialog.data.inventory_id = data.inventory_id
+          this.formDialog.data.inventory_tags = [...data.tags]
+          this.formDialog.data.inventory_omit_tags = [...data.omit_tags]
+        }
+      } catch (error) {
+        console.error(error)
+      }
+    },
     sendTposData() {
       const data = {
         ...this.formDialog.data,
@@ -225,7 +289,16 @@ window.app = Vue.createApp({
         tip_wallet:
           (this.formDialog.advanced.tips && this.formDialog.data.tip_wallet) ||
           '',
-        items: JSON.stringify(this.formDialog.data.items)
+        items: JSON.stringify(this.formDialog.data.items || [])
+      }
+      data.inventory_tags = data.inventory_tags || []
+      if (!this.inventoryStatus.enabled) {
+        data.use_inventory = false
+      } else if (!data.inventory_id) {
+        data.inventory_id = this.inventoryStatus.inventory_id
+      }
+      if (data.use_inventory && !data.inventory_id) {
+        data.use_inventory = false
       }
       // delete withdraw_between if value is empty string, defaults to 10 minutes
       if (this.formDialog.data.withdraw_between == '') {
@@ -284,6 +357,64 @@ window.app = Vue.createApp({
         .catch(error => {
           LNbits.utils.notifyApiError(error)
         })
+    },
+    saveInventorySettings(tpos) {
+      const wallet = _.findWhere(this.g.user.wallets, {id: tpos.wallet})
+      if (!wallet) return
+      const resolvedInventoryId =
+        this.inventoryStatus.inventory_id || tpos.inventory_id
+      const payload = {
+        use_inventory: this.inventoryStatus.enabled && tpos.use_inventory,
+        inventory_id:
+          this.inventoryStatus.enabled && tpos.use_inventory
+            ? resolvedInventoryId
+            : null,
+        inventory_tags: tpos.inventory_tags || [],
+        inventory_omit_tags: tpos.inventory_omit_tags || []
+      }
+      if (payload.use_inventory && !payload.inventory_id) {
+        Quasar.Notify.create({
+          type: 'warning',
+          message: 'No inventory found for this user.'
+        })
+        return
+      }
+      LNbits.api
+        .request(
+          'PUT',
+          `/tpos/api/v1/tposs/${tpos.id}`,
+          wallet.adminkey,
+          payload
+        )
+        .then(response => {
+          this.tposs = _.reject(this.tposs, obj => obj.id == tpos.id)
+          this.tposs.push(mapTpos(response.data))
+        })
+        .catch(LNbits.utils.notifyApiError)
+    },
+    onInventoryModeChange(tpos, value) {
+      tpos.use_inventory = value
+      if (value && this.inventoryStatus.enabled) {
+        tpos.inventory_id = this.inventoryStatus.inventory_id
+        if (!tpos.inventory_tags.length && this.inventoryStatus.tags.length) {
+          tpos.inventory_tags = [...this.inventoryStatus.tags]
+        }
+        if (
+          !tpos.inventory_omit_tags.length &&
+          this.inventoryStatus.omit_tags
+        ) {
+          tpos.inventory_omit_tags = [...this.inventoryStatus.omit_tags]
+        }
+      }
+      this.saveInventorySettings(tpos)
+    },
+    onInventoryTagsChange(tpos, tags) {
+      tpos.inventory_tags = tags || []
+      this.saveInventorySettings(tpos)
+    },
+    onInventoryOmitTagsChange(tpos, tags) {
+      tpos.inventory_omit_tags = tags || []
+      this.saveInventorySettings(tpos)
     },
     deleteTpos(tposId) {
       const tpos = _.findWhere(this.tposs, {id: tposId})
@@ -506,6 +637,7 @@ window.app = Vue.createApp({
   created() {
     if (this.g.user.wallets.length) {
       this.getTposs()
+      this.loadInventoryStatus()
     }
     LNbits.api
       .request('GET', '/api/v1/currencies')

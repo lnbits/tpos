@@ -1,5 +1,7 @@
 import asyncio
 
+import httpx
+from lnbits.core.crud import get_wallet
 from lnbits.core.models import Payment
 from lnbits.core.services import (
     create_invoice,
@@ -7,10 +9,44 @@ from lnbits.core.services import (
     pay_invoice,
     websocket_updater,
 )
+from lnbits.helpers import create_access_token
+from lnbits.settings import settings
 from lnbits.tasks import register_invoice_listener
 from loguru import logger
 
 from .crud import get_tpos
+
+
+async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:
+    wallet = await get_wallet(wallet_id)
+    if not wallet:
+        return
+    inventory_id = inventory_payload.get("inventory_id")
+    items = inventory_payload.get("items") or []
+    if not inventory_id or not items:
+        return
+    ids: list[str] = []
+    quantities: list[int] = []
+    for item in items:
+        item_id = item.get("id")
+        qty = item.get("quantity") or 0
+        if not item_id or qty <= 0:
+            continue
+        ids.append(item_id)
+        quantities.append(int(qty))
+    if not ids:
+        return
+    # Needed to accomodate admin users, as using user ID is not possible
+    access = create_access_token(
+        {"sub": "", "usr": wallet.user}, token_expire_minutes=1
+    )
+    async with httpx.AsyncClient() as client:
+        await client.patch(
+            url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/quantities",
+            headers={"Authorization": f"Bearer {access}"},
+            params={"source": "tpos", "ids": ids, "quantities": quantities},
+        )
+    return
 
 
 async def wait_for_paid_invoices():
@@ -63,6 +99,10 @@ async def on_invoice_paid(payment: Payment) -> None:
             logger.debug(f"tpos: LNaddress paid cut: {paid_payment.checking_id}")
 
     await websocket_updater(tpos_id, str(stripped_payment))
+
+    inventory_payload = payment.extra.get("inventory")
+    if inventory_payload:
+        await _deduct_inventory_stock(payment.wallet_id, inventory_payload)
 
     if not tip_amount:
         # no tip amount

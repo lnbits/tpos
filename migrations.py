@@ -224,3 +224,35 @@ async def m015_addfiat(db: Database):
         ALTER TABLE tpos.pos ADD stripe_card_payments BOOLEAN DEFAULT false;
     """
     )
+
+
+async def m016_add_inventory_settings(db: Database):
+    """
+    Add inventory integration columns
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD use_inventory BOOLEAN DEFAULT false;
+    """
+    )
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD inventory_id TEXT NULL;
+    """
+    )
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD inventory_tags TEXT NULL;
+    """
+    )
+
+
+async def m017_add_inventory_omit_tags(db: Database):
+    """
+    Add inventory omit tags column
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD inventory_omit_tags TEXT NULL;
+    """
+    )

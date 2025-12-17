@@ -145,6 +145,18 @@
     object-fit: scale-down;
   }
 
+  .item-grid-title {
+    display: block;
+    padding: 4px 6px 6px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .table {
     border-collapse: collapse;
     width: 100%;
@@ -188,6 +200,13 @@
   const tpos = JSON.parse({{ tpos | tojson | safe }})
   tpos.items = tpos.items !== null ? JSON.parse(tpos.items) : []
   tpos.tip_options = tpos.tip_options ? JSON.parse(tpos.tip_options) : []
+  tpos.inventory_tags = tpos.inventory_tags
+    ? tpos.inventory_tags.split(',').filter(Boolean)
+    : []
+  tpos.inventory_omit_tags = tpos.inventory_omit_tags
+    ? tpos.inventory_omit_tags.split(',').filter(Boolean)
+    : []
+  tpos.use_inventory = Boolean(tpos.use_inventory)
   if (tpos.withdraw_maximum) {
     tpos.withdraw_premium = Number(tpos.withdraw_maximum / 100)
   }

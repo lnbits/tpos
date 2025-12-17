@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from time import time
 
 from fastapi import Query
@@ -17,6 +19,7 @@ class CreateTposInvoice(BaseModel):
     memo: str | None = Query(None)
     exchange_rate: float | None = Query(None, ge=0.0)
     details: dict | None = Query(None)
+    inventory: InventorySale | None = Query(None)
     tip_amount: int | None = Query(None, ge=1)
     user_lnaddress: str | None = Query(None)
     internal_memo: str | None = Query(None, max_length=512)
@@ -26,12 +29,27 @@ class CreateTposInvoice(BaseModel):
     tip_amount_fiat: float | None = Query(None, ge=0.0)
 
 
+class InventorySaleItem(BaseModel):
+    id: str
+    quantity: int = Field(1, ge=1)
+
+
+class InventorySale(BaseModel):
+    inventory_id: str
+    tags: list[str] = Field(default_factory=list)
+    items: list[InventorySaleItem] = Field(default_factory=list)
+
+
 class CreateTposData(BaseModel):
     wallet: str | None
     name: str | None
     currency: str | None
+    use_inventory: bool = Field(False)
+    inventory_id: str | None = None
+    inventory_tags: list[str] | None = None
+    inventory_omit_tags: list[str] | None = None
     tax_inclusive: bool = Field(True)
-    tax_default: float = Field(0.0)
+    tax_default: float | None = Field(0.0)
     tip_options: str = Field("[]")
     tip_wallet: str = Field("")
     withdraw_time: int = Field(0)
@@ -47,6 +65,10 @@ class CreateTposData(BaseModel):
     business_vat_id: str | None
     fiat_provider: str | None = Field(None)
     stripe_card_payments: bool = False
+
+    @validator("tax_default", pre=True, always=True)
+    def default_tax_when_none(cls, v):
+        return 0.0 if v is None else v
 
 
 class TposClean(BaseModel):
@@ -64,6 +86,10 @@ class TposClean(BaseModel):
     lnaddress: bool | None = None
     lnaddress_cut: int = 0
     items: str | None = None
+    use_inventory: bool = False
+    inventory_id: str | None = None
+    inventory_tags: str | None = None
+    inventory_omit_tags: str | None = None
     tip_options: str | None = None
     enable_receipt_print: bool
     business_name: str | None = None
@@ -129,3 +155,6 @@ class TapToPay(BaseModel):
     tpos_id: str | None = None
     payment_hash: str | None = None
     paid: bool = False
+
+
+CreateTposInvoice.update_forward_refs(InventorySale=InventorySale)

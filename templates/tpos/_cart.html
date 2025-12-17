@@ -131,8 +131,10 @@
       </div>
     </div>
   </q-drawer>
-  <div class="flex flex-center q-pa-md">
+  <div class="row items-center q-pt-md q-pl-md q-pr-md q-pb-xs q-gutter-sm">
+    <!-- left: don't stretch -->
     <q-btn
+      class="col-auto self-center"
       round
       padding="sm"
       color="primary"
@@ -140,7 +142,13 @@
       @click="isGridView = !isGridView"
     ></q-btn>
     <q-space></q-space>
-    <q-input v-model="searchTerm" label="Filter" dense>
+    <!-- middle: grows -->
+    <q-input
+      class="col-6 col-sm-4 col-md-3 col-lg-2"
+      v-model="searchTerm"
+      label="Filter"
+      dense
+    >
       <q-icon
         v-if="searchTerm !== ''"
         name="close"
@@ -148,133 +156,47 @@
         class="cursor-pointer"
       ></q-icon>
     </q-input>
-    <q-space></q-space>
-    {% include "tpos/_options_fab.html" %}
-  </div>
-  <div
-    class="flex justify-center q-pa-md q-gutter-md"
-    v-if="categories && categories.length"
-  >
-    <template
-      v-if="$q.screen.gt.sm"
-      v-for="category in Array.from(categories.values())"
+    <div class="col-auto lt-md">{% include "tpos/_options_fab.html" %}</div>
+
+    <!-- categories: drop under on xs -->
+    <div
+      class="col-12 col-sm-auto row wrap justify-center q-pa-sm q-mx-md"
+      v-if="categories && categories.length"
     >
-      <q-btn
-        color="secondary"
-        :label="category"
-        @click="handleCategoryBtn(category)"
-        :outline="!(categoryFilter === category || (categoryFilter === '' && category === 'All'))"
-      ></q-btn>
-    </template>
-    <template v-else>
-      <q-btn
-        size="sm"
-        color="primary"
-        label="All Items"
-        class="text-capitalize"
-        @click="categoryFilter = ''"
-      ></q-btn>
-      <q-space></q-space>
-      <q-btn-dropdown
-        size="sm"
-        color="primary"
-        label="Categories"
-        class="text-capitalize"
-      >
-        <q-list dense>
-          <q-item
-            v-for="category in Array.from(categories.values())"
-            :key="category"
-            @click="handleCategoryBtn(category)"
-            class="text-capitalize"
-            :class="{ 'bg-primary text-white': category == categoryFilter }"
-            clickable
-            v-close-popup
-          >
-            <q-item-section>
-              <q-item-label v-text="category"></q-item-label>
-            </q-item-section>
-            <q-item-section side>
-              <q-icon
-                v-if="categoryFilter == category"
-                name="check"
-                color="white"
-                size="xs"
-              ></q-icon>
-            </q-item-section>
-          </q-item>
-        </q-list>
-      </q-btn-dropdown>
-    </template>
+      <template v-for="category in Array.from(categories.values())">
+        <q-btn
+          class="q-ml-xs"
+          :color="setColor(category)"
+          :label="category"
+          @click="handleCategoryBtn(category)"
+        ></q-btn>
+      </template>
+    </div>
+    <q-space></q-space>
+    <!-- right: don't stretch -->
+    <div class="col-auto gt-sm">{% include "tpos/_options_fab.html" %}</div>
   </div>
-  <div :class="{'dimmed': moreBtn}">
+
+  <div class="q-mx-auto q-pa-md" :class="{'dimmed': moreBtn}">
     <!-- Items List Large -->
-    <div v-if="isGridView" class="row q-col-gutter-md q-pa-md">
+    <div v-if="isGridView" class="flex justify-center q-col-gutter-sm q-mt-md">
       <div
-        class="col-12 col-sm-6 col-md-4 col-lg-3"
+        style="height: 150px; width: 150px"
         v-for="item in filteredItems"
         :key="item.id"
       >
         <q-card class="full-height" flat bordered v-ripple>
           <div @click="addToCart(item)">
-            <q-img
-              :src="item.image || null"
-              :ratio="4/3"
-              fit="contain"
-              :style="$q.screen.gt.sm ? 'height: 200px' : 'height: 100px'"
-            >
+            <q-img :src="item.image || null" :ratio="4/3" fit="contain">
             </q-img>
 
-            <q-card-section>
-              <div class="text-subtitle1 text-weight-bold ellipsis">
-                <span v-text="item.title"></span>
-              </div>
-              <div class="text-caption text-grey ellipsis">
-                <span v-text="item.description"></span>
-              </div>
-            </q-card-section>
-            <q-separator></q-separator>
-          </div>
+            <span class="item-grid-title" dense v-text="item.title"></span>
 
-          <q-card-actions class="q-pa-md">
-            <span>
-              <div class="text-subtitle1">
-                <span v-text="item.formattedPrice"></span>
-              </div>
-              <div class="text-caption text-grey" v-if="item.tax || taxDefault">
-                <span
-                  v-text="`(tax ${taxInclusive ? 'incl.' : 'excl.'} ${item.tax || taxDefault}%)`"
-                ></span>
-              </div>
-            </span>
-            <q-space></q-space>
-            <div class="flex">
-              <q-btn
-                :outline="itemCartQty(item.id) == 0"
-                round
-                dense
-                size="sm"
-                color="secondary"
-                icon="remove"
-                @click="removeFromCart(item)"
-                :disabled="!itemCartQty(item.id)"
-              ></q-btn>
-              <div
-                class="text-subtitle2 text-center q-mx-sm"
-                style="width: 2ch"
-              >
-                <span v-text="itemCartQty(item.id)"></span>
-              </div>
-              <q-btn
-                round
-                dense
-                size="sm"
-                color="secondary"
-                icon="add"
-                @click="addToCart(item)"
-              ></q-btn>
-            </div>
-          </q-card-actions>
+            <q-separator
+              class="q-pt-xs"
+              :color="setColor(item.categories[0])"
+            ></q-separator>
+          </div>
         </q-card>
       </div>
     </div>
@@ -290,14 +212,17 @@
               :src="item.image"
               fit="contain"
             ></q-img>
+
             <q-icon
               v-else
               name="sell"
               size="xs"
               class="absolute-center text-grey"
             ></q-icon>
+            <q-badge floating :color="setColor(item.categories[0])"></q-badge>
           </q-avatar>
         </q-item-section>
+
         <q-item-section @click="addToCart(item)">
           <q-item-label
             class="text-subtitle1 ellipsis"
