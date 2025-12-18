@@ -1,7 +1,6 @@
 from typing import Any
 
 import httpx
-
 from lnbits.core.crud import get_wallet
 from lnbits.core.models import User
 from lnbits.helpers import create_access_token

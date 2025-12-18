@@ -1,7 +1,5 @@
 import asyncio
 
-from loguru import logger
-
 from lnbits.core.models import Payment
 from lnbits.core.services import (
     create_invoice,
@@ -10,6 +8,7 @@ from lnbits.core.services import (
     websocket_updater,
 )
 from lnbits.tasks import register_invoice_listener
+from loguru import logger
 
 from .crud import get_tpos
 from .services import _deduct_inventory_stock
