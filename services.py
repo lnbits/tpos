@@ -1,12 +1,13 @@
 from typing import Any
 
 import httpx
+
 from lnbits.core.crud import get_wallet
 from lnbits.core.models import User
 from lnbits.helpers import create_access_token
 from lnbits.settings import settings
 
-from .helpers import _inventory_tags_to_list
+from .helpers import _from_csv, _inventory_tags_to_list
 
 
 async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:
@@ -80,6 +81,11 @@ async def _get_inventory_items_for_tpos(
         )
         payload = resp.json()
         items = payload.get("data", []) if isinstance(payload, dict) else payload
+
+        # item images are a comma separated string; make a list
+        for item in items:
+            images = item.get("images")
+            item["images"] = _from_csv(images)
 
     def has_allowed_tag(item_tags: str | list[str] | None) -> bool:
         # When no tags are configured for this TPoS, show no items

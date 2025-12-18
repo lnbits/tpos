@@ -3,6 +3,13 @@ import json
 from loguru import logger
 
 
+def _from_csv(value: str | None, separator: str = ",") -> list[str]:
+    if not value:
+        return []
+    parts = [part.strip() for part in value.split(separator)]
+    return [part for part in parts if part]
+
+
 def _serialize_inventory_tags(tags: list[str] | str | None) -> str | None:
     if isinstance(tags, list):
         return ",".join([tag for tag in tags if tag])
