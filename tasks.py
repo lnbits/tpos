@@ -42,7 +42,7 @@ async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> No
     )
     async with httpx.AsyncClient() as client:
         await client.patch(
-            url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/quantities",
+            url=f"inventory/api/v1/items/{inventory_id}/quantities",
             headers={"Authorization": f"Bearer {access}"},
             params={"source": "tpos", "ids": ids, "quantities": quantities},
         )
