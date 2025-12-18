@@ -10,14 +10,12 @@ from lnbits.core.crud import (
     get_user,
     get_wallet,
 )
-from lnbits.core.models import CreateInvoice, Payment, User, WalletTypeInfo
+from lnbits.core.models import CreateInvoice, Payment, WalletTypeInfo
 from lnbits.core.services import create_payment_request, websocket_updater
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
-from lnbits.helpers import create_access_token
-from lnbits.settings import settings
 from lnurl import LnurlPayResponse
 from lnurl import decode as decode_lnurl
 from lnurl import handle as lnurl_handle
@@ -29,6 +27,11 @@ from .crud import (
     get_tposs,
     update_tpos,
 )
+from .helpers import (
+    _first_image,
+    _inventory_tags_to_list,
+    _inventory_tags_to_string,
+)
 from .models import (
     CreateTposData,
     CreateTposInvoice,
@@ -38,129 +41,13 @@ from .models import (
     TapToPay,
     Tpos,
 )
+from .services import (
+    _get_default_inventory,
+    _get_inventory_items_for_tpos,
+    _inventory_available_for_user,
+)
 
 tpos_api_router = APIRouter()
-
-
-def _inventory_tags_to_list(raw_tags: str | list[str] | None) -> list[str]:
-    if raw_tags is None:
-        return []
-    if isinstance(raw_tags, list):
-        return [tag.strip() for tag in raw_tags if tag and tag.strip()]
-    return [tag.strip() for tag in raw_tags.split(",") if tag and tag.strip()]
-
-
-def _inventory_tags_to_string(raw_tags: str | list[str] | None) -> str | None:
-    if raw_tags is None:
-        return None
-    if isinstance(raw_tags, str):
-        return raw_tags
-    return ",".join([tag for tag in raw_tags if tag])
-
-
-def _first_image(images: str | list[str] | None) -> str | None:
-    if not images:
-        return None
-    if isinstance(images, list):
-        return _normalize_image(images[0]) if images else None
-    raw = str(images).strip()
-    if not raw:
-        return None
-    try:
-        parsed = json.loads(raw)
-        if isinstance(parsed, list) and parsed:
-            return _normalize_image(parsed[0])
-    except Exception:
-        pass
-    if "|||" in raw:
-        return _normalize_image(raw.split("|||")[0])
-    if "," in raw:
-        return _normalize_image(raw.split(",")[0])
-    return _normalize_image(raw)
-
-
-def _normalize_image(val: str | None) -> str | None:
-    if not val:
-        return None
-    val = str(val).strip()
-    if not val:
-        return None
-    if val.startswith("http") or val.startswith("/api/") or val.startswith("data:"):
-        return val
-    return f"/api/v1/assets/{val}/binary"
-
-
-async def _get_default_inventory(user_id: str) -> dict[str, Any] | None:
-    access = create_access_token({"sub": "", "usr": user_id}, token_expire_minutes=1)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            url=f"http://{settings.host}:{settings.port}/inventory/api/v1",
-            headers={"Authorization": f"Bearer {access}"},
-        )
-        inventory = resp.json()
-    if not inventory:
-        return None
-    if isinstance(inventory, list):
-        inventory = inventory[0] if inventory else None
-    if not isinstance(inventory, dict):
-        return None
-    inventory["tags"] = _inventory_tags_to_list(inventory.get("tags"))
-    inventory["omit_tags"] = _inventory_tags_to_list(inventory.get("omit_tags"))
-    return inventory
-
-
-async def _get_inventory_items_for_tpos(
-    user_id: str,
-    inventory_id: str,
-    tags: str | list[str] | None,
-    omit_tags: str | list[str] | None,
-) -> list[Any]:
-
-    tag_list = _inventory_tags_to_list(tags)
-    omit_list = [tag.lower() for tag in _inventory_tags_to_list(omit_tags)]
-    allowed_tags = [tag.lower() for tag in tag_list]
-    access = create_access_token({"sub": "", "usr": user_id}, token_expire_minutes=1)
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/paginated",
-            headers={"Authorization": f"Bearer {access}"},
-            params={"limit": 500, "offset": 0, "is_active": True},
-        )
-        payload = resp.json()
-        items = payload.get("data", []) if isinstance(payload, dict) else payload
-
-    def has_allowed_tag(item_tags: str | list[str] | None) -> bool:
-        # When no tags are configured for this TPoS, show no items
-        if not tag_list:
-            return False
-        item_tag_list = [tag.lower() for tag in _inventory_tags_to_list(item_tags)]
-        return any(tag in item_tag_list for tag in allowed_tags)
-
-    def has_omit_tag(item_omit_tags: str | list[str] | None) -> bool:
-        if not omit_list:
-            return False
-        item_tag_list = [tag.lower() for tag in _inventory_tags_to_list(item_omit_tags)]
-        return any(tag in item_tag_list for tag in omit_list)
-
-    filtered = [
-        item
-        for item in items
-        if has_allowed_tag(item.get("tags")) and not has_omit_tag(item.get("omit_tags"))
-    ]
-    # If no items matched the provided tags, fall back to all items minus omitted ones.
-    if tag_list and not filtered:
-        filtered = [item for item in items if not has_omit_tag(item.get("omit_tags"))]
-
-    # hide items with no stock when stock tracking is enabled
-    return [
-        item
-        for item in filtered
-        if item.get("quantity_in_stock") is None or item.get("quantity_in_stock") > 0
-    ]
-
-
-def _inventory_available_for_user(user: User | None) -> bool:
-    return bool(user and "inventory" in (user.extensions or []))
 
 
 @tpos_api_router.get("/api/v1/tposs", status_code=HTTPStatus.OK)
