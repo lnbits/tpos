@@ -17,40 +17,6 @@ from lnbits.tasks import register_invoice_listener
 from .crud import get_tpos
 
 
-async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:
-    wallet = await get_wallet(wallet_id)
-    if not wallet:
-        return
-    inventory_id = inventory_payload.get("inventory_id")
-    items = inventory_payload.get("items") or []
-    if not inventory_id or not items:
-        return
-    items_to_update = []
-    for item in items:
-        item_id = item.get("id")
-        qty = item.get("quantity") or 0
-        if not item_id or qty <= 0:
-            continue
-        items_to_update.append({"id": item_id, "quantity": int(qty)})
-    if not items_to_update:
-        return
-
-    ids = [item["id"] for item in items_to_update]
-    quantities = [item["quantity"] for item in items_to_update]
-
-    # Needed to accomodate admin users, as using user ID is not possible
-    access = create_access_token(
-        {"sub": "", "usr": wallet.user}, token_expire_minutes=1
-    )
-    async with httpx.AsyncClient() as client:
-        await client.patch(
-            url=f"inventory/api/v1/items/{inventory_id}/quantities",
-            headers={"Authorization": f"Bearer {access}"},
-            params={"source": "tpos", "ids": ids, "quantities": quantities},
-        )
-    return
-
-
 async def wait_for_paid_invoices():
     invoice_queue = asyncio.Queue()
     register_invoice_listener(invoice_queue, "ext_tpos")
@@ -127,3 +93,37 @@ async def on_invoice_paid(payment: Payment) -> None:
         extra={**payment.extra, "tipSplitted": True},
     )
     logger.debug(f"tpos: tip invoice paid: {paid_payment.checking_id}")
+
+
+async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:
+    wallet = await get_wallet(wallet_id)
+    if not wallet:
+        return
+    inventory_id = inventory_payload.get("inventory_id")
+    items = inventory_payload.get("items") or []
+    if not inventory_id or not items:
+        return
+    items_to_update = []
+    for item in items:
+        item_id = item.get("id")
+        qty = item.get("quantity") or 0
+        if not item_id or qty <= 0:
+            continue
+        items_to_update.append({"id": item_id, "quantity": int(qty)})
+    if not items_to_update:
+        return
+
+    ids = [item["id"] for item in items_to_update]
+    quantities = [item["quantity"] for item in items_to_update]
+
+    # Needed to accomodate admin users, as using user ID is not possible
+    access = create_access_token(
+        {"sub": "", "usr": wallet.user}, token_expire_minutes=1
+    )
+    async with httpx.AsyncClient() as client:
+        await client.patch(
+            url=f"inventory/api/v1/items/{inventory_id}/quantities",
+            headers={"Authorization": f"Bearer {access}"},
+            params={"source": "tpos", "ids": ids, "quantities": quantities},
+        )
+    return
