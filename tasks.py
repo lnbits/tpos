@@ -1,6 +1,8 @@
 import asyncio
 
 import httpx
+from loguru import logger
+
 from lnbits.core.crud import get_wallet
 from lnbits.core.models import Payment
 from lnbits.core.services import (
@@ -10,9 +12,7 @@ from lnbits.core.services import (
     websocket_updater,
 )
 from lnbits.helpers import create_access_token
-from lnbits.settings import settings
 from lnbits.tasks import register_invoice_listener
-from loguru import logger
 
 from .crud import get_tpos
 
@@ -25,17 +25,19 @@ async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> No
     items = inventory_payload.get("items") or []
     if not inventory_id or not items:
         return
-    ids: list[str] = []
-    quantities: list[int] = []
+    items_to_update = []
     for item in items:
         item_id = item.get("id")
         qty = item.get("quantity") or 0
         if not item_id or qty <= 0:
             continue
-        ids.append(item_id)
-        quantities.append(int(qty))
-    if not ids:
+        items_to_update.append({"id": item_id, "quantity": int(qty)})
+    if not items_to_update:
         return
+
+    ids = [item["id"] for item in items_to_update]
+    quantities = [item["quantity"] for item in items_to_update]
+
     # Needed to accomodate admin users, as using user ID is not possible
     access = create_access_token(
         {"sub": "", "usr": wallet.user}, token_expire_minutes=1
