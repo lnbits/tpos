@@ -429,6 +429,23 @@
             </small>
           </div>
         </div>
+        <div
+          v-if="
+            (formDialog.data.fiat_provider || []).includes('stripe') &&
+              formDialog.data.stripe_card_payments
+          "
+          class="row q-mt-sm"
+        >
+          <div class="col">
+            <q-input
+              filled
+              dense
+              v-model.trim="formDialog.data.stripe_reader_id"
+              label="Stripe reader ID"
+              hint="If you are using a Stripe reader (rather than a generic device) add it here"
+            ></q-input>
+          </div>
+        </div>
         <div class="row">
           <div class="col">
             <q-checkbox

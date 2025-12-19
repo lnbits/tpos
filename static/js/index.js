@@ -107,7 +107,8 @@ window.app = Vue.createApp({
           lnaddress_cut: 2,
           enable_receipt_print: false,
           fiat: false,
-          stripe_card_payments: false
+          stripe_card_payments: false,
+          stripe_reader_id: ''
         },
         advanced: {
           tips: false,
@@ -241,7 +242,8 @@ window.app = Vue.createApp({
         lnaddress_cut: 2,
         enable_receipt_print: false,
         fiat: false,
-        stripe_card_payments: false
+        stripe_card_payments: false,
+        stripe_reader_id: ''
       }
       this.formDialog.advanced = {tips: false, otc: false}
     },

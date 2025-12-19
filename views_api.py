@@ -230,6 +230,8 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Paym
             extra["inventory"] = inventory_payload.dict()
         if data.pay_in_fiat and tpos.fiat_provider:
             extra["fiat_method"] = data.fiat_method if data.fiat_method else "checkout"
+            if tpos.stripe_reader_id:
+                extra["terminal"] = {"reader_id": tpos.stripe_reader_id}
         invoice_data = CreateInvoice(
             unit=currency,
             out=False,

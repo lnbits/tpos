@@ -294,6 +294,8 @@ window.app = Vue.createApp({
         }
         quantity = Math.min(quantity, item.quantity_in_stock - inCart)
       }
+      const existing = this.cart.get(item.id)
+      const priceSource = existing || item
       if (this.cart.has(item.id)) {
         this.cart.set(item.id, {
           ...this.cart.get(item.id),
@@ -305,11 +307,12 @@ window.app = Vue.createApp({
           quantity: quantity
         })
       }
-      this.total = this.total + this.calculateItemPrice(item, quantity)
+      this.total = this.total + this.calculateItemPrice(priceSource, quantity)
       this.cartTaxTotal()
     },
     removeFromCart(item, quantity = 1) {
-      let item_quantity = this.cart.get(item.id).quantity
+      const existing = this.cart.get(item.id)
+      let item_quantity = existing.quantity
       if (item_quantity == 1 || item_quantity == quantity) {
         this.cart.delete(item.id)
       } else {
@@ -318,7 +321,55 @@ window.app = Vue.createApp({
           quantity: this.cart.get(item.id).quantity - quantity
         })
       }
-      this.total = this.total - this.calculateItemPrice(item, quantity)
+      const priceSource = existing || item
+      this.total = this.total - this.calculateItemPrice(priceSource, quantity)
+      this.cartTaxTotal()
+    },
+    promptItemPrice(item) {
+      const cartItem = this.cart.get(item.id)
+      if (!cartItem) return
+      this.$q
+        .dialog({
+          title: 'Set price',
+          message: 'Update item price for this cart line',
+          prompt: {
+            model:
+              this.currency === 'sats'
+                ? String(cartItem.price)
+                : cartItem.price.toFixed(2),
+            type: 'number'
+          },
+          cancel: true
+        })
+        .onOk(val => {
+          const newPrice = parseFloat(val)
+          if (isNaN(newPrice) || newPrice < 0) {
+            Quasar.Notify.create({
+              type: 'warning',
+              message: 'Please enter a valid price.'
+            })
+            return
+          }
+          this.updateCartItemPrice(cartItem, newPrice)
+        })
+    },
+    updateCartItemPrice(cartItem, newPrice) {
+      const roundedPrice =
+        this.currency === 'sats' ? Math.ceil(newPrice) : +newPrice.toFixed(2)
+      const existing = this.cart.get(cartItem.id)
+      if (!existing) return
+      const oldItemTotal = this.calculateItemPrice(existing, existing.quantity)
+      const updatedItem = {
+        ...existing,
+        price: roundedPrice,
+        formattedPrice: this.formatAmount(roundedPrice, this.currency)
+      }
+      this.cart.set(cartItem.id, updatedItem)
+      const newItemTotal = this.calculateItemPrice(
+        updatedItem,
+        updatedItem.quantity
+      )
+      this.total = +(this.total - oldItemTotal + newItemTotal).toFixed(2)
       this.cartTaxTotal()
     },
     calculateItemPrice(item, qty) {
