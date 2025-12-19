@@ -333,9 +333,10 @@ window.app = Vue.createApp({
           title: 'Set price',
           message: 'Update item price for this cart line',
           prompt: {
-            model: this.currency === 'sats'
-              ? String(cartItem.price)
-              : cartItem.price.toFixed(2),
+            model:
+              this.currency === 'sats'
+                ? String(cartItem.price)
+                : cartItem.price.toFixed(2),
             type: 'number'
           },
           cancel: true
@@ -357,10 +358,7 @@ window.app = Vue.createApp({
         this.currency === 'sats' ? Math.ceil(newPrice) : +newPrice.toFixed(2)
       const existing = this.cart.get(cartItem.id)
       if (!existing) return
-      const oldItemTotal = this.calculateItemPrice(
-        existing,
-        existing.quantity
-      )
+      const oldItemTotal = this.calculateItemPrice(existing, existing.quantity)
       const updatedItem = {
         ...existing,
         price: roundedPrice,
