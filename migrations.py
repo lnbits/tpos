@@ -256,3 +256,14 @@ async def m017_add_inventory_omit_tags(db: Database):
         ALTER TABLE tpos.pos ADD inventory_omit_tags TEXT NULL;
     """
     )
+
+
+async def m018_add_stripe_reader_id(db: Database):
+    """
+    Add Stripe reader id column
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD stripe_reader_id TEXT NULL;
+    """
+    )
