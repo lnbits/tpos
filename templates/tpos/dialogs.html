@@ -152,41 +152,94 @@
             <q-item-label class="text-bold">No paid invoices</q-item-label>
           </q-item-section>
         </q-item>
-        <q-item v-for="(payment, idx) in lastPaymentsDialog.data" :key="idx">
-          <q-item-section>
-            <q-item-label
-              v-if="payment.amountFiat"
-              class="text-bold"
-              v-text="payment.amountFiat"
+        <q-expansion-item
+          @show="payment.amount > 0 ? showDetails(payment.checking_id) : null"
+          @before-hide="paymentDetails = null"
+          group="paymentList"
+          v-for="(payment, idx) in lastPaymentsDialog.data"
+          :key="idx"
+          dense
+        >
+          <template v-slot:header>
+            <q-item-section>
+              <q-item-label v-if="payment.amountFiat">
+                <span class="text-bold" v-text="payment.amountFiat"></span>
+                <span
+                  class="text-italic q-ml-sm"
+                  v-text="`(${payment.amountFiatNow})`"
+                >
+                </span>
+                <q-tooltip>
+                  Amount at payment time vs current amount
+                </q-tooltip>
+              </q-item-label>
+              <q-item-label
+                class="text-bold"
+                v-text="formatBalance(payment.amount  / 1000)"
+              >
+              </q-item-label>
+              <q-item-label caption>
+                <q-icon
+                  class="q-mr-sm"
+                  size="sm"
+                  name="check"
+                  color="green"
+                ></q-icon>
+                <span v-text="payment.dateFrom"></span>
+              </q-item-label>
+              <q-item-label
+                caption
+                lines="2"
+                v-text="`Hash: ${payment.checking_id.slice(0, 30)}...`"
+              ></q-item-label>
+            </q-item-section>
+          </template>
+          <q-card class="q-ma-md">
+            <q-card-section v-if="paymentDetails && paymentDetails.items">
+              <q-list separator dense>
+                <q-item
+                  v-for="(item, index) in paymentDetails.items"
+                  :key="index"
+                >
+                  <q-item-section>
+                    <q-item-label
+                      v-text="`${item.quantity} x ${item.title}`"
+                    ></q-item-label>
+                    <q-item-label
+                      caption
+                      v-text="formatAmount(item.price * item.quantity, currency)"
+                    ></q-item-label>
+                  </q-item-section>
+                </q-item>
+                <q-item>
+                  <q-item-section>
+                    <q-item-label class="text-bold">Total</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-item-label
+                      class="text-bold"
+                      v-text="payment.amountFiat"
+                    ></q-item-label>
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-card-section>
+            <q-inner-loading :showing="!paymentDetails">
+              <q-spinner-gears size="30px" color="primary"></q-spinner-gears>
+            </q-inner-loading>
+            <q-card-actions
+              align="right"
+              v-if="enablePrint && payment.amount > 0"
             >
-            </q-item-label>
-            <q-item-label
-              class="text-bold"
-              v-text="formatBalance(payment.amount  / 1000)"
-            >
-            </q-item-label>
-            <q-item-label caption>
-              <q-icon
-                class="q-mr-sm"
-                size="sm"
-                name="check"
-                color="green"
-              ></q-icon>
-              <span v-text="payment.dateFrom"></span>
-            </q-item-label>
-            <q-item-label caption lines="2"
-              >Hash: ${payment.checking_id.slice(0, 30)}...</q-item-label
-            >
-          </q-item-section>
-          <q-item-section side v-if="enablePrint && payment.amount > 0">
-            <q-btn
-              round
-              icon="print"
-              color="primary"
-              @click="printReceipt(payment.checking_id)"
-            ></q-btn>
-          </q-item-section>
-        </q-item>
+              <q-btn
+                round
+                icon="print"
+                color="primary"
+                @click.stop="printReceipt(payment.checking_id)"
+              ></q-btn>
+            </q-card-actions>
+          </q-card>
+        </q-expansion-item>
       </q-list>
     </q-card>
   </q-dialog>

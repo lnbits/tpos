@@ -1,15 +1,10 @@
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
+from .helpers import _serialize_inventory_tags
 from .models import CreateTposData, LnurlCharge, Tpos, TposClean
 
 db = Database("ext_tpos")
-
-
-def _serialize_inventory_tags(tags: list[str] | str | None) -> str | None:
-    if isinstance(tags, list):
-        return ",".join([tag for tag in tags if tag])
-    return tags
 
 
 async def create_tpos(data: CreateTposData) -> Tpos:

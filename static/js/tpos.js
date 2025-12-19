@@ -125,6 +125,7 @@ window.app = Vue.createApp({
       addedAmount: 0,
       enablePrint: false,
       receiptData: null,
+      paymentDetails: null,
       currency_choice: false,
       _currencyResolver: null,
       _withdrawing: false,
@@ -402,7 +403,9 @@ window.app = Vue.createApp({
       this.cartTax = 0.0
       this.total = 0.0
       this.addedAmount = 0.0
-      this.cartDrawer = false
+      if (this.$q.screen.lt.md) {
+        this.cartDrawer = false
+      }
     },
     formatAndSetItems(items, keepIds = false) {
       this.items = (items || []).map((item, idx) => {
@@ -1035,7 +1038,11 @@ window.app = Vue.createApp({
               obj.dateFrom = moment(obj.time).fromNow()
               if (obj.currency != LNBITS_DENOMINATION) {
                 obj.amountFiat = this.formatAmount(
-                  obj.amount / 1000 / this.exchangeRate,
+                  obj.amount / 1000 / (obj.exchange_rate || this.exchangeRate),
+                  this.currency
+                )
+                obj.amountFiatNow = this.formatAmount(
+                  Math.abs(obj.amount) / 1000 / this.exchangeRate,
                   this.currency
                 )
               }
@@ -1106,7 +1113,7 @@ window.app = Vue.createApp({
       }
     },
     formatDate(timestamp) {
-      return LNbits.utils.formatDate(timestamp / 1000)
+      return LNbits.utils.formatTimestamp(timestamp / 1000)
     },
     showComplete() {
       this.complete.show = true
@@ -1114,14 +1121,37 @@ window.app = Vue.createApp({
         this.cartDrawer = false
       }
     },
-    async printReceipt(paymentHash) {
-      this.receiptData = null
+    async showDetails(paymentHash) {
       try {
         const {data} = await LNbits.api.request(
           'GET',
           `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
         )
         this.receiptData = data
+        if (data.extra && data.extra.details) {
+          this.paymentDetails = {}
+          this.paymentDetails.items = data.extra.details.items || []
+          this.paymentDetails.currency = data.extra.details.currency
+          this.paymentDetails.exchangeRate = data.extra.details.exchangeRate
+        }
+        return
+      } catch (error) {
+        console.error('Error fetching receipt data:', error)
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Error fetching receipt data.'
+        })
+      }
+    },
+    async printReceipt(paymentHash) {
+      try {
+        if (!this.receiptData) {
+          const {data} = await LNbits.api.request(
+            'GET',
+            `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
+          )
+          this.receiptData = data
+        }
 
         this.$q
           .dialog({
