@@ -1,7 +1,7 @@
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
-from .helpers import _serialize_inventory_tags
+from .helpers import serialize_inventory_tags
 from .models import CreateTposData, LnurlCharge, Tpos, TposClean
 
 db = Database("ext_tpos")
@@ -10,8 +10,8 @@ db = Database("ext_tpos")
 async def create_tpos(data: CreateTposData) -> Tpos:
     tpos_id = urlsafe_short_hash()
     data_dict = data.dict()
-    data_dict["inventory_tags"] = _serialize_inventory_tags(data.inventory_tags)
-    data_dict["inventory_omit_tags"] = _serialize_inventory_tags(
+    data_dict["inventory_tags"] = serialize_inventory_tags(data.inventory_tags)
+    data_dict["inventory_omit_tags"] = serialize_inventory_tags(
         data.inventory_omit_tags
     )
     tpos = Tpos(id=tpos_id, **data_dict)
@@ -52,8 +52,8 @@ async def get_clean_tpos(tpos_id: str) -> TposClean | None:
 
 
 async def update_tpos(tpos: Tpos) -> Tpos:
-    tpos.inventory_tags = _serialize_inventory_tags(tpos.inventory_tags)
-    tpos.inventory_omit_tags = _serialize_inventory_tags(tpos.inventory_omit_tags)
+    tpos.inventory_tags = serialize_inventory_tags(tpos.inventory_tags)
+    tpos.inventory_omit_tags = serialize_inventory_tags(tpos.inventory_omit_tags)
     await db.update("tpos.pos", tpos)
     return tpos
 

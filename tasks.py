@@ -1,5 +1,7 @@
 import asyncio
 
+from loguru import logger
+
 from lnbits.core.models import Payment
 from lnbits.core.services import (
     create_invoice,
@@ -8,10 +10,9 @@ from lnbits.core.services import (
     websocket_updater,
 )
 from lnbits.tasks import register_invoice_listener
-from loguru import logger
 
 from .crud import get_tpos
-from .services import _deduct_inventory_stock
+from .services import deduct_inventory_stock
 
 
 async def wait_for_paid_invoices():
@@ -67,7 +68,7 @@ async def on_invoice_paid(payment: Payment) -> None:
 
     inventory_payload = payment.extra.get("inventory")
     if inventory_payload:
-        await _deduct_inventory_stock(payment.wallet_id, inventory_payload)
+        await deduct_inventory_stock(payment.wallet_id, inventory_payload)
 
     if not tip_amount:
         # no tip amount
