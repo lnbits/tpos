@@ -4,6 +4,10 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
+from lnurl import LnurlPayResponse
+from lnurl import decode as decode_lnurl
+from lnurl import handle as lnurl_handle
+
 from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
@@ -16,9 +20,6 @@ from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
-from lnurl import LnurlPayResponse
-from lnurl import decode as decode_lnurl
-from lnurl import handle as lnurl_handle
 
 from .crud import (
     create_tpos,
@@ -28,9 +29,9 @@ from .crud import (
     update_tpos,
 )
 from .helpers import (
-    _first_image,
-    _inventory_tags_to_list,
-    _inventory_tags_to_string,
+    first_image,
+    inventory_tags_to_list,
+    inventory_tags_to_string,
 )
 from .models import (
     CreateTposData,
@@ -42,9 +43,9 @@ from .models import (
     Tpos,
 )
 from .services import (
-    _get_default_inventory,
-    _get_inventory_items_for_tpos,
-    _inventory_available_for_user,
+    get_default_inventory,
+    get_inventory_items_for_tpos,
+    inventory_available_for_user,
 )
 
 tpos_api_router = APIRouter()
@@ -67,11 +68,11 @@ async def api_inventory_status(
     wallet: WalletTypeInfo = Depends(require_admin_key),
 ) -> dict:
     user = await get_user(wallet.wallet.user)
-    if not _inventory_available_for_user(user):
+    if not inventory_available_for_user(user):
         return {"enabled": False, "inventory_id": None, "tags": [], "omit_tags": []}
-    inventory = await _get_default_inventory(wallet.wallet.user)
-    tags = _inventory_tags_to_list(inventory.get("tags")) if inventory else []
-    omit_tags = _inventory_tags_to_list(inventory.get("omit_tags")) if inventory else []
+    inventory = await get_default_inventory(wallet.wallet.user)
+    tags = inventory_tags_to_list(inventory.get("tags")) if inventory else []
+    omit_tags = inventory_tags_to_list(inventory.get("omit_tags")) if inventory else []
     return {
         "enabled": True,
         "inventory_id": inventory.get("id") if inventory else None,
@@ -86,10 +87,10 @@ async def api_tpos_create(
 ):
     data.wallet = wallet.wallet.id
     user = await get_user(wallet.wallet.user)
-    if data.use_inventory and not _inventory_available_for_user(user):
+    if data.use_inventory and not inventory_available_for_user(user):
         data.use_inventory = False
     if data.use_inventory and not data.inventory_id:
-        inventory = await _get_default_inventory(wallet.wallet.user)
+        inventory = await get_default_inventory(wallet.wallet.user)
         if not inventory:
             data.use_inventory = False
         else:
@@ -116,7 +117,7 @@ async def api_tpos_update(
     user = await get_user(wallet.wallet.user)
     update_payload = data.dict(exclude_unset=True)
     if update_payload.get("use_inventory") and not update_payload.get("inventory_id"):
-        inventory = await _get_default_inventory(wallet.wallet.user)
+        inventory = await get_default_inventory(wallet.wallet.user)
         if inventory:
             update_payload["inventory_id"] = inventory.get("id")
         else:
@@ -124,18 +125,18 @@ async def api_tpos_update(
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="No inventory found for this user.",
             )
-    if update_payload.get("use_inventory") and not _inventory_available_for_user(user):
+    if update_payload.get("use_inventory") and not inventory_available_for_user(user):
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Inventory extension must be enabled to use it.",
         )
     if "inventory_tags" in update_payload:
-        update_payload["inventory_tags"] = _inventory_tags_to_string(
-            _inventory_tags_to_list(update_payload["inventory_tags"])
+        update_payload["inventory_tags"] = inventory_tags_to_string(
+            inventory_tags_to_list(update_payload["inventory_tags"])
         )
     if "inventory_omit_tags" in update_payload:
-        update_payload["inventory_omit_tags"] = _inventory_tags_to_string(
-            _inventory_tags_to_list(update_payload["inventory_omit_tags"])
+        update_payload["inventory_omit_tags"] = inventory_tags_to_string(
+            inventory_tags_to_list(update_payload["inventory_omit_tags"])
         )
     for field, value in update_payload.items():
         setattr(tpos, field, value)
@@ -179,13 +180,13 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Paym
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="Inventory is not enabled for this TPoS.",
             )
-        inventory_payload.tags = _inventory_tags_to_list(inventory_payload.tags)
+        inventory_payload.tags = inventory_tags_to_list(inventory_payload.tags)
         if tpos.inventory_id and inventory_payload.inventory_id != tpos.inventory_id:
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="Mismatched inventory selection.",
             )
-        allowed_tags = set(_inventory_tags_to_list(tpos.inventory_tags))
+        allowed_tags = set(inventory_tags_to_list(tpos.inventory_tags))
         if allowed_tags and any(
             tag not in allowed_tags for tag in inventory_payload.tags
         ):
@@ -445,17 +446,17 @@ async def api_tpos_inventory_items(tpos_id: str):
     inventory_id = tpos.inventory_id
     inventory_data: dict[str, Any] | None = None
     if not inventory_id:
-        inventory_data = await _get_default_inventory(wallet.user)
+        inventory_data = await get_default_inventory(wallet.user)
         inventory_id = inventory_data.get("id") if inventory_data else None
     else:
-        inventory_data = await _get_default_inventory(wallet.user)
+        inventory_data = await get_default_inventory(wallet.user)
     if not inventory_id:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND,
             detail="No inventory found for this TPoS.",
         )
 
-    items = await _get_inventory_items_for_tpos(
+    items = await get_inventory_items_for_tpos(
         wallet.user,
         inventory_id,
         tpos.inventory_tags,
@@ -468,8 +469,8 @@ async def api_tpos_inventory_items(tpos_id: str):
             "description": item.get("description"),
             "price": item.get("price"),
             "tax": item.get("tax_rate"),
-            "image": _first_image(item.get("images")),
-            "categories": _inventory_tags_to_list(item.get("tags")),
+            "image": first_image(item.get("images")),
+            "categories": inventory_tags_to_list(item.get("tags")),
             "quantity_in_stock": item.get("quantity_in_stock"),
             "disabled": (not item.get("is_active"))
             or (

@@ -1,15 +1,16 @@
 from typing import Any
 
 import httpx
+
 from lnbits.core.crud import get_wallet
 from lnbits.core.models import User
 from lnbits.helpers import create_access_token
 from lnbits.settings import settings
 
-from .helpers import _from_csv, _inventory_tags_to_list
+from .helpers import from_csv, inventory_tags_to_list
 
 
-async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:
+async def deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:
     wallet = await get_wallet(wallet_id)
     if not wallet:
         return
@@ -43,7 +44,7 @@ async def _deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> No
     return
 
 
-async def _get_default_inventory(user_id: str) -> dict[str, Any] | None:
+async def get_default_inventory(user_id: str) -> dict[str, Any] | None:
     access = create_access_token({"sub": "", "usr": user_id}, token_expire_minutes=1)
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -57,19 +58,19 @@ async def _get_default_inventory(user_id: str) -> dict[str, Any] | None:
         inventory = inventory[0] if inventory else None
     if not isinstance(inventory, dict):
         return None
-    inventory["tags"] = _inventory_tags_to_list(inventory.get("tags"))
-    inventory["omit_tags"] = _inventory_tags_to_list(inventory.get("omit_tags"))
+    inventory["tags"] = inventory_tags_to_list(inventory.get("tags"))
+    inventory["omit_tags"] = inventory_tags_to_list(inventory.get("omit_tags"))
     return inventory
 
 
-async def _get_inventory_items_for_tpos(
+async def get_inventory_items_for_tpos(
     user_id: str,
     inventory_id: str,
     tags: str | list[str] | None,
     omit_tags: str | list[str] | None,
 ) -> list[Any]:
-    tag_list = _inventory_tags_to_list(tags)
-    omit_list = [tag.lower() for tag in _inventory_tags_to_list(omit_tags)]
+    tag_list = inventory_tags_to_list(tags)
+    omit_list = [tag.lower() for tag in inventory_tags_to_list(omit_tags)]
     allowed_tags = [tag.lower() for tag in tag_list]
     access = create_access_token({"sub": "", "usr": user_id}, token_expire_minutes=1)
     async with httpx.AsyncClient() as client:
@@ -84,19 +85,19 @@ async def _get_inventory_items_for_tpos(
         # item images are a comma separated string; make a list
         for item in items:
             images = item.get("images")
-            item["images"] = _from_csv(images)
+            item["images"] = from_csv(images)
 
     def has_allowed_tag(item_tags: str | list[str] | None) -> bool:
         # When no tags are configured for this TPoS, show no items
         if not tag_list:
             return False
-        item_tag_list = [tag.lower() for tag in _inventory_tags_to_list(item_tags)]
+        item_tag_list = [tag.lower() for tag in inventory_tags_to_list(item_tags)]
         return any(tag in item_tag_list for tag in allowed_tags)
 
     def has_omit_tag(item_omit_tags: str | list[str] | None) -> bool:
         if not omit_list:
             return False
-        item_tag_list = [tag.lower() for tag in _inventory_tags_to_list(item_omit_tags)]
+        item_tag_list = [tag.lower() for tag in inventory_tags_to_list(item_omit_tags)]
         return any(tag in item_tag_list for tag in omit_list)
 
     filtered = [
@@ -116,5 +117,5 @@ async def _get_inventory_items_for_tpos(
     ]
 
 
-def _inventory_available_for_user(user: User | None) -> bool:
+def inventory_available_for_user(user: User | None) -> bool:
     return bool(user and "inventory" in (user.extensions or []))
