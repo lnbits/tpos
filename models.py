@@ -63,6 +63,7 @@ class CreateTposData(BaseModel):
     business_name: str | None
     business_address: str | None
     business_vat_id: str | None
+    only_show_sats_on_bitcoin: bool = Query(True)
     fiat_provider: str | None = Field(None)
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
@@ -96,6 +97,7 @@ class TposClean(BaseModel):
     business_name: str | None = None
     business_address: str | None = None
     business_vat_id: str | None = None
+    only_show_sats_on_bitcoin: bool = True
     fiat_provider: str | None = None
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None

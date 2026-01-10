@@ -4,10 +4,6 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
-from lnurl import LnurlPayResponse
-from lnurl import decode as decode_lnurl
-from lnurl import handle as lnurl_handle
-
 from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
@@ -20,6 +16,9 @@ from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
+from lnurl import LnurlPayResponse
+from lnurl import decode as decode_lnurl
+from lnurl import handle as lnurl_handle
 
 from .crud import (
     create_tpos,
@@ -226,6 +225,7 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Paym
             "details": data.details if data.details else None,
             "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
             "internal_memo": data.internal_memo if data.internal_memo else None,
+            "paid_in_fiat": data.pay_in_fiat,
         }
         if inventory_payload:
             extra["inventory"] = inventory_payload.dict()
@@ -383,6 +383,7 @@ async def api_tpos_check_invoice(
             "business_name": tpos.business_name,
             "business_address": tpos.business_address,
             "business_vat_id": tpos.business_vat_id,
+            "only_show_sats_on_bitcoin": tpos.only_show_sats_on_bitcoin,
         }
     return {"paid": payment.success}
 

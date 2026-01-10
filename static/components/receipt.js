@@ -46,6 +46,17 @@ window.app.component('receipt', {
     },
     currencyText() {
       return `(${this.currency})`
+    },
+    isBitcoinTransaction() {
+      return !(
+        this.data.extra?.paid_in_fiat ||
+        this.data.extra?.fiat_method ||
+        this.data.extra?.fiat_payment_request
+      )
+    },
+    showBitcoinDetails() {
+      const onlyShowOnBitcoin = this.data.only_show_sats_on_bitcoin !== false
+      return !onlyShowOnBitcoin || this.isBitcoinTransaction
     }
   },
   methods: {
@@ -66,7 +77,9 @@ window.app.component('receipt', {
     <div class="text-center q-mb-xl">
     <p class='text-h6 text-uppercase'>Receipt</p>
     <p class=''><span v-text="formattedDate"></span></p>
-    <p class=''><span v-text="exchangeRateInfo"></span></p>
+    <p class='' v-if="showBitcoinDetails">
+      <span v-text="exchangeRateInfo"></span>
+    </p>
     </div>
     <div v-if=data.business_name>
       <span v-text="data.business_name"></span>
@@ -119,7 +132,7 @@ window.app.component('receipt', {
         <span v-text="cartTotal.toFixed(2)"></span>
         </div>
       </div>
-      <div class="row">
+      <div class="row" v-if="showBitcoinDetails">
         <div class="col-6">Total (sats)</div>
         <div class="col-6 text-right">
         <span v-text="data.extra.amount"></span>
