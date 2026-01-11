@@ -103,6 +103,20 @@ window.app.component('receipt', {
       row-key="title"
         hide-bottom
     >
+      <template v-slot:body="props">
+        <q-tr :props="props">
+          <q-td key="title" :props="props">
+            <div v-text="props.row.title"></div>
+            <div v-if="props.row.note" class="text-caption" v-text="props.row.note"></div>
+          </q-td>
+          <q-td key="formattedPrice" :props="props" class="text-right">
+            <span v-text="props.row.formattedPrice"></span>
+          </q-td>
+          <q-td key="quantity" :props="props">
+            <span v-text="props.row.quantity"></span>
+          </q-td>
+        </q-tr>
+      </template>
     </q-table>
     <div class="q-my-xl q-gutter-md">
       <div class="row">

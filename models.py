@@ -19,6 +19,7 @@ class CreateTposInvoice(BaseModel):
     memo: str | None = Query(None)
     exchange_rate: float | None = Query(None, ge=0.0)
     details: dict | None = Query(None)
+    notes: dict | None = Query(None)
     inventory: InventorySale | None = Query(None)
     tip_amount: int | None = Query(None, ge=1)
     user_lnaddress: str | None = Query(None)

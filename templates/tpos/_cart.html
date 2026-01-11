@@ -38,7 +38,16 @@
                   max-width: 1px;
                 "
               >
-                <span v-text="item.title"></span>
+                <span
+                  class="cursor-pointer"
+                  @click="promptItemNote(item)"
+                  v-text="item.title"
+                ></span>
+                <div
+                  v-if="item.note"
+                  class="text-caption text-grey-6 ellipsis"
+                  v-text="item.note"
+                ></div>
               </td>
               <td>
                 <div class="flex justify-evenly" style="align-items: center">

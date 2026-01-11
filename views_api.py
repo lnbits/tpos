@@ -223,6 +223,7 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Paym
             "amount": data.amount,
             "exchangeRate": data.exchange_rate if data.exchange_rate else None,
             "details": data.details if data.details else None,
+            "notes": data.notes if data.notes else None,
             "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
             "internal_memo": data.internal_memo if data.internal_memo else None,
             "paid_in_fiat": data.pay_in_fiat,
