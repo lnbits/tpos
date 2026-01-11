@@ -206,6 +206,11 @@
                       v-text="`${item.quantity} x ${item.title}`"
                     ></q-item-label>
                     <q-item-label
+                      v-if="item.note"
+                      caption
+                      v-text="item.note"
+                    ></q-item-label>
+                    <q-item-label
                       caption
                       v-text="formatAmount(item.price * item.quantity, currency)"
                     ></q-item-label>

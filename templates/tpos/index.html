@@ -521,6 +521,10 @@
             label="VAT ID"
             placeholder="123456789"
           ></q-input>
+          <q-checkbox
+            v-model="formDialog.data.only_show_sats_on_bitcoin"
+            label="Only show sats & sats conversion rate on bitcoin transactions"
+          ></q-checkbox>
         </template>
         <template v-if="formDialog.advanced.tips">
           <q-select
