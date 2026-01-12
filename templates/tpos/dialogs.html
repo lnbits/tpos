@@ -238,6 +238,14 @@
             >
               <q-btn
                 round
+                icon="receipt_long"
+                color="secondary"
+                @click.stop="printOrderReceipt(payment.checking_id)"
+              >
+                <q-tooltip>Print order receipt</q-tooltip>
+              </q-btn>
+              <q-btn
+                round
                 icon="print"
                 color="primary"
                 @click.stop="printReceipt(payment.checking_id)"

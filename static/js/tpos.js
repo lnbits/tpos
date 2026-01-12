@@ -125,6 +125,7 @@ window.app = Vue.createApp({
       addedAmount: 0,
       enablePrint: false,
       receiptData: null,
+      orderReceipt: false,
       paymentDetails: null,
       currency_choice: false,
       _currencyResolver: null,
@@ -1198,7 +1199,30 @@ window.app = Vue.createApp({
             persistent: false
           })
           .onOk(() => {
+            this.orderReceipt = false
             console.log('Printing receipt for payment hash:', paymentHash)
+            window.print()
+          })
+      } catch (error) {
+        console.error('Error fetching receipt data:', error)
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Error fetching receipt data.'
+        })
+      }
+    },
+    async printOrderReceipt(paymentHash) {
+      try {
+        this.$q
+          .dialog({
+            title: 'Print Order',
+            message: 'Do you want to print the order receipt?',
+            cancel: true,
+            persistent: false
+          })
+          .onOk(() => {
+            this.orderReceipt = true
+            console.log('Printing order receipt for payment hash:', paymentHash)
             window.print()
           })
       } catch (error) {

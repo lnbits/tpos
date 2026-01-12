@@ -1,11 +1,11 @@
 window.app.component('order-receipt', {
   name: 'order-receipt',
-  props: ['data'],
+  props: ['data', 'type'],
   data() {},
   template: `
     <div class="q-pa-md">
     <div class="text-center q-mb-xl">
-    <p class='text-h6 text-uppercase'>Order</p>
+    <p class='text-subtitle2 text-uppercase'>Order</p>
     </div>
     <q-table v-if="data.extra.details.items && data.extra.details.items.length > 0"
       dense

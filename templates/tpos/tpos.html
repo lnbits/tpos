@@ -104,7 +104,17 @@
 </q-page-container>
 <template v-if="enablePrint">
   <Teleport to="body">
-    <receipt class="receipt" v-if="receiptData" :data="receiptData"></receipt>
+    <receipt
+      class="receipt"
+      v-if="receiptData && !orderReceipt"
+      :data="receiptData"
+    ></receipt>
+    <order-receipt
+      class="receipt"
+      v-if="receiptData && orderReceipt"
+      :data="receiptData"
+      type="order"
+    ></order-receipt>
   </Teleport>
 </template>
 {% endblock %} {% block styles %}
@@ -230,6 +240,7 @@
 <script src="{{ static_url_for('tpos/static', path='components/item-list.js') }}"></script>
 <script src="{{ static_url_for('tpos/static', path='components/keypad.js') }}"></script>
 <script src="{{ static_url_for('tpos/static', path='components/receipt.js') }}"></script>
+<script src="{{ static_url_for('tpos/static', path='components/order-receipt.js') }}"></script>
 
 <style scoped>
   input::-webkit-outer-spin-button,
