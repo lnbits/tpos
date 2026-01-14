@@ -126,6 +126,10 @@ window.app = Vue.createApp({
       enablePrint: false,
       receiptData: null,
       orderReceipt: false,
+      printDialog: {
+        show: false,
+        paymentHash: null
+      },
       paymentDetails: null,
       currency_choice: false,
       _currencyResolver: null,
@@ -877,7 +881,7 @@ window.app = Vue.createApp({
             this.clearCart()
             this.showComplete()
             if (this.enablePrint) {
-              this.printReceipt(paymentHash)
+              this.promptPrintType(paymentHash)
             }
             ws.close()
           }
@@ -1174,12 +1178,28 @@ window.app = Vue.createApp({
         }
         return
       } catch (error) {
+        console.error('Error showing print options:', error)
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Error showing print options.'
+        })
+      }
+    },
+    promptPrintType(paymentHash) {
+      try {
+        this.printDialog.paymentHash = paymentHash
+        this.printDialog.show = true
+      } catch (error) {
         console.error('Error fetching receipt data:', error)
         Quasar.Notify.create({
           type: 'negative',
           message: 'Error fetching receipt data.'
         })
       }
+    },
+    closePrintDialog() {
+      this.printDialog.show = false
+      this.printDialog.paymentHash = null
     },
     async printReceipt(paymentHash) {
       try {
@@ -1191,18 +1211,10 @@ window.app = Vue.createApp({
           this.receiptData = data
         }
 
-        this.$q
-          .dialog({
-            title: 'Print Receipt',
-            message: 'Do you want to print the receipt?',
-            cancel: true,
-            persistent: false
-          })
-          .onOk(() => {
-            this.orderReceipt = false
-            console.log('Printing receipt for payment hash:', paymentHash)
-            window.print()
-          })
+        this.orderReceipt = false
+        console.log('Printing receipt for payment hash:', paymentHash)
+        await this.$nextTick()
+        window.print()
       } catch (error) {
         console.error('Error fetching receipt data:', error)
         Quasar.Notify.create({
@@ -1213,18 +1225,18 @@ window.app = Vue.createApp({
     },
     async printOrderReceipt(paymentHash) {
       try {
-        this.$q
-          .dialog({
-            title: 'Print Order',
-            message: 'Do you want to print the order receipt?',
-            cancel: true,
-            persistent: false
-          })
-          .onOk(() => {
-            this.orderReceipt = true
-            console.log('Printing order receipt for payment hash:', paymentHash)
-            window.print()
-          })
+        if (!this.receiptData) {
+          const {data} = await LNbits.api.request(
+            'GET',
+            `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
+          )
+          this.receiptData = data
+        }
+
+        this.orderReceipt = true
+        console.log('Printing order receipt for payment hash:', paymentHash)
+        await this.$nextTick()
+        window.print()
       } catch (error) {
         console.error('Error fetching receipt data:', error)
         Quasar.Notify.create({
