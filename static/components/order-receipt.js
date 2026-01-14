@@ -28,7 +28,7 @@ window.app.component('order-receipt', {
             :key="col.name"
             :props="props"
           >
-            <span class="q-pa-none text-subtitle2 text-no-wrap" v-text="col.label"></span>
+            <span class="q-pa-none" v-text="col.label"></span>
           </q-th>
         </q-tr>
       </template>
