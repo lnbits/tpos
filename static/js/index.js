@@ -21,6 +21,7 @@ const mapTpos = obj => {
   obj.inventory_omit_tags = omitTagString
     ? omitTagString.split(',').filter(Boolean)
     : []
+  obj.only_show_sats_on_bitcoin = obj.only_show_sats_on_bitcoin ?? true
   obj.itemsMap = new Map()
   obj.items.forEach((item, idx) => {
     let id = `${obj.id}:${idx + 1}`
@@ -106,6 +107,7 @@ window.app = Vue.createApp({
           lnaddress: false,
           lnaddress_cut: 2,
           enable_receipt_print: false,
+          only_show_sats_on_bitcoin: true,
           fiat: false,
           stripe_card_payments: false,
           stripe_reader_id: ''
@@ -241,6 +243,7 @@ window.app = Vue.createApp({
         lnaddress: false,
         lnaddress_cut: 2,
         enable_receipt_print: false,
+        only_show_sats_on_bitcoin: true,
         fiat: false,
         stripe_card_payments: false,
         stripe_reader_id: ''

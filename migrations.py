@@ -267,3 +267,14 @@ async def m018_add_stripe_reader_id(db: Database):
         ALTER TABLE tpos.pos ADD stripe_reader_id TEXT NULL;
     """
     )
+
+
+async def m019_add_receipt_sats_only(db: Database):
+    """
+    Add receipt option to only show sats on bitcoin transactions
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD only_show_sats_on_bitcoin BOOLEAN DEFAULT true;
+    """
+    )

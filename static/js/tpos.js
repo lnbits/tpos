@@ -125,6 +125,11 @@ window.app = Vue.createApp({
       addedAmount: 0,
       enablePrint: false,
       receiptData: null,
+      orderReceipt: false,
+      printDialog: {
+        show: false,
+        paymentHash: null
+      },
       paymentDetails: null,
       currency_choice: false,
       _currencyResolver: null,
@@ -304,7 +309,8 @@ window.app = Vue.createApp({
       } else {
         this.cart.set(item.id, {
           ...item,
-          quantity: quantity
+          quantity: quantity,
+          note: item.note || null
         })
       }
       this.total = this.total + this.calculateItemPrice(priceSource, quantity)
@@ -353,6 +359,25 @@ window.app = Vue.createApp({
           this.updateCartItemPrice(cartItem, newPrice)
         })
     },
+    promptItemNote(item) {
+      const cartItem = this.cart.get(item.id)
+      if (!cartItem) return
+      this.$q
+        .dialog({
+          title: 'Set note',
+          message: 'Add a note for this item',
+          prompt: {
+            model: cartItem.note || '',
+            type: 'text',
+            placeholder: 'e.g. allergy info'
+          },
+          cancel: true
+        })
+        .onOk(val => {
+          const note = (val || '').trim()
+          this.updateCartItemNote(cartItem, note || null)
+        })
+    },
     updateCartItemPrice(cartItem, newPrice) {
       const roundedPrice =
         this.currency === 'sats' ? Math.ceil(newPrice) : +newPrice.toFixed(2)
@@ -371,6 +396,15 @@ window.app = Vue.createApp({
       )
       this.total = +(this.total - oldItemTotal + newItemTotal).toFixed(2)
       this.cartTaxTotal()
+    },
+    updateCartItemNote(cartItem, note) {
+      const existing = this.cart.get(cartItem.id)
+      if (!existing) return
+      const updatedItem = {
+        ...existing,
+        note: note
+      }
+      this.cart.set(cartItem.id, updatedItem)
     },
     calculateItemPrice(item, qty) {
       let tax = item.tax || this.taxDefault
@@ -751,10 +785,20 @@ window.app = Vue.createApp({
             formattedPrice: item.formattedPrice,
             quantity: item.quantity,
             title: item.title,
-            tax: item.tax || this.taxDefault
+            tax: item.tax || this.taxDefault,
+            note: item.note || null
           })),
           taxIncluded: this.taxInclusive,
           taxValue: this.cartTax
+        }
+        const notes = {}
+        ;[...this.cart.values()].forEach(item => {
+          if (item.note) {
+            notes[item.title] = item.note
+          }
+        })
+        if (Object.keys(notes).length) {
+          params.notes = notes
         }
       }
       if (this.lnaddress) {
@@ -837,7 +881,7 @@ window.app = Vue.createApp({
             this.clearCart()
             this.showComplete()
             if (this.enablePrint) {
-              this.printReceipt(paymentHash)
+              this.promptPrintType(paymentHash)
             }
             ws.close()
           }
@@ -1134,12 +1178,28 @@ window.app = Vue.createApp({
         }
         return
       } catch (error) {
+        console.error('Error showing print options:', error)
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Error showing print options.'
+        })
+      }
+    },
+    promptPrintType(paymentHash) {
+      try {
+        this.printDialog.paymentHash = paymentHash
+        this.printDialog.show = true
+      } catch (error) {
         console.error('Error fetching receipt data:', error)
         Quasar.Notify.create({
           type: 'negative',
           message: 'Error fetching receipt data.'
         })
       }
+    },
+    closePrintDialog() {
+      this.printDialog.show = false
+      this.printDialog.paymentHash = null
     },
     async printReceipt(paymentHash) {
       try {
@@ -1151,17 +1211,32 @@ window.app = Vue.createApp({
           this.receiptData = data
         }
 
-        this.$q
-          .dialog({
-            title: 'Print Receipt',
-            message: 'Do you want to print the receipt?',
-            cancel: true,
-            persistent: false
-          })
-          .onOk(() => {
-            console.log('Printing receipt for payment hash:', paymentHash)
-            window.print()
-          })
+        this.orderReceipt = false
+        console.log('Printing receipt for payment hash:', paymentHash)
+        await this.$nextTick()
+        window.print()
+      } catch (error) {
+        console.error('Error fetching receipt data:', error)
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Error fetching receipt data.'
+        })
+      }
+    },
+    async printOrderReceipt(paymentHash) {
+      try {
+        if (!this.receiptData) {
+          const {data} = await LNbits.api.request(
+            'GET',
+            `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
+          )
+          this.receiptData = data
+        }
+
+        this.orderReceipt = true
+        console.log('Printing order receipt for payment hash:', paymentHash)
+        await this.$nextTick()
+        window.print()
       } catch (error) {
         console.error('Error fetching receipt data:', error)
         Quasar.Notify.create({

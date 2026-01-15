@@ -19,6 +19,7 @@ class CreateTposInvoice(BaseModel):
     memo: str | None = Query(None)
     exchange_rate: float | None = Query(None, ge=0.0)
     details: dict | None = Query(None)
+    notes: dict | None = Query(None)
     inventory: InventorySale | None = Query(None)
     tip_amount: int | None = Query(None, ge=1)
     user_lnaddress: str | None = Query(None)
@@ -63,6 +64,7 @@ class CreateTposData(BaseModel):
     business_name: str | None
     business_address: str | None
     business_vat_id: str | None
+    only_show_sats_on_bitcoin: bool = Query(True)
     fiat_provider: str | None = Field(None)
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
@@ -96,6 +98,7 @@ class TposClean(BaseModel):
     business_name: str | None = None
     business_address: str | None = None
     business_vat_id: str | None = None
+    only_show_sats_on_bitcoin: bool = True
     fiat_provider: str | None = None
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None

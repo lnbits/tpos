@@ -46,6 +46,17 @@ window.app.component('receipt', {
     },
     currencyText() {
       return `(${this.currency})`
+    },
+    isBitcoinTransaction() {
+      return !(
+        this.data.extra?.paid_in_fiat ||
+        this.data.extra?.fiat_method ||
+        this.data.extra?.fiat_payment_request
+      )
+    },
+    showBitcoinDetails() {
+      const onlyShowOnBitcoin = this.data.only_show_sats_on_bitcoin !== false
+      return !onlyShowOnBitcoin || this.isBitcoinTransaction
     }
   },
   methods: {
@@ -66,7 +77,9 @@ window.app.component('receipt', {
     <div class="text-center q-mb-xl">
     <p class='text-h6 text-uppercase'>Receipt</p>
     <p class=''><span v-text="formattedDate"></span></p>
-    <p class=''><span v-text="exchangeRateInfo"></span></p>
+    <p class='' v-if="showBitcoinDetails">
+      <span v-text="exchangeRateInfo"></span>
+    </p>
     </div>
     <div v-if=data.business_name>
       <span v-text="data.business_name"></span>
@@ -79,17 +92,53 @@ window.app.component('receipt', {
       <span v-text="data.business_vat_id"></span>
     </div>
     <q-table v-if="data.extra.details.items && data.extra.details.items.length > 0"
+      dense
+      class="q-ma-none"
       :hide-pagination="true"
       :rows-per-page-options="[0]"  
       :rows="data.extra.details.items"
+      class="q-pa-none text-caption"
       :columns="[
           { name: 'title', label: 'Item', field: 'title' },
-          { name: 'formattedPrice', label: 'Unit Price', field: 'formattedPrice', align: 'right' },
-          { name: 'quantity', label: 'Quantity', field: 'quantity' },
+          { name: 'formattedPrice', label: 'Price', field: 'formattedPrice', align: 'right' },
+          { name: 'quantity', label: 'Qty', field: 'quantity' },
         ]"
       row-key="title"
         hide-bottom
     >
+      <template v-slot:header="props">
+        <q-tr :props="props">
+          <q-th
+            v-for="col in props.cols"
+            :key="col.name"
+            :props="props"
+          >
+            <span class="q-pa-none text-subtitle2 text-no-wrap" v-text="col.label"></span>
+          </q-th>
+        </q-tr>
+      </template>
+      <template v-slot:body="props">
+        <q-tr :props="props">
+          <q-td key="title" :props="props" class="q-pa-none">
+            <div class="text-subtitle2" v-text="props.row.title"></div>
+            <div
+              v-if="props.row.note"
+              class="text-subtitle2 text-italic"
+              v-text="props.row.note"
+            ></div>
+          </q-td>
+          <q-td
+            key="formattedPrice"
+            :props="props"
+            class="q-pa-none text-right text-no-wrap"
+          >
+            <span class="text-subtitle2 text-no-wrap" v-text="props.row.formattedPrice"></span>
+          </q-td>
+          <q-td key="quantity" :props="props" class="q-pa-none">
+            <span class="text-subtitle2 text-no-wrap" v-text="props.row.quantity"></span>
+          </q-td>
+        </q-tr>
+      </template>
     </q-table>
     <div class="q-my-xl q-gutter-md">
       <div class="row">
@@ -119,7 +168,7 @@ window.app.component('receipt', {
         <span v-text="cartTotal.toFixed(2)"></span>
         </div>
       </div>
-      <div class="row">
+      <div class="row" v-if="showBitcoinDetails">
         <div class="col-6">Total (sats)</div>
         <div class="col-6 text-right">
         <span v-text="data.extra.amount"></span>
