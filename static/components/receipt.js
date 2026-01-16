@@ -81,16 +81,6 @@ window.app.component('receipt', {
       <span v-text="exchangeRateInfo"></span>
     </p>
     </div>
-    <div v-if=data.business_name>
-      <span v-text="data.business_name"></span>
-    </div>
-    <div v-if=data.business_address v-for="line in businessAddress">
-    <span v-text="line"></span>
-    </div>
-    <div v-if=data.business_vat_id class=q-mb-xl>
-    <span class="text-h6 text-uppercase">VAT: </span>
-      <span v-text="data.business_vat_id"></span>
-    </div>
     <q-table v-if="data.extra.details.items && data.extra.details.items.length > 0"
       dense
       class="q-ma-none"
@@ -176,9 +166,19 @@ window.app.component('receipt', {
       </div>
     </div>
     <div class="text-center q-mb-xl">
-    <p class='text-h6 text-uppercase'>
+    <p class='text-h6 q-mb-md text-uppercase'>
     Thank you for your purchase! 
     </p>
+    <div v-if=data.business_name>
+      <span v-text="data.business_name" class="text-subtitle2"></span>
+    </div>
+    <div v-if=data.business_address v-for="line in businessAddress">
+    <span v-text="line" class="text-subtitle2"></span>
+    </div>
+    <div v-if=data.business_vat_id class=q-mb-xl>
+    <span class="text-h6 text-uppercase">VAT: </span>
+      <span v-text="data.business_vat_id"></span>
+    </div>
     </div>
   </div>
     `
