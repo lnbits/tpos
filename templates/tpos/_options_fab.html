@@ -25,10 +25,10 @@
   <q-fab-action
     color="primary"
     @click.prevent="headerToggle"
-    :icon="headerElement && headerElement.style.display === 'none' ? 'visibility' : 'visibility_off'"
+    :icon="headerHidden ? 'visibility' : 'visibility_off'"
     external-label
     label-position="left"
-    :label="headerElement && headerElement.style.display === 'none' ? 'Show Header' : 'Hide Header'"
+    :label="headerHidden ? 'Show Header' : 'Hide Header'"
   ></q-fab-action>
   <q-fab-action
     color="primary"

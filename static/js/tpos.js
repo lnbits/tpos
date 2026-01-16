@@ -135,6 +135,8 @@ window.app = Vue.createApp({
       _currencyResolver: null,
       _withdrawing: false,
       headerElement: null,
+      headerHidden:
+        this.$q.localStorage.getItem('lnbits.tpos.header') !== 'shown',
       categoryColors: {},
       categoryColorIndex: 0,
       pastelColors: [
@@ -1272,14 +1274,13 @@ window.app = Vue.createApp({
         })
     },
     headerToggle() {
+      this.headerHidden = !this.headerHidden
+      this.$q.localStorage.set(
+        'lnbits.tpos.header',
+        this.headerHidden ? 'hidden' : 'shown'
+      )
       if (this.headerElement) {
-        this.headerElement.style.display =
-          this.headerElement.style.display === 'none' ? '' : 'none'
-        if (this.headerElement.style.display === 'none') {
-          this.$q.localStorage.set('lnbits.tpos.header', 'hidden')
-        } else {
-          this.$q.localStorage.remove('lnbits.tpos.header')
-        }
+        this.headerElement.style.display = this.headerHidden ? 'none' : ''
       }
     }
   },
@@ -1327,13 +1328,16 @@ window.app = Vue.createApp({
     })
     this.headerElement = document.querySelector('.q-header')
     if (this.headerElement) {
-      this.headerElement.style.display =
-        this.$q.localStorage.getItem('lnbits.tpos.header') === 'hidden'
-          ? 'none'
-          : null
+      this.headerElement.style.display = this.headerHidden ? 'none' : ''
     }
   },
   onMounted() {
+    if (!this.headerElement) {
+      this.headerElement = document.querySelector('.q-header')
+    }
+    if (this.headerElement) {
+      this.headerElement.style.display = this.headerHidden ? 'none' : ''
+    }
     setInterval(() => {
       this.getRates()
     }, 120000)
