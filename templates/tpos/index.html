@@ -381,7 +381,7 @@
           label="Wallet *"
         ></q-select>
         <q-select
-          v-if="'{{LNBITS_DENOMINATION}}' == 'sats'"
+          v-if="g.settings.denomination == 'sats'"
           filled
           dense
           emit-value
@@ -390,7 +390,7 @@
           label="Currency *"
         ></q-select>
         <q-select
-          v-if="formDialog.data.currency != '{{LNBITS_DENOMINATION}}' && hasFiatProvider"
+          v-if="formDialog.data.currency != g.settings.denomination && hasFiatProvider"
           filled
           dense
           emit-value
@@ -562,7 +562,7 @@
             dense
             v-model.number="formDialog.data.withdraw_limit"
             type="number"
-            label="Max amount to be sold daily ({{LNBITS_DENOMINATION}}) *"
+            label="Max amount to be sold daily ({{g.settings.denomination}}) *"
           ></q-input>
 
           <div class="row">
@@ -573,7 +573,7 @@
                 v-model.number="formDialog.data.withdraw_between"
                 type="number"
                 min="0"
-                label="Time between withdraws"
+                label="Time between withdraws ({{g.settings.denomination}})"
               ></q-input>
             </div>
             <div class="col-4">
@@ -826,8 +826,5 @@
   </q-dialog>
 </div>
 {% endblock %} {% block scripts %} {{ window_vars(user) }}
-<script>
-  const DENOMINATION = '{{ LNBITS_DENOMINATION }}'
-</script>
 <script src="{{ static_url_for('tpos/static', path='js/index.js') }}"></script>
 {% endblock %}

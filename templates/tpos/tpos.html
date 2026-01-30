@@ -28,7 +28,7 @@
             <span v-text="amountFormatted"></span>
           </h3>
           <h5
-            v-show="!denomIsSats && '{{LNBITS_DENOMINATION}}' == 'sats'"
+            v-show="!denomIsSats && g.settings.denomination == 'sats'"
             class="q-mt-none q-mb-sm"
           >
             <span v-text="fsat"> </span>
