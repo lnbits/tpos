@@ -68,7 +68,7 @@ window.app.component('receipt', {
     }
   },
   created() {
-    this.currency = this.data.extra.details.currency || LNBITS_DENOMINATION
+    this.currency = this.data.extra.details.currency || g.settings.denomination
     this.exchangeRate = this.data.extra.details.exchangeRate || 1
     console.log('Receipt component created', this.data)
   },
