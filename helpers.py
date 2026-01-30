@@ -63,4 +63,4 @@ def normalize_image(val: str | None) -> str | None:
         return None
     if val.startswith("http") or val.startswith("/api/") or val.startswith("data:"):
         return val
-    return f"/api/v1/assets/{val}/binary"
+    return f"/api/v1/assets/{val}/data"
