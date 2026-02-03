@@ -648,8 +648,8 @@ window.app = Vue.createApp({
       .request('GET', '/api/v1/currencies')
       .then(response => {
         this.currencyOptions = ['sats', ...response.data]
-        if (LNBITS_DENOMINATION != 'sats') {
-          this.formDialog.data.currency = DENOMINATION
+        if (g.settings.denomination != 'sats') {
+          this.formDialog.data.currency = g.settings.denomination
         }
       })
       .catch(LNbits.utils.notifyApiError)
