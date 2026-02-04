@@ -3,7 +3,7 @@ from http import HTTPStatus
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from lnbits.core.crud import (
     get_latest_payments_by_extension,
     get_standalone_payment,
@@ -164,7 +164,9 @@ async def api_tpos_delete(
 @tpos_api_router.post(
     "/api/v1/tposs/{tpos_id}/invoices", status_code=HTTPStatus.CREATED
 )
-async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Payment:
+async def api_tpos_create_invoice(
+    tpos_id: str, data: CreateTposInvoice, request: Request
+) -> Payment:
     tpos = await get_tpos(tpos_id)
 
     if not tpos:
@@ -227,6 +229,7 @@ async def api_tpos_create_invoice(tpos_id: str, data: CreateTposInvoice) -> Paym
             "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
             "internal_memo": data.internal_memo if data.internal_memo else None,
             "paid_in_fiat": data.pay_in_fiat,
+            "base_url": str(request.base_url),
         }
         if inventory_payload:
             extra["inventory"] = inventory_payload.dict()

@@ -787,6 +787,7 @@ window.app = Vue.createApp({
             formattedPrice: item.formattedPrice,
             quantity: item.quantity,
             title: item.title,
+            weight_grams: item.weight_grams,
             tax: item.tax || this.taxDefault,
             note: item.note || null
           })),
