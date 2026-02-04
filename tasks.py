@@ -107,7 +107,6 @@ async def maybe_push_order(payment: Payment, tpos) -> None:
     if "orders" not in active_extensions:
         return
 
-    details = payment.extra.get("details") or {}
     await push_order_to_orders(
         wallet.user,
         payment,

@@ -139,7 +139,8 @@ async def push_order_to_orders(
         "memo": payment.memo,
         "paid_in_fiat": bool(payment.extra.get("paid_in_fiat")),
         "currency": details.get("currency"),
-        "exchange_rate": details.get("exchangeRate") or payment.extra.get("exchangeRate"),
+        "exchange_rate": details.get("exchangeRate")
+        or payment.extra.get("exchangeRate"),
         "tax_included": details.get("taxIncluded"),
         "tax_value": details.get("taxValue"),
         "items": details.get("items") or [],
