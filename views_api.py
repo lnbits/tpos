@@ -246,6 +246,23 @@ async def api_tpos_create_invoice(
             fiat_provider=tpos.fiat_provider if data.pay_in_fiat else None,
         )
         payment = await create_payment_request(tpos.wallet, invoice_data)
+        payment_request_for_display = "lightning:" + payment.bolt11.upper()
+        fiat_payment_request = payment.extra.get("fiat_payment_request")
+        if fiat_payment_request and not fiat_payment_request.startswith("pi_"):
+            payment_request_for_display = fiat_payment_request
+        elif fiat_payment_request and fiat_payment_request.startswith("pi_"):
+            payment_request_for_display = "tap_to_pay"
+
+        if tpos.enable_remote:
+            payload = {
+                "type": "invoice_created",
+                "tpos_id": tpos_id,
+                "payment_hash": payment.payment_hash,
+                "payment_request": payment_request_for_display,
+                "paid_in_fiat": data.pay_in_fiat,
+            }
+            await websocket_updater(tpos_id, json.dumps(payload))
+
         if (invoice_data.extra or {}).get("fiat_method") == "terminal":
             pi_id = payment.extra.get("fiat_checking_id")
             client_secret = payment.extra.get("fiat_payment_request")
@@ -259,7 +276,7 @@ async def api_tpos_create_invoice(
                     tpos_id=tpos_id,
                     payment_hash=payment.payment_hash,
                 )
-                await websocket_updater(tpos_id, str(payload))
+                await websocket_updater(tpos_id, json.dumps(payload.dict()))
         return payment
 
     except Exception as exc:

@@ -278,3 +278,14 @@ async def m019_add_receipt_sats_only(db: Database):
         ALTER TABLE tpos.pos ADD only_show_sats_on_bitcoin BOOLEAN DEFAULT true;
     """
     )
+
+
+async def m020_add_remote_mode_toggle(db: Database):
+    """
+    Add enable_remote option for cross-device invoice triggering.
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD enable_remote BOOLEAN DEFAULT false;
+    """
+    )
