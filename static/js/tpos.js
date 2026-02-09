@@ -309,6 +309,9 @@ window.app = Vue.createApp({
 
       if (payload.type !== 'invoice_created') return
       if (!payload.payment_hash || !payload.payment_request) return
+      this.amount = payload.amount_fiat || this.amount
+      this.tipAmount = payload.tip_amount || this.tipAmount
+      this.exchangeRate = payload.exchange_rate || this.exchangeRate
 
       this.openInvoiceDialog(payload.payment_hash, payload.payment_request)
       this.subscribeToPaymentWS(payload.payment_hash)
