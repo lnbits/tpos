@@ -715,7 +715,7 @@ window.app = Vue.createApp({
         if (this.currency == 'sats') {
           this.stack = Array.from(String(Math.ceil(this.total), Number))
         } else {
-          this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
+          this.stack = Array.from(String((this.total).toFixed(2).replace('.', '')), Number)
         }
         this.sat = this.totalSat
       }
