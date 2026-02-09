@@ -406,6 +406,7 @@ window.app = Vue.createApp({
       if (!cartItem) return
       this.$q
         .dialog({
+          position: 'top',
           title: 'Set price',
           message: 'Update item price for this cart line',
           prompt: {
@@ -434,6 +435,7 @@ window.app = Vue.createApp({
       if (!cartItem) return
       this.$q
         .dialog({
+          position: 'top',
           title: 'Set note',
           message: 'Add a note for this item',
           prompt: {
