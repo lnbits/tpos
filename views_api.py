@@ -268,7 +268,7 @@ async def api_tpos_create_invoice(
             client_secret = payment.extra.get("fiat_payment_request")
             if pi_id and client_secret:
                 amount_minor = round(amount * 100)
-                payload = TapToPay(
+                tap_to_pay_payload = TapToPay(
                     payment_intent_id=pi_id,
                     client_secret=client_secret,
                     currency=invoice_data.unit.lower(),
@@ -276,7 +276,7 @@ async def api_tpos_create_invoice(
                     tpos_id=tpos_id,
                     payment_hash=payment.payment_hash,
                 )
-                await websocket_updater(tpos_id, json.dumps(payload.dict()))
+                await websocket_updater(tpos_id, json.dumps(tap_to_pay_payload.dict()))
         return payment
 
     except Exception as exc:
