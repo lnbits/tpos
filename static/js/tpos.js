@@ -124,6 +124,7 @@ window.app = Vue.createApp({
       totalfsat: 0,
       addedAmount: 0,
       enablePrint: false,
+      enableRemote: false,
       receiptData: null,
       orderReceipt: false,
       printDialog: {
@@ -139,6 +140,9 @@ window.app = Vue.createApp({
         this.$q.localStorage.getItem('lnbits.tpos.header') !== 'shown',
       categoryColors: {},
       categoryColorIndex: 0,
+      remoteInvoiceWs: null,
+      remoteInvoiceReconnectTimer: null,
+      paymentWsByHash: {},
       pastelColors: [
         'blue-5',
         'green-5',
@@ -261,6 +265,73 @@ window.app = Vue.createApp({
     }
   },
   methods: {
+    connectRemoteInvoiceWS() {
+      if (!this.enableRemote || !this.tposId) return
+      if (this.remoteInvoiceWs) return
+
+      const url = new URL(window.location)
+      url.protocol = url.protocol === 'https:' ? 'wss' : 'ws'
+      url.pathname = `/api/v1/ws/${this.tposId}`
+      const ws = new WebSocket(url)
+      this.remoteInvoiceWs = ws
+
+      ws.onmessage = ({data}) => this.handleRemoteInvoiceMessage(data)
+      ws.onclose = () => {
+        this.remoteInvoiceWs = null
+        if (this.enableRemote) {
+          this.remoteInvoiceReconnectTimer = setTimeout(() => {
+            this.connectRemoteInvoiceWS()
+          }, 2000)
+        }
+      }
+      ws.onerror = err => {
+        console.warn('Remote websocket error:', err)
+      }
+    },
+    disconnectRemoteInvoiceWS() {
+      if (this.remoteInvoiceReconnectTimer) {
+        clearTimeout(this.remoteInvoiceReconnectTimer)
+        this.remoteInvoiceReconnectTimer = null
+      }
+      if (this.remoteInvoiceWs) {
+        this.remoteInvoiceWs.close()
+        this.remoteInvoiceWs = null
+      }
+    },
+    handleRemoteInvoiceMessage(rawData) {
+      let payload = null
+      try {
+        payload = JSON.parse(rawData)
+      } catch {
+        // Ignore non-JSON events from other TPoS websocket usages.
+        return
+      }
+
+      if (payload.type !== 'invoice_created') return
+      if (!payload.payment_hash || !payload.payment_request) return
+      this.amount = payload.amount_fiat || this.amount
+      this.tipAmount = payload.tip_amount || this.tipAmount
+      this.exchangeRate = payload.exchange_rate || this.exchangeRate
+
+      this.openInvoiceDialog(payload.payment_hash, payload.payment_request)
+      this.subscribeToPaymentWS(payload.payment_hash)
+    },
+    openInvoiceDialog(paymentHash, paymentRequest) {
+      if (
+        this.invoiceDialog.show &&
+        this.invoiceDialog.data.payment_hash === paymentHash
+      ) {
+        return
+      }
+      this.invoiceDialog.data.payment_hash = paymentHash
+      this.invoiceDialog.data.payment_request = paymentRequest
+      this.invoiceDialog.show = true
+      this.readNfcTag()
+      this.invoiceDialog.dismissMsg = Quasar.Notify.create({
+        timeout: 0,
+        message: 'Waiting for payment...'
+      })
+    },
     setColor(category) {
       if (!category || category.toLowerCase() === 'all') {
         return 'primary'
@@ -338,6 +409,7 @@ window.app = Vue.createApp({
       if (!cartItem) return
       this.$q
         .dialog({
+          position: 'top',
           title: 'Set price',
           message: 'Update item price for this cart line',
           prompt: {
@@ -366,6 +438,7 @@ window.app = Vue.createApp({
       if (!cartItem) return
       this.$q
         .dialog({
+          position: 'top',
           title: 'Set note',
           message: 'Add a note for this item',
           prompt: {
@@ -838,28 +911,19 @@ window.app = Vue.createApp({
           null,
           params
         )
+        let paymentRequest = 'lightning:' + data.bolt11.toUpperCase()
         if (
           data.extra.fiat_payment_request &&
           !data.extra.fiat_payment_request.startsWith('pi_')
         ) {
-          this.invoiceDialog.data.payment_request =
-            data.extra.fiat_payment_request
+          paymentRequest = data.extra.fiat_payment_request
         } else if (
           data.extra.fiat_payment_request &&
           data.extra.fiat_payment_request.startsWith('pi_')
         ) {
-          this.invoiceDialog.data.payment_request = 'tap_to_pay'
-        } else {
-          this.invoiceDialog.data.payment_request =
-            'lightning:' + data.bolt11.toUpperCase()
+          paymentRequest = 'tap_to_pay'
         }
-        this.invoiceDialog.data.payment_hash = data.payment_hash
-        this.invoiceDialog.show = true
-        this.readNfcTag()
-        this.invoiceDialog.dismissMsg = Quasar.Notify.create({
-          timeout: 0,
-          message: 'Waiting for payment...'
-        })
+        this.openInvoiceDialog(data.payment_hash, paymentRequest)
         this.subscribeToPaymentWS(data.payment_hash)
       } catch (error) {
         console.error(error)
@@ -867,11 +931,13 @@ window.app = Vue.createApp({
       }
     },
     subscribeToPaymentWS(paymentHash) {
+      if (this.paymentWsByHash[paymentHash]) return
       try {
         const url = new URL(window.location)
         url.protocol = url.protocol === 'https:' ? 'wss' : 'ws'
         url.pathname = `/api/v1/ws/${paymentHash}`
         const ws = new WebSocket(url)
+        this.paymentWsByHash[paymentHash] = ws
         ws.onmessage = async ({data}) => {
           const payment = JSON.parse(data)
           if (payment.pending === false) {
@@ -888,6 +954,9 @@ window.app = Vue.createApp({
             }
             ws.close()
           }
+        }
+        ws.onclose = () => {
+          delete this.paymentWsByHash[paymentHash]
         }
       } catch (err) {
         console.warn(err)
@@ -1302,6 +1371,7 @@ window.app = Vue.createApp({
     this.tposLNaddress = tpos.lnaddress
     this.tposLNaddressCut = tpos.lnaddress_cut
     this.enablePrint = tpos.enable_receipt_print
+    this.enableRemote = Boolean(tpos.enable_remote)
     this.fiatProvider = tpos.fiat_provider
 
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
@@ -1334,6 +1404,11 @@ window.app = Vue.createApp({
     if (this.headerElement) {
       this.headerElement.style.display = this.headerHidden ? 'none' : ''
     }
+    this.connectRemoteInvoiceWS()
+  },
+  beforeUnmount() {
+    this.disconnectRemoteInvoiceWS()
+    Object.values(this.paymentWsByHash).forEach(ws => ws.close())
   },
   onMounted() {
     if (!this.headerElement) {
