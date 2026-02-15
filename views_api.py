@@ -260,6 +260,9 @@ async def api_tpos_create_invoice(
                 "payment_hash": payment.payment_hash,
                 "payment_request": payment_request_for_display,
                 "paid_in_fiat": data.pay_in_fiat,
+                "amount_fiat": data.amount_fiat,
+                "tip_amount": data.tip_amount,
+                "exchange_rate": data.exchange_rate if data.exchange_rate else None,
             }
             await websocket_updater(tpos_id, json.dumps(payload))
 
