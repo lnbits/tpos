@@ -715,7 +715,7 @@ window.app = Vue.createApp({
         if (this.currency == 'sats') {
           this.stack = Array.from(String(Math.ceil(this.total), Number))
         } else {
-          this.stack = Array.from(String(Math.ceil(this.total * 100)), Number)
+          this.stack = Array.from(String((this.total).toFixed(2).replace('.', '')), Number)
         }
         this.sat = this.totalSat
       }
@@ -770,7 +770,7 @@ window.app = Vue.createApp({
         pay_in_fiat: this.payInFiat,
         fiat_method: this.fiatMethod
       }
-      if (this.currency != LNBITS_DENOMINATION) {
+      if (this.currency != g.settings.denomination) {
         params.amount_fiat = this.total > 0 ? this.total : this.amount
         params.tip_amount_fiat = this.tipAmount > 0 ? this.tipAmount : 0.0
       }
@@ -787,6 +787,7 @@ window.app = Vue.createApp({
             formattedPrice: item.formattedPrice,
             quantity: item.quantity,
             title: item.title,
+            weight_grams: item.weight_grams,
             tax: item.tax || this.taxDefault,
             note: item.note || null
           })),
@@ -1057,7 +1058,7 @@ window.app = Vue.createApp({
     async getRates() {
       let rate = 1
       try {
-        if (this.currency != LNBITS_DENOMINATION) {
+        if (this.currency != g.settings.denomination) {
           const {data} = await LNbits.api.request(
             'GET',
             `/api/v1/rate/${this.currency}`
@@ -1080,7 +1081,7 @@ window.app = Vue.createApp({
             let last = [...res.data]
             this.lastPaymentsDialog.data = last.map(obj => {
               obj.dateFrom = moment(obj.time).fromNow()
-              if (obj.currency != LNBITS_DENOMINATION) {
+              if (obj.currency != g.settings.denomination) {
                 obj.amountFiat = this.formatAmount(
                   obj.amount / 1000 / (obj.exchange_rate || this.exchangeRate),
                   this.currency
@@ -1147,8 +1148,11 @@ window.app = Vue.createApp({
       }
     },
     formatAmount(amount, currency) {
-      if (LNBITS_DENOMINATION != 'sats') {
-        return LNbits.utils.formatCurrency(amount / 100, LNBITS_DENOMINATION)
+      if (g.settings.denomination != 'sats') {
+        return LNbits.utils.formatCurrency(
+          amount / 100,
+          g.settings.denomination
+        )
       }
       if (currency == 'sats') {
         return LNbits.utils.formatSat(amount) + ' sats'

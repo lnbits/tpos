@@ -28,7 +28,7 @@
             <span v-text="amountFormatted"></span>
           </h3>
           <h5
-            v-show="!denomIsSats && '{{LNBITS_DENOMINATION}}' == 'sats'"
+            v-show="!denomIsSats && g.settings.denomination == 'sats'"
             class="q-mt-none q-mb-sm"
           >
             <span v-text="fsat"> </span>
@@ -110,7 +110,7 @@
       :data="receiptData"
     ></receipt>
     <order-receipt
-      class="receipt"
+      class="receipt order-receipt"
       v-if="receiptData && orderReceipt"
       :data="receiptData"
       type="order"
@@ -198,6 +198,8 @@
     .receipt {
       display: block !important;
       margin: 0mm !important;
+      padding-top: 2cm !important;
+      padding-bottom: 2cm !important;
     }
 
     .receipt p {
@@ -210,6 +212,13 @@
     .receipt .q-table th {
       white-space: normal !important;
       word-break: break-word;
+    }
+    .order-receipt .q-table th span,
+    .order-receipt .q-table td div,
+    .order-receipt .q-table td span,
+    .order-receipt p {
+      font-size: 1.5em !important;
+      line-height: 1.2 !important;
     }
   }
 </style>

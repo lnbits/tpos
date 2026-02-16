@@ -1,5 +1,6 @@
 import asyncio
 
+from lnbits.core.crud import get_user_active_extensions_ids, get_wallet
 from lnbits.core.models import Payment
 from lnbits.core.services import (
     create_invoice,
@@ -11,7 +12,7 @@ from lnbits.tasks import register_invoice_listener
 from loguru import logger
 
 from .crud import get_tpos
-from .services import deduct_inventory_stock
+from .services import deduct_inventory_stock, push_order_to_orders
 
 
 async def wait_for_paid_invoices():
@@ -65,9 +66,14 @@ async def on_invoice_paid(payment: Payment) -> None:
 
     await websocket_updater(tpos_id, str(stripped_payment))
 
+    await maybe_push_order(payment, tpos)
+
     inventory_payload = payment.extra.get("inventory")
     if inventory_payload:
-        await deduct_inventory_stock(payment.wallet_id, inventory_payload)
+        try:
+            await deduct_inventory_stock(payment.wallet_id, inventory_payload)
+        except Exception as exc:
+            logger.warning(f"tpos: inventory deduction failed: {exc}")
 
     if not tip_amount:
         # no tip amount
@@ -90,3 +96,20 @@ async def on_invoice_paid(payment: Payment) -> None:
         extra={**payment.extra, "tipSplitted": True},
     )
     logger.debug(f"tpos: tip invoice paid: {paid_payment.checking_id}")
+
+
+async def maybe_push_order(payment: Payment, tpos) -> None:
+    wallet = await get_wallet(payment.wallet_id)
+    if not wallet:
+        return
+
+    active_extensions = await get_user_active_extensions_ids(wallet.user)
+    if "orders" not in active_extensions:
+        return
+
+    await push_order_to_orders(
+        wallet.user,
+        payment,
+        tpos,
+        base_url=payment.extra.get("base_url"),
+    )
