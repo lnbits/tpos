@@ -246,12 +246,32 @@ async def api_tpos_create_invoice(
             fiat_provider=tpos.fiat_provider if data.pay_in_fiat else None,
         )
         payment = await create_payment_request(tpos.wallet, invoice_data)
+        payment_request_for_display = "lightning:" + payment.bolt11.upper()
+        fiat_payment_request = payment.extra.get("fiat_payment_request")
+        if fiat_payment_request and not fiat_payment_request.startswith("pi_"):
+            payment_request_for_display = fiat_payment_request
+        elif fiat_payment_request and fiat_payment_request.startswith("pi_"):
+            payment_request_for_display = "tap_to_pay"
+
+        if tpos.enable_remote:
+            payload = {
+                "type": "invoice_created",
+                "tpos_id": tpos_id,
+                "payment_hash": payment.payment_hash,
+                "payment_request": payment_request_for_display,
+                "paid_in_fiat": data.pay_in_fiat,
+                "amount_fiat": data.amount_fiat,
+                "tip_amount": data.tip_amount,
+                "exchange_rate": data.exchange_rate if data.exchange_rate else None,
+            }
+            await websocket_updater(tpos_id, json.dumps(payload))
+
         if (invoice_data.extra or {}).get("fiat_method") == "terminal":
             pi_id = payment.extra.get("fiat_checking_id")
             client_secret = payment.extra.get("fiat_payment_request")
             if pi_id and client_secret:
                 amount_minor = round(amount * 100)
-                payload = TapToPay(
+                tap_to_pay_payload = TapToPay(
                     payment_intent_id=pi_id,
                     client_secret=client_secret,
                     currency=invoice_data.unit.lower(),
@@ -259,7 +279,7 @@ async def api_tpos_create_invoice(
                     tpos_id=tpos_id,
                     payment_hash=payment.payment_hash,
                 )
-                await websocket_updater(tpos_id, str(payload))
+                await websocket_updater(tpos_id, json.dumps(tap_to_pay_payload.dict()))
         return payment
 
     except Exception as exc:

@@ -488,10 +488,18 @@
               label="Enable selling BTC (ATM)"
             ></q-checkbox>
           </div>
+        </div>
+        <div class="row">
           <div class="col">
             <q-checkbox
               v-model="formDialog.data.enable_receipt_print"
               label="Enable printing (experimental)"
+            ></q-checkbox>
+          </div>
+          <div class="col">
+            <q-checkbox
+              v-model="formDialog.data.enable_remote"
+              label="Enable remote (to trigger payments on external device)"
             ></q-checkbox>
           </div>
         </div>

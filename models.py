@@ -61,6 +61,7 @@ class CreateTposData(BaseModel):
     lnaddress: bool = Field(False)
     lnaddress_cut: int | None = Field(0)
     enable_receipt_print: bool = Query(False)
+    enable_remote: bool = Query(False)
     business_name: str | None
     business_address: str | None
     business_vat_id: str | None
@@ -95,6 +96,7 @@ class TposClean(BaseModel):
     inventory_omit_tags: str | None = None
     tip_options: str | None = None
     enable_receipt_print: bool
+    enable_remote: bool = False
     business_name: str | None = None
     business_address: str | None = None
     business_vat_id: str | None = None
