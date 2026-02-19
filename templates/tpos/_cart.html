@@ -192,25 +192,46 @@
 
   <div class="q-mx-auto q-pa-md" :class="{'dimmed': moreBtn}">
     <!-- Items List Large -->
-    <div v-if="isGridView" class="flex justify-center q-col-gutter-sm q-mt-md">
-      <div
-        style="height: 150px; width: 150px"
-        v-for="item in filteredItems"
-        :key="item.id"
-      >
-        <q-card class="full-height" flat bordered v-ripple>
-          <div @click="addToCart(item)">
-            <q-img :src="item.image || null" :ratio="4/3" fit="contain">
-            </q-img>
+    <div v-if="isGridView">
+      <!-- xs: 4 per row, fill width -->
+      <div class="row q-col-gutter-sm q-mt-md lt-sm">
+        <div class="col-3" v-for="item in filteredItems" :key="item.id">
+          <q-card class="full-height" flat bordered v-ripple>
+            <div @click="addToCart(item)">
+              <q-img :src="item.image || null" :ratio="4/3" fit="contain">
+              </q-img>
 
-            <span class="item-grid-title" dense v-text="item.title"></span>
+              <span class="item-grid-title" dense v-text="item.title"></span>
 
-            <q-separator
-              class="q-pt-xs"
-              :color="setColor(item.categories[0])"
-            ></q-separator>
-          </div>
-        </q-card>
+              <q-separator
+                class="q-pt-xs"
+                :color="setColor(item.categories[0])"
+              ></q-separator>
+            </div>
+          </q-card>
+        </div>
+      </div>
+      <!-- sm+ : keep original fixed card size -->
+      <div class="flex justify-center q-col-gutter-sm q-mt-md gt-xs">
+        <div
+          style="height: 150px; width: 150px"
+          v-for="item in filteredItems"
+          :key="item.id"
+        >
+          <q-card class="full-height" flat bordered v-ripple>
+            <div @click="addToCart(item)">
+              <q-img :src="item.image || null" :ratio="4/3" fit="contain">
+              </q-img>
+
+              <span class="item-grid-title" dense v-text="item.title"></span>
+
+              <q-separator
+                class="q-pt-xs"
+                :color="setColor(item.categories[0])"
+              ></q-separator>
+            </div>
+          </q-card>
+        </div>
       </div>
     </div>
     <!-- Items List Small -->
