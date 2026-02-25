@@ -8,6 +8,7 @@
     <q-card
       v-if="invoiceDialog.data"
       class="q-pa-lg q-pt-xl lnbits__dialog-card"
+      style="max-height: 90vh"
     >
       <div
         v-if="invoiceDialog.data.payment_request == 'tap_to_pay'"
