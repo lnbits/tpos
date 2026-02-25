@@ -262,6 +262,12 @@ window.app = Vue.createApp({
     },
     keypadDisabled() {
       return !this.exchangeRate
+    },
+    isMobileLandscaped() {
+      return (
+        this.$q.platform.is.mobile &&
+        window.screen.orientation.type.includes('landscape')
+      )
     }
   },
   methods: {
@@ -1394,7 +1400,7 @@ window.app = Vue.createApp({
     }
     this.exchangeRate = await this.getRates()
     this.heldCarts = JSON.parse(
-      localStorage.getItem('lnbits.heldCarts') || '{}'
+      this.$q.localStorage.getItem('lnbits.heldCarts') || '{}'
     )
     // remove held carts older than 1 day
     const now = Date.now()
