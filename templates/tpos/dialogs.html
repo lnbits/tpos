@@ -8,6 +8,7 @@
     <q-card
       v-if="invoiceDialog.data"
       class="q-pa-lg q-pt-xl lnbits__dialog-card"
+      style="max-height: 90vh"
     >
       <div
         v-if="invoiceDialog.data.payment_request == 'tap_to_pay'"
@@ -19,7 +20,7 @@
         </div>
         <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
       </div>
-      <div v-else>
+      <div v-else :class="isMobileLandscaped ? 'row flex-center' : ''">
         <lnbits-qrcode
           :show-buttons="false"
           :value="isLNURL(invoiceDialog.data.payment_request) 
@@ -41,7 +42,7 @@
           </q-chip>
           <span v-else class="text-caption text-grey">NFC not supported</span>
         </div>
-        <div class="row q-mt-lg">
+        <div class="row q-mt-lg full-width">
           <q-btn
             outline
             color="grey"
