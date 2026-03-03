@@ -69,6 +69,7 @@ class CreateTposData(BaseModel):
     fiat_provider: str | None = Field(None)
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
+    allow_cash_settlement: bool = Field(False)
 
     @validator("tax_default", pre=True, always=True)
     def default_tax_when_none(cls, v):
@@ -104,6 +105,7 @@ class TposClean(BaseModel):
     fiat_provider: str | None = None
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
+    allow_cash_settlement: bool = False
 
     @property
     def withdraw_maximum(self) -> int:

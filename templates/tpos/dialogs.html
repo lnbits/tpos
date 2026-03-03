@@ -20,6 +20,28 @@
         </div>
         <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
       </div>
+      <div
+        v-else-if="invoiceDialog.data.payment_request == 'cash'"
+        class="text-center q-mb-xl"
+      >
+        <h3>CASH ${ currency }</h3>
+        <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
+        <h5 class="q-mt-none q-mb-sm">
+          ${ amountFormatted }
+          <span v-show="tip_options" style="font-size: 0.75rem"
+            >(+ ${ tipAmountFormatted } tip)</span
+          >
+        </h5>
+        <div class="row q-mt-lg full-width">
+          <q-btn
+            color="primary"
+            :loading="cashValidating"
+            @click="validateCashInvoice"
+            >VALIDATE</q-btn
+          >
+          <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
+        </div>
+      </div>
       <div v-else :class="isMobileLandscaped ? 'row flex-center' : ''">
         <lnbits-qrcode
           :show-buttons="false"
@@ -385,6 +407,7 @@
           color="secondary"
           rounded
           @click="selectPaymentMethod('fiat')"
+          v-if="fiatProvider"
         ></q-btn>
         <q-btn
           class="q-ma-sm"
@@ -393,6 +416,16 @@
           color="secondary"
           rounded
           @click="selectPaymentMethod('fiat_tap')"
+          v-if="fiatProvider"
+        ></q-btn>
+        <q-btn
+          class="q-ma-sm"
+          size="lg"
+          :label="`CASH ${currency}`"
+          color="secondary"
+          rounded
+          @click="selectPaymentMethod('cash')"
+          v-if="allowCashSettlement && currency != 'sats'"
         ></q-btn>
       </div>
     </q-card>

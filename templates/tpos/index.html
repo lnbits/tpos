@@ -446,6 +446,19 @@
             ></q-input>
           </div>
         </div>
+        <div v-if="g.user.super_user" class="row q-mt-sm">
+          <div class="col">
+            <q-checkbox
+              v-model="formDialog.data.allow_cash_settlement"
+              :disable="!isFiatCurrency"
+              label="Allow cash settlement"
+            >
+              <q-tooltip v-if="!isFiatCurrency">
+                currency must be set to fiat
+              </q-tooltip>
+            </q-checkbox>
+          </div>
+        </div>
         <div class="row">
           <div class="col">
             <q-checkbox

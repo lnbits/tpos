@@ -22,6 +22,7 @@ const mapTpos = obj => {
     ? omitTagString.split(',').filter(Boolean)
     : []
   obj.only_show_sats_on_bitcoin = obj.only_show_sats_on_bitcoin ?? true
+  obj.allow_cash_settlement = Boolean(obj.allow_cash_settlement)
   obj.itemsMap = new Map()
   obj.items.forEach((item, idx) => {
     let id = `${obj.id}:${idx + 1}`
@@ -111,7 +112,8 @@ window.app = Vue.createApp({
           only_show_sats_on_bitcoin: true,
           fiat: false,
           stripe_card_payments: false,
-          stripe_reader_id: ''
+          stripe_reader_id: '',
+          allow_cash_settlement: false
         },
         advanced: {
           tips: false,
@@ -227,6 +229,12 @@ window.app = Vue.createApp({
         label: tag,
         value: tag
       }))
+    },
+    isFiatCurrency() {
+      return (
+        !!this.formDialog.data.currency &&
+        this.formDialog.data.currency !== 'sats'
+      )
     }
   },
   methods: {
@@ -248,7 +256,8 @@ window.app = Vue.createApp({
         only_show_sats_on_bitcoin: true,
         fiat: false,
         stripe_card_payments: false,
-        stripe_reader_id: ''
+        stripe_reader_id: '',
+        allow_cash_settlement: false
       }
       this.formDialog.advanced = {tips: false, otc: false}
     },
@@ -314,6 +323,9 @@ window.app = Vue.createApp({
       if (!this.formDialog.advanced.otc) {
         data.withdraw_limit = null
         data.withdraw_premium = null
+      }
+      if (data.currency === 'sats') {
+        data.allow_cash_settlement = false
       }
       const wallet = _.findWhere(this.g.user.wallets, {
         id: this.formDialog.data.wallet

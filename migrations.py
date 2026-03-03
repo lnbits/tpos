@@ -289,3 +289,14 @@ async def m020_add_remote_mode_toggle(db: Database):
         ALTER TABLE tpos.pos ADD enable_remote BOOLEAN DEFAULT false;
     """
     )
+
+
+async def m021_add_cash_settlement(db: Database):
+    """
+    Add allow_cash_settlement toggle for fiat cash settlements.
+    """
+    await db.execute(
+        """
+        ALTER TABLE tpos.pos ADD allow_cash_settlement BOOLEAN DEFAULT false;
+    """
+    )

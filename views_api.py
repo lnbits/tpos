@@ -5,17 +5,22 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from lnbits.core.crud import (
+    get_account,
     get_latest_payments_by_extension,
     get_standalone_payment,
     get_user,
     get_wallet,
 )
+from lnbits.core.crud.payments import update_payment_checking_id
+from lnbits.core.crud.users import update_account
 from lnbits.core.models import CreateInvoice, Payment, WalletTypeInfo
+from lnbits.core.models.users import UserLabel
 from lnbits.core.services import create_payment_request, websocket_updater
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
+from lnbits.tasks import internal_invoice_queue_put
 from lnurl import LnurlPayResponse
 from lnurl import decode as decode_lnurl
 from lnurl import handle as lnurl_handle
@@ -86,6 +91,10 @@ async def api_tpos_create(
 ):
     data.wallet = wallet.wallet.id
     user = await get_user(wallet.wallet.user)
+    if not (user and user.super_user):
+        data.allow_cash_settlement = False
+    if data.currency == "sats":
+        data.allow_cash_settlement = False
     if data.use_inventory and not inventory_available_for_user(user):
         data.use_inventory = False
     if data.use_inventory and not data.inventory_id:
@@ -115,6 +124,15 @@ async def api_tpos_update(
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
     user = await get_user(wallet.wallet.user)
     update_payload = data.dict(exclude_unset=True)
+    desired_currency = update_payload.get("currency", tpos.currency)
+    if desired_currency == "sats":
+        update_payload["allow_cash_settlement"] = False
+    if "allow_cash_settlement" in update_payload:
+        if update_payload["allow_cash_settlement"] and not (user and user.super_user):
+            raise HTTPException(
+                status_code=HTTPStatus.FORBIDDEN,
+                detail="Cash settlement can only be enabled by super users.",
+            )
     if update_payload.get("use_inventory") and not update_payload.get("inventory_id"):
         inventory = await get_default_inventory(wallet.wallet.user)
         if inventory:
@@ -212,6 +230,12 @@ async def api_tpos_create_invoice(
             "taxValue": tax_value,
         }
 
+    cash_method = data.pay_in_fiat and data.fiat_method == "cash"
+    if cash_method and not tpos.allow_cash_settlement:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail="Cash settlement is not enabled for this TPoS.",
+        )
     currency = tpos.currency if data.pay_in_fiat else "sat"
     amount = data.amount + (data.tip_amount or 0.0)
     if data.pay_in_fiat:
@@ -231,11 +255,26 @@ async def api_tpos_create_invoice(
             "paid_in_fiat": data.pay_in_fiat,
             "base_url": str(request.base_url),
         }
+        if cash_method:
+            wallet = await get_wallet(tpos.wallet)
+            if wallet:
+                account = await get_account(wallet.user)
+                if account:
+                    existing = {label.name for label in account.extra.labels or []}
+                    if "cash" not in existing:
+                        account.extra.labels.append(
+                            UserLabel(
+                                name="cash",
+                                description="Cash payment",
+                                color="#FFC107",
+                            )
+                        )
+                        await update_account(account)
         if inventory_payload:
             extra["inventory"] = inventory_payload.dict()
-        if data.pay_in_fiat and tpos.fiat_provider:
+        if data.pay_in_fiat:
             extra["fiat_method"] = data.fiat_method if data.fiat_method else "checkout"
-            if tpos.stripe_reader_id:
+            if data.fiat_method == "terminal" and tpos.stripe_reader_id:
                 extra["terminal"] = {"reader_id": tpos.stripe_reader_id}
         invoice_data = CreateInvoice(
             unit=currency,
@@ -243,12 +282,22 @@ async def api_tpos_create_invoice(
             amount=amount,
             memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
             extra=extra,
-            fiat_provider=tpos.fiat_provider if data.pay_in_fiat else None,
+            fiat_provider=(
+                tpos.fiat_provider if data.pay_in_fiat and not cash_method else None
+            ),
+            internal=bool(cash_method),
+            labels=["cash"] if cash_method else [],
         )
         payment = await create_payment_request(tpos.wallet, invoice_data)
+        if cash_method:
+            new_checking_id = f"internal_cash_{payment.payment_hash}"
+            await update_payment_checking_id(payment.checking_id, new_checking_id)
+            payment.checking_id = new_checking_id
         payment_request_for_display = "lightning:" + payment.bolt11.upper()
         fiat_payment_request = payment.extra.get("fiat_payment_request")
-        if fiat_payment_request and not fiat_payment_request.startswith("pi_"):
+        if cash_method:
+            payment_request_for_display = "cash"
+        elif fiat_payment_request and not fiat_payment_request.startswith("pi_"):
             payment_request_for_display = fiat_payment_request
         elif fiat_payment_request and fiat_payment_request.startswith("pi_"):
             payment_request_for_display = "tap_to_pay"
@@ -410,6 +459,45 @@ async def api_tpos_check_invoice(
             "only_show_sats_on_bitcoin": tpos.only_show_sats_on_bitcoin,
         }
     return {"paid": payment.success}
+
+
+@tpos_api_router.post(
+    "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}/cash/validate",
+    status_code=HTTPStatus.OK,
+)
+async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+    if not tpos.allow_cash_settlement:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail="Cash settlement is not enabled for this TPoS.",
+        )
+    payment = await get_standalone_payment(payment_hash, incoming=True)
+    if not payment:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
+        )
+    if payment.extra.get("tag") != "tpos" or payment.extra.get("tpos_id") != tpos_id:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
+        )
+    if payment.extra.get("fiat_method") != "cash":
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST, detail="Payment is not cash."
+        )
+    if not payment.is_internal:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Payment is not an internal cash invoice.",
+        )
+    if payment.success:
+        return {"success": True}
+    await internal_invoice_queue_put(payment.checking_id)
+    return {"success": True}
 
 
 @tpos_api_router.put("/api/v1/tposs/{tpos_id}/items", status_code=HTTPStatus.CREATED)

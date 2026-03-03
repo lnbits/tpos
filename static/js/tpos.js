@@ -7,6 +7,7 @@ window.app = Vue.createApp({
       tposId: null,
       currency: null,
       fiatProvider: null,
+      allowCashSettlement: false,
       payInFiat: false,
       fiatMethod: 'checkout',
       atmPremium: tpos.withdraw_premium / 100,
@@ -41,6 +42,7 @@ window.app = Vue.createApp({
         paymentChecker: null,
         internalMemo: null
       },
+      cashValidating: false,
       tipDialog: {
         show: false
       },
@@ -332,11 +334,15 @@ window.app = Vue.createApp({
       this.invoiceDialog.data.payment_hash = paymentHash
       this.invoiceDialog.data.payment_request = paymentRequest
       this.invoiceDialog.show = true
-      this.readNfcTag()
-      this.invoiceDialog.dismissMsg = Quasar.Notify.create({
-        timeout: 0,
-        message: 'Waiting for payment...'
-      })
+      if (paymentRequest !== 'cash') {
+        this.readNfcTag()
+        this.invoiceDialog.dismissMsg = Quasar.Notify.create({
+          timeout: 0,
+          message: 'Waiting for payment...'
+        })
+      } else {
+        this.invoiceDialog.dismissMsg = () => {}
+      }
     },
     setColor(category) {
       if (!category || category.toLowerCase() === 'all') {
@@ -770,6 +776,7 @@ window.app = Vue.createApp({
     closeInvoiceDialog() {
       this.stack = []
       this.tipAmount = 0.0
+      this.cashValidating = false
       const dialog = this.invoiceDialog
       setTimeout(() => {
         clearInterval(dialog.paymentChecker)
@@ -838,6 +845,11 @@ window.app = Vue.createApp({
         if (method == 'fiat_tap') {
           this.fiatMethod = 'terminal'
           method = 'fiat'
+        } else if (method == 'cash') {
+          this.fiatMethod = 'cash'
+          method = 'fiat'
+        } else if (method == 'btc') {
+          this.fiatMethod = 'checkout'
         }
         this._currencyResolver(method)
         this._currencyResolver = null
@@ -907,7 +919,7 @@ window.app = Vue.createApp({
         return
       }
 
-      if (this.fiatProvider) {
+      if (this.fiatProvider || this.allowCashSettlement) {
         const method = await this.showPaymentMethod()
         this.payInFiat = method === 'fiat'
       }
@@ -921,22 +933,45 @@ window.app = Vue.createApp({
           params
         )
         let paymentRequest = 'lightning:' + data.bolt11.toUpperCase()
-        if (
-          data.extra.fiat_payment_request &&
+        if (data.extra?.fiat_method === 'cash') {
+          paymentRequest = 'cash'
+        } else if (
+          data.extra?.fiat_payment_request &&
           !data.extra.fiat_payment_request.startsWith('pi_')
         ) {
           paymentRequest = data.extra.fiat_payment_request
         } else if (
-          data.extra.fiat_payment_request &&
+          data.extra?.fiat_payment_request &&
           data.extra.fiat_payment_request.startsWith('pi_')
         ) {
           paymentRequest = 'tap_to_pay'
+        }
+        if (
+          !data.extra?.fiat_payment_request &&
+          data.extra?.fiat_method !== 'cash'
+        ) {
+          paymentRequest = 'lightning:' + data.bolt11.toUpperCase()
         }
         this.openInvoiceDialog(data.payment_hash, paymentRequest)
         this.subscribeToPaymentWS(data.payment_hash)
       } catch (error) {
         console.error(error)
         LNbits.utils.notifyApiError(error)
+      }
+    },
+    async validateCashInvoice() {
+      const paymentHash = this.invoiceDialog.data.payment_hash
+      if (!paymentHash || this.cashValidating) return
+      this.cashValidating = true
+      try {
+        await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}/cash/validate`
+        )
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+      } finally {
+        this.cashValidating = false
       }
     },
     subscribeToPaymentWS(paymentHash) {
@@ -1382,6 +1417,7 @@ window.app = Vue.createApp({
     this.enablePrint = tpos.enable_receipt_print
     this.enableRemote = Boolean(tpos.enable_remote)
     this.fiatProvider = tpos.fiat_provider
+    this.allowCashSettlement = Boolean(tpos.allow_cash_settlement)
 
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
 
