@@ -431,7 +431,7 @@
             color="secondary"
             rounded
             :aria-label="currency + ' TAP'"
-            @click="selectPaymentMethod('fiat_tap')"
+            @click="selectPaymentMethod('cash')"
           >
             <div class="row items-center no-wrap q-gutter-x-xs">
               <span
@@ -449,7 +449,7 @@
             color="secondary"
             rounded
             :aria-label="`CASH ${currency}`"
-            @click="selectPaymentMethod('cash')"
+            @click="selectPaymentMethod('fiat_tap')"
           >
             <div class="row items-center no-wrap q-gutter-x-xs">
               <span

@@ -851,6 +851,8 @@ window.app = Vue.createApp({
         if (method == 'fiat_tap') {
           this.fiatMethod = 'terminal'
           method = 'fiat'
+        } else if (method == 'fiat') {
+          this.fiatMethod = 'checkout'
         } else if (method == 'cash') {
           this.fiatMethod = 'cash'
           method = 'fiat'
