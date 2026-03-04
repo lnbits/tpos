@@ -225,6 +225,12 @@ window.app = Vue.createApp({
     fullScreenIcon() {
       return this.isFullScreen ? 'fullscreen_exit' : 'fullscreen'
     },
+    bitcoinSymbol() {
+      return LNbits.utils.getCurrencySymbol('BTC')
+    },
+    currencySymbol() {
+      return LNbits.utils.getCurrencySymbol(this.currency)
+    },
     filteredItems() {
       // filter out disabled items
       let items = this.items.filter(item => !item.disabled)
