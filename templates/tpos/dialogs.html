@@ -424,7 +424,7 @@
             </div>
           </q-btn>
         </div>
-        <div class="col-6" v-if="fiatProvider">
+        <div class="col-6" v-if="allowCashSettlement && currency != 'sats'">
           <q-btn
             class="full-width q-px-lg q-py-sm"
             size="xl"
@@ -442,7 +442,7 @@
             </div>
           </q-btn>
         </div>
-        <div class="col-6" v-if="allowCashSettlement && currency != 'sats'">
+        <div class="col-6" v-if="fiatProvider">
           <q-btn
             class="full-width q-px-lg q-py-sm"
             size="xl"
