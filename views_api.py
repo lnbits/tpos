@@ -4,6 +4,10 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from lnurl import LnurlPayResponse
+from lnurl import decode as decode_lnurl
+from lnurl import handle as lnurl_handle
+
 from lnbits.core.crud import (
     get_account,
     get_latest_payments_by_extension,
@@ -21,9 +25,6 @@ from lnbits.decorators import (
     require_invoice_key,
 )
 from lnbits.tasks import internal_invoice_queue_put
-from lnurl import LnurlPayResponse
-from lnurl import decode as decode_lnurl
-from lnurl import handle as lnurl_handle
 
 from .crud import (
     create_tpos,
