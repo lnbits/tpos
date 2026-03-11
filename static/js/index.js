@@ -1,3 +1,27 @@
+const getTposCurrencyFractionDigits = currency => {
+  const code = (currency || '').toUpperCase()
+  if (code === 'SAT' || code === 'SATS') {
+    return 0
+  }
+  try {
+    return new Intl.NumberFormat(window.i18n.global.locale, {
+      style: 'currency',
+      currency: code
+    }).resolvedOptions().maximumFractionDigits
+  } catch (e) {
+    return 2
+  }
+}
+
+const roundTposCurrencyAmount = (amount, currency) => {
+  const value = Number(amount) || 0
+  if ((currency || '').toLowerCase() === 'sats') {
+    return Math.ceil(value)
+  }
+  const scale = 10 ** getTposCurrencyFractionDigits(currency)
+  return Math.round(value * scale) / scale
+}
+
 const mapTpos = obj => {
   obj.date = Quasar.date.formatDate(
     new Date(obj.time * 1000),
@@ -468,7 +492,10 @@ window.app = Vue.createApp({
       if (currency == 'sats') {
         return LNbits.utils.formatSat(price) + ' sat'
       } else {
-        return LNbits.utils.formatCurrency(Number(price).toFixed(2), currency)
+        return LNbits.utils.formatCurrency(
+          roundTposCurrencyAmount(price, currency),
+          currency
+        )
       }
     },
     openItemDialog(id) {
@@ -649,7 +676,10 @@ window.app = Vue.createApp({
       if (currency == 'sats') {
         return LNbits.utils.formatSat(amount) + ' sat'
       } else {
-        return LNbits.utils.formatCurrency(Number(amount).toFixed(2), currency)
+        return LNbits.utils.formatCurrency(
+          roundTposCurrencyAmount(amount, currency),
+          currency
+        )
       }
     }
   },
