@@ -1314,6 +1314,8 @@ window.app = Vue.createApp({
     },
     promptPrintType(paymentHash) {
       try {
+        this.receiptData = null
+        this.orderReceipt = false
         this.printDialog.paymentHash = paymentHash
         this.printDialog.show = true
       } catch (error) {
@@ -1327,16 +1329,15 @@ window.app = Vue.createApp({
     closePrintDialog() {
       this.printDialog.show = false
       this.printDialog.paymentHash = null
+      this.receiptData = null
     },
     async printReceipt(paymentHash) {
       try {
-        if (!this.receiptData) {
-          const {data} = await LNbits.api.request(
-            'GET',
-            `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
-          )
-          this.receiptData = data
-        }
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
+        )
+        this.receiptData = data
 
         this.orderReceipt = false
         console.log('Printing receipt for payment hash:', paymentHash)
@@ -1352,13 +1353,11 @@ window.app = Vue.createApp({
     },
     async printOrderReceipt(paymentHash) {
       try {
-        if (!this.receiptData) {
-          const {data} = await LNbits.api.request(
-            'GET',
-            `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
-          )
-          this.receiptData = data
-        }
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
+        )
+        this.receiptData = data
 
         this.orderReceipt = true
         console.log('Printing order receipt for payment hash:', paymentHash)
