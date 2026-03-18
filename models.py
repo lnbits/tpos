@@ -181,9 +181,9 @@ class ReceiptItemData(BaseModel):
 
 class ReceiptDetailsData(BaseModel):
     currency: str = "sats"
-    exchangeRate: float = 1.0
-    taxValue: float = 0.0
-    taxIncluded: bool = False
+    exchange_rate: float = 1.0
+    tax_value: float = 0.0
+    tax_included: bool = False
     items: list[ReceiptItemData] = Field(default_factory=list)
 
 
@@ -216,19 +216,17 @@ class ReceiptData(BaseModel):
 
     def subtotal(self) -> float:
         if self.extra.details.items:
-            return sum(
-                item.price * item.quantity for item in self.extra.details.items
-            )
-        rate = self.extra.details.exchangeRate or 1.0
+            return sum(item.price * item.quantity for item in self.extra.details.items)
+        rate = self.extra.details.exchange_rate or 1.0
         return self.extra.amount / rate
 
     def total(self) -> float:
         if not self.extra.details.items:
-            rate = self.extra.details.exchangeRate or 1.0
+            rate = self.extra.details.exchange_rate or 1.0
             return self.extra.amount / rate
-        if self.extra.details.taxIncluded:
+        if self.extra.details.tax_included:
             return self.subtotal()
-        return self.subtotal() + self.extra.details.taxValue
+        return self.subtotal() + self.extra.details.tax_value
 
     def format_money(self, amount: float) -> str:
         return f"{amount:.2f} {self.extra.details.currency.upper()}"
@@ -258,7 +256,7 @@ class ReceiptData(BaseModel):
         if self.show_bitcoin_details() and receipt_type != "order_receipt":
             lines.append(
                 f"Rate (sat/{self.extra.details.currency}): "
-                f"{self.extra.details.exchangeRate:.2f}"
+                f"{self.extra.details.exchange_rate:.2f}"
             )
         lines.append("")
 
@@ -275,7 +273,7 @@ class ReceiptData(BaseModel):
 
         if receipt_type != "order_receipt":
             lines.append(f"Subtotal: {self.format_money(self.subtotal())}")
-            lines.append(f"Tax: {self.format_money(self.extra.details.taxValue)}")
+            lines.append(f"Tax: {self.format_money(self.extra.details.tax_value)}")
             lines.append(f"Total: {self.format_money(self.total())}")
             if self.show_bitcoin_details():
                 lines.append(f"Total (sats): {self.extra.amount}")
@@ -298,6 +296,10 @@ class ReceiptData(BaseModel):
 
     def to_api_dict(self) -> dict[str, Any]:
         data = self.dict()
+        details = data.get("extra", {}).get("details", {})
+        details["exchangeRate"] = details.pop("exchange_rate", 1.0)
+        details["taxValue"] = details.pop("tax_value", 0.0)
+        details["taxIncluded"] = details.pop("tax_included", False)
         data["print_text"] = self.render_text("receipt")
         data["order_print_text"] = self.render_text("order_receipt")
         return data

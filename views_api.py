@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from http import HTTPStatus
 from time import time
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import httpx
@@ -109,9 +109,9 @@ def _build_receipt_data(tpos: Tpos, payment: Payment) -> ReceiptData:
             fiat_payment_request=extra.get("fiat_payment_request"),
             details=ReceiptDetailsData(
                 currency=str(details.get("currency") or "sats"),
-                exchangeRate=float(details.get("exchangeRate") or 1.0),
-                taxValue=float(details.get("taxValue") or 0.0),
-                taxIncluded=bool(details.get("taxIncluded")),
+                exchange_rate=float(details.get("exchangeRate") or 1.0),
+                tax_value=float(details.get("taxValue") or 0.0),
+                tax_included=bool(details.get("taxIncluded")),
                 items=receipt_items,
             ),
         ),
@@ -623,14 +623,16 @@ async def api_tpos_print_invoice(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
         )
 
-    receipt_type = data.receipt_type if data.receipt_type == "order_receipt" else "receipt"
+    receipt_type: Literal["receipt", "order_receipt"] = (
+        "order_receipt" if data.receipt_type == "order_receipt" else "receipt"
+    )
     receipt = _build_receipt_data(tpos, payment)
     payload = ReceiptPrint(
         tpos_id=tpos_id,
         payment_hash=payment_hash,
         receipt_type=receipt_type,
         print_text=receipt.render_text(receipt_type),
-        receipt=receipt.dict(),
+        receipt=receipt.to_api_dict(),
     )
     await websocket_updater(tpos_id, json.dumps(payload.dict()))
     return {"success": True}
