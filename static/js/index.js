@@ -23,6 +23,10 @@ const mapTpos = obj => {
     : []
   obj.only_show_sats_on_bitcoin = obj.only_show_sats_on_bitcoin ?? true
   obj.allow_cash_settlement = Boolean(obj.allow_cash_settlement)
+  obj.useWrapper = false
+  obj.posLocation = ''
+  obj.auth = ''
+  obj.loadingWrapperToken = false
   obj.itemsMap = new Map()
   obj.items.forEach((item, idx) => {
     let id = `${obj.id}:${idx + 1}`
@@ -634,6 +638,67 @@ window.app = Vue.createApp({
         this.fileDataDialog.show = false
       }
     },
+    buildTposShareUrl(tpos) {
+      if (!tpos) return ''
+
+      if (!tpos.useWrapper) {
+        return tpos.shareUrl || ''
+      }
+
+      if (tpos.loadingWrapperToken && !tpos.auth) {
+        return ''
+      }
+
+      const url = new URL(
+        `https://quickskink4974.lnpro.xyz/tpos/${encodeURIComponent(tpos.id)}`
+      )
+      url.searchParams.set('wrapper', 'true')
+
+      if (tpos.posLocation) {
+        url.searchParams.set('pos', tpos.posLocation)
+      }
+      if (tpos.auth) {
+        url.searchParams.set('auth', tpos.auth)
+      }
+
+      return url.toString()
+    },
+    async generateWrapperToken(tpos) {
+      if (!tpos?.useWrapper || tpos.loadingWrapperToken) {
+        return
+      }
+
+      const wallet = _.findWhere(this.g.user.wallets, {
+        id: tpos.wallet
+      })
+      if (!wallet) {
+        tpos.useWrapper = false
+        Quasar.Notify.create({
+          type: 'warning',
+          message: 'Unable to find the wallet for this TPoS.'
+        })
+        return
+      }
+
+      tpos.loadingWrapperToken = true
+      try {
+        const {data} = await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/tposs/${tpos.id}/wrapper-token`,
+          wallet.adminkey,
+          {}
+        )
+        tpos.auth = data.auth
+        Quasar.Notify.create({
+          type: 'positive',
+          message: 'ACL token generated.'
+        })
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+      } finally {
+        tpos.loadingWrapperToken = false
+      }
+    },
     openUrlDialog(id) {
       if (this.tposs.stripe_card_payments) {
         this.urlDialog.data = _.findWhere(this.tposs, {
@@ -642,6 +707,13 @@ window.app = Vue.createApp({
         })
       } else {
         this.urlDialog.data = _.findWhere(this.tposs, {id})
+      }
+      this.urlDialog.data = {
+        ...this.urlDialog.data,
+        useWrapper: false,
+        posLocation: '',
+        auth: '',
+        loadingWrapperToken: false
       }
       this.urlDialog.show = true
     },
