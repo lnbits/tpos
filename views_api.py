@@ -261,7 +261,9 @@ async def api_tpos_create_wrapper_token(
             token_id_list=[],
         )
         user_acls.access_control_list.append(acl)
-        user_acls.access_control_list.sort(key=lambda existing_acl: existing_acl.name.lower())
+        user_acls.access_control_list.sort(
+            key=lambda existing_acl: existing_acl.name.lower()
+        )
 
     token_expire_minutes = _two_year_token_expiry_minutes()
     api_token_id = uuid4().hex
