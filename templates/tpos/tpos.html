@@ -104,17 +104,11 @@
 </q-page-container>
 <template v-if="enablePrint">
   <Teleport to="body">
-    <receipt
-      class="receipt"
-      v-if="receiptData && !orderReceipt"
-      :data="receiptData"
-    ></receipt>
-    <order-receipt
-      class="receipt order-receipt"
-      v-if="receiptData && orderReceipt"
-      :data="receiptData"
-      type="order"
-    ></order-receipt>
+    <div
+      class="receipt-text"
+      v-if="printText"
+      v-html="renderPrintHtml(printText, orderReceipt)"
+    ></div>
   </Teleport>
 </template>
 {% endblock %} {% block styles %}
@@ -176,7 +170,8 @@
     text-align: left;
   }
   @media screen {
-    .receipt {
+    .receipt,
+    .receipt-text {
       display: none;
     }
   }
@@ -195,30 +190,27 @@
     body > * {
       display: none !important;
     }
-    .receipt {
+    .receipt,
+    .receipt-text {
       display: block !important;
       margin: 0mm !important;
-      padding-top: 2cm !important;
-      padding-bottom: 2cm !important;
+      padding: 8mm 5mm !important;
     }
 
-    .receipt p {
-      margin: 0 !important;
+    .receipt-text {
+      font-family: monospace !important;
+      font-size: 16px !important;
+      line-height: 1.35 !important;
+      letter-spacing: 0.01em;
     }
-    .receipt .q-table__middle {
-      overflow: visible !important;
+    .receipt-block {
+      white-space: pre-wrap !important;
+      text-align: left;
+      margin: 0 0 1.1em 0;
     }
-    .receipt .q-table td,
-    .receipt .q-table th {
-      white-space: normal !important;
-      word-break: break-word;
-    }
-    .order-receipt .q-table th span,
-    .order-receipt .q-table td div,
-    .order-receipt .q-table td span,
-    .order-receipt p {
-      font-size: 1.5em !important;
-      line-height: 1.2 !important;
+    .receipt-block-header,
+    .receipt-block-footer {
+      text-align: center;
     }
   }
 </style>

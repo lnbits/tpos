@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
 from time import time
+from typing import Any, Literal
 
 from fastapi import Query
 from pydantic import BaseModel, Field, validator
@@ -164,6 +166,150 @@ class TapToPay(BaseModel):
     tpos_id: str | None = None
     payment_hash: str | None = None
     paid: bool = False
+
+
+class PrintReceiptRequest(BaseModel):
+    receipt_type: Literal["receipt", "order_receipt"] = "receipt"
+
+
+class ReceiptItemData(BaseModel):
+    title: str = ""
+    note: str | None = None
+    quantity: int = 0
+    price: float = 0.0
+
+
+class ReceiptDetailsData(BaseModel):
+    currency: str = "sats"
+    exchangeRate: float = 1.0
+    taxValue: float = 0.0
+    taxIncluded: bool = False
+    items: list[ReceiptItemData] = Field(default_factory=list)
+
+
+class ReceiptExtraData(BaseModel):
+    amount: int = 0
+    paid_in_fiat: bool = False
+    fiat_method: str | None = None
+    fiat_payment_request: str | None = None
+    details: ReceiptDetailsData = Field(default_factory=ReceiptDetailsData)
+
+
+class ReceiptData(BaseModel):
+    paid: bool = False
+    extra: ReceiptExtraData = Field(default_factory=ReceiptExtraData)
+    created_at: Any = None
+    business_name: str | None = None
+    business_address: str | None = None
+    business_vat_id: str | None = None
+    only_show_sats_on_bitcoin: bool = True
+
+    def paid_in_fiat(self) -> bool:
+        return bool(
+            self.extra.paid_in_fiat
+            or self.extra.fiat_method
+            or self.extra.fiat_payment_request
+        )
+
+    def show_bitcoin_details(self) -> bool:
+        return (not self.only_show_sats_on_bitcoin) or (not self.paid_in_fiat())
+
+    def subtotal(self) -> float:
+        if self.extra.details.items:
+            return sum(
+                item.price * item.quantity for item in self.extra.details.items
+            )
+        rate = self.extra.details.exchangeRate or 1.0
+        return self.extra.amount / rate
+
+    def total(self) -> float:
+        if not self.extra.details.items:
+            rate = self.extra.details.exchangeRate or 1.0
+            return self.extra.amount / rate
+        if self.extra.details.taxIncluded:
+            return self.subtotal()
+        return self.subtotal() + self.extra.details.taxValue
+
+    def format_money(self, amount: float) -> str:
+        return f"{amount:.2f} {self.extra.details.currency.upper()}"
+
+    def formatted_created_at(self) -> str | None:
+        if not self.created_at:
+            return None
+        if isinstance(self.created_at, datetime):
+            return self.created_at.strftime("%Y-%m-%d %H:%M")
+        value = str(self.created_at).strip()
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return parsed.strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            return value
+
+    def render_text(
+        self, receipt_type: Literal["receipt", "order_receipt"] = "receipt"
+    ) -> str:
+        lines: list[str] = []
+        lines.append("ORDER" if receipt_type == "order_receipt" else "RECEIPT")
+        formatted_created_at = self.formatted_created_at()
+        if formatted_created_at:
+            lines.append(formatted_created_at)
+        if self.show_bitcoin_details() and receipt_type != "order_receipt":
+            lines.append(
+                f"Rate (sat/{self.extra.details.currency}): "
+                f"{self.extra.details.exchangeRate:.2f}"
+            )
+        lines.append("")
+
+        for item in self.extra.details.items:
+            if item.title.strip():
+                lines.append(item.title.strip())
+            if receipt_type == "order_receipt":
+                lines.append(f"Qty: {item.quantity}")
+            else:
+                lines.append(f"{item.quantity} x {self.format_money(item.price)}")
+            if item.note and item.note.strip():
+                lines.append(item.note.strip())
+            lines.append("")
+
+        if receipt_type != "order_receipt":
+            lines.append(f"Subtotal: {self.format_money(self.subtotal())}")
+            lines.append(f"Tax: {self.format_money(self.extra.details.taxValue)}")
+            lines.append(f"Total: {self.format_money(self.total())}")
+            if self.show_bitcoin_details():
+                lines.append(f"Total (sats): {self.extra.amount}")
+            lines.append("")
+            lines.append("Thank you for your purchase!")
+
+        if receipt_type != "order_receipt":
+            if self.business_name:
+                lines.append(self.business_name)
+            if self.business_address:
+                lines.extend(
+                    line for line in self.business_address.splitlines() if line.strip()
+                )
+            if self.business_vat_id:
+                lines.append(f"VAT: {self.business_vat_id}")
+
+        while lines and not lines[-1].strip():
+            lines.pop()
+        return "\n".join(lines)
+
+    def to_api_dict(self) -> dict[str, Any]:
+        data = self.dict()
+        data["print_text"] = self.render_text("receipt")
+        data["order_print_text"] = self.render_text("order_receipt")
+        return data
+
+
+class ReceiptPrint(BaseModel):
+    type: str = "receipt_print"
+    tpos_id: str | None = None
+    payment_hash: str | None = None
+    receipt_type: Literal["receipt", "order_receipt"] = "receipt"
+    print_text: str = ""
+    receipt: dict[str, Any] = Field(default_factory=dict)
 
 
 CreateTposInvoice.update_forward_refs(InventorySale=InventorySale)

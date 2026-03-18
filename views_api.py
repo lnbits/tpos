@@ -57,6 +57,12 @@ from .models import (
     CreateUpdateItemData,
     InventorySale,
     PayLnurlWData,
+    PrintReceiptRequest,
+    ReceiptData,
+    ReceiptDetailsData,
+    ReceiptExtraData,
+    ReceiptItemData,
+    ReceiptPrint,
     TapToPay,
     Tpos,
 )
@@ -77,6 +83,44 @@ def _two_year_token_expiry_minutes() -> int:
         # Handle February 29 by falling back to February 28 two years later.
         expires_at = now.replace(year=now.year + 2, month=2, day=28)
     return max(1, int((expires_at - now).total_seconds() // 60))
+
+
+def _build_receipt_data(tpos: Tpos, payment: Payment) -> ReceiptData:
+    extra = payment.extra or {}
+    details = extra.get("details") or {}
+    items = details.get("items") or []
+
+    receipt_items = [
+        ReceiptItemData(
+            title=str(item.get("title") or ""),
+            note=(str(item.get("note")) if item.get("note") is not None else None),
+            quantity=int(item.get("quantity") or 0),
+            price=float(item.get("price") or 0.0),
+        )
+        for item in items
+    ]
+
+    return ReceiptData(
+        paid=payment.success,
+        extra=ReceiptExtraData(
+            amount=int(extra.get("amount") or 0),
+            paid_in_fiat=bool(extra.get("paid_in_fiat")),
+            fiat_method=extra.get("fiat_method"),
+            fiat_payment_request=extra.get("fiat_payment_request"),
+            details=ReceiptDetailsData(
+                currency=str(details.get("currency") or "sats"),
+                exchangeRate=float(details.get("exchangeRate") or 1.0),
+                taxValue=float(details.get("taxValue") or 0.0),
+                taxIncluded=bool(details.get("taxIncluded")),
+                items=receipt_items,
+            ),
+        ),
+        created_at=payment.created_at,
+        business_name=tpos.business_name,
+        business_address=tpos.business_address,
+        business_vat_id=tpos.business_vat_id,
+        only_show_sats_on_bitcoin=tpos.only_show_sats_on_bitcoin,
+    )
 
 
 @tpos_api_router.get("/api/v1/tposs", status_code=HTTPStatus.OK)
@@ -552,16 +596,44 @@ async def api_tpos_check_invoice(
         )
 
     if extra:
-        return {
-            "paid": payment.success,
-            "extra": payment.extra,
-            "created_at": payment.created_at,
-            "business_name": tpos.business_name,
-            "business_address": tpos.business_address,
-            "business_vat_id": tpos.business_vat_id,
-            "only_show_sats_on_bitcoin": tpos.only_show_sats_on_bitcoin,
-        }
+        return _build_receipt_data(tpos, payment).to_api_dict()
     return {"paid": payment.success}
+
+
+@tpos_api_router.post(
+    "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}/print",
+    status_code=HTTPStatus.OK,
+)
+async def api_tpos_print_invoice(
+    data: PrintReceiptRequest, tpos_id: str, payment_hash: str
+):
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+
+    payment = await get_standalone_payment(payment_hash, incoming=True)
+    if not payment:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
+        )
+    if payment.extra.get("tag") != "tpos" or payment.extra.get("tpos_id") != tpos_id:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
+        )
+
+    receipt_type = data.receipt_type if data.receipt_type == "order_receipt" else "receipt"
+    receipt = _build_receipt_data(tpos, payment)
+    payload = ReceiptPrint(
+        tpos_id=tpos_id,
+        payment_hash=payment_hash,
+        receipt_type=receipt_type,
+        print_text=receipt.render_text(receipt_type),
+        receipt=receipt.dict(),
+    )
+    await websocket_updater(tpos_id, json.dumps(payload.dict()))
+    return {"success": True}
 
 
 @tpos_api_router.post(

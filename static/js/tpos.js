@@ -127,7 +127,9 @@ window.app = Vue.createApp({
       addedAmount: 0,
       enablePrint: false,
       enableRemote: false,
+      wrapperMode: false,
       receiptData: null,
+      printText: '',
       orderReceipt: false,
       printDialog: {
         show: false,
@@ -1330,14 +1332,61 @@ window.app = Vue.createApp({
       this.printDialog.show = false
       this.printDialog.paymentHash = null
       this.receiptData = null
+      this.printText = ''
+    },
+    escapePrintHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+    },
+    renderPrintHtml(printText, isOrderReceipt = false) {
+      const blocks = String(printText || '')
+        .split(/\n\s*\n/)
+        .map(block => block.trim())
+        .filter(Boolean)
+
+      if (!blocks.length) return ''
+
+      return blocks
+        .map((block, index) => {
+          const className =
+            index === 0
+              ? 'receipt-block receipt-block-header'
+              : !isOrderReceipt && index === blocks.length - 1
+                ? 'receipt-block receipt-block-footer'
+                : 'receipt-block'
+          return `<div class="${className}">${this.escapePrintHtml(block)}</div>`
+        })
+        .join('')
+    },
+    async sendWrapperPrint(paymentHash, receiptType) {
+      await LNbits.api.request(
+        'POST',
+        `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}/print`,
+        null,
+        {
+          receipt_type: receiptType
+        }
+      )
+      Quasar.Notify.create({
+        type: 'positive',
+        message: 'Print request sent to wrapper.'
+      })
+      this.closePrintDialog()
     },
     async printReceipt(paymentHash) {
       try {
+        if (this.wrapperMode) {
+          await this.sendWrapperPrint(paymentHash, 'receipt')
+          return
+        }
         const {data} = await LNbits.api.request(
           'GET',
           `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
         )
         this.receiptData = data
+        this.printText = data.print_text || ''
 
         this.orderReceipt = false
         console.log('Printing receipt for payment hash:', paymentHash)
@@ -1353,11 +1402,16 @@ window.app = Vue.createApp({
     },
     async printOrderReceipt(paymentHash) {
       try {
+        if (this.wrapperMode) {
+          await this.sendWrapperPrint(paymentHash, 'order_receipt')
+          return
+        }
         const {data} = await LNbits.api.request(
           'GET',
           `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}?extra=true`
         )
         this.receiptData = data
+        this.printText = data.order_print_text || ''
 
         this.orderReceipt = true
         console.log('Printing order receipt for payment hash:', paymentHash)
@@ -1423,6 +1477,8 @@ window.app = Vue.createApp({
     this.tposLNaddressCut = tpos.lnaddress_cut
     this.enablePrint = tpos.enable_receipt_print
     this.enableRemote = Boolean(tpos.enable_remote)
+    this.wrapperMode =
+      new URL(window.location.href).searchParams.get('wrapper') === 'true'
     this.fiatProvider = tpos.fiat_provider
     this.allowCashSettlement = Boolean(tpos.allow_cash_settlement)
 
