@@ -157,6 +157,7 @@ window.app = Vue.createApp({
       amountFormatted: 0,
       totalFormatted: 0,
       amountWithTipFormatted: 0,
+      paymentAmount: null,
       sat: 0,
       fsat: 0,
       totalfsat: 0,
@@ -234,6 +235,18 @@ window.app = Vue.createApp({
     }
   },
   computed: {
+    activePaymentAmount() {
+      return this.paymentAmount !== null ? this.paymentAmount : this.amount
+    },
+    activePaymentAmountFormatted() {
+      return this.formatAmount(this.activePaymentAmount, this.currency)
+    },
+    activePaymentAmountWithTipFormatted() {
+      return this.formatAmount(
+        this.activePaymentAmount + this.tipAmount,
+        this.currency
+      )
+    },
     tipAmountSat() {
       if (!this.exchangeRate) return 0
       return Math.ceil(this.tipAmount * this.exchangeRate)
@@ -243,13 +256,13 @@ window.app = Vue.createApp({
     },
     roundToSugestion() {
       switch (true) {
-        case this.amount > 50:
+        case this.activePaymentAmount > 50:
           toNext = 10
           break
-        case this.amount > 6:
+        case this.activePaymentAmount > 6:
           toNext = 5
           break
-        case this.amount > 2.5:
+        case this.activePaymentAmount > 2.5:
           toNext = 1
           break
         default:
@@ -258,7 +271,7 @@ window.app = Vue.createApp({
       }
 
       return roundTposCurrencyAmount(
-        Math.ceil(this.amount / toNext) * toNext,
+        Math.ceil(this.activePaymentAmount / toNext) * toNext,
         this.currency
       )
     },
@@ -591,6 +604,7 @@ window.app = Vue.createApp({
       this.cartTax = 0.0
       this.total = 0.0
       this.addedAmount = 0.0
+      this.resetPaymentAttempt()
       if (this.$q.screen.lt.md) {
         this.cartDrawer = false
       }
@@ -831,7 +845,10 @@ window.app = Vue.createApp({
       this.$nextTick(() => this.$refs.inputRounding.focus())
     },
     calculatePercent() {
-      const change = ((this.tipRounding - this.amount) / this.amount) * 100
+      const change =
+        ((this.tipRounding - this.activePaymentAmount) /
+          this.activePaymentAmount) *
+        100
       if (change < 0) {
         Quasar.Notify.create({
           type: 'warning',
@@ -844,8 +861,8 @@ window.app = Vue.createApp({
     },
     closeInvoiceDialog() {
       this.stack = []
-      this.tipAmount = 0.0
       this.cashValidating = false
+      this.resetPaymentAttempt()
       const dialog = this.invoiceDialog
       setTimeout(() => {
         clearInterval(dialog.paymentChecker)
@@ -860,22 +877,25 @@ window.app = Vue.createApp({
       }
 
       this.tipAmount = roundTposCurrencyAmount(
-        (selectedTipOption / 100) * this.amount,
+        (selectedTipOption / 100) * this.activePaymentAmount,
         this.currency
       )
       this.showInvoice()
     },
+    resetPaymentAttempt() {
+      this.paymentAmount = null
+      this.tipAmount = 0.0
+      this.rounding = false
+      this.tipRounding = null
+    },
     submitForm() {
-      if (this.total != 0.0) {
-        if (this.amount > 0.0) {
-          this.total = roundTposCurrencyAmount(
-            this.total + this.amount,
-            this.currency
-          )
-        }
-        this.stack = amountToTposStack(this.total, this.currency)
-        this.sat = this.totalSat
-      }
+      const paymentAmount =
+        this.total > 0.0
+          ? roundTposCurrencyAmount(this.total + this.amount, this.currency)
+          : this.amount
+
+      this.paymentAmount = paymentAmount
+      this.sat = Math.ceil(paymentAmount * this.exchangeRate)
 
       if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
         Quasar.Notify.create({
@@ -926,16 +946,18 @@ window.app = Vue.createApp({
       }
     },
     buildInvoiceParams() {
+      const paymentAmount =
+        this.paymentAmount !== null ? this.paymentAmount : this.amount
       const params = {
         amount: this.sat,
-        memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
+        memo: this.formatAmount(paymentAmount, this.currency),
         exchange_rate: this.exchangeRate,
         internal_memo: this.invoiceDialog.internalMemo || null,
         pay_in_fiat: this.payInFiat,
         fiat_method: this.fiatMethod
       }
       if (this.currency != g.settings.denomination) {
-        params.amount_fiat = this.total > 0 ? this.total : this.amount
+        params.amount_fiat = paymentAmount
         params.tip_amount_fiat = this.tipAmount > 0 ? this.tipAmount : 0.0
       }
       if (this.tipAmountSat > 0) {
