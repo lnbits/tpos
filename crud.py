@@ -2,7 +2,7 @@ from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
 from .helpers import serialize_inventory_tags
-from .models import CreateTposData, LnurlCharge, Tpos, TposClean
+from .models import CreateTposData, LnurlCharge, Tpos, TposClean, TposPayment
 
 db = Database("ext_tpos")
 
@@ -70,3 +70,61 @@ async def get_tposs(wallet_ids: str | list[str]) -> list[Tpos]:
 
 async def delete_tpos(tpos_id: str) -> None:
     await db.execute("DELETE FROM tpos.pos WHERE id = :id", {"id": tpos_id})
+    await db.execute("DELETE FROM tpos.payments WHERE tpos_id = :id", {"id": tpos_id})
+
+
+async def create_tpos_payment(payment: TposPayment) -> TposPayment:
+    await db.insert("tpos.payments", payment)
+    return payment
+
+
+async def get_tpos_payment(payment_id: str) -> TposPayment | None:
+    return await db.fetchone(
+        "SELECT * FROM tpos.payments WHERE id = :id",
+        {"id": payment_id},
+        TposPayment,
+    )
+
+
+async def get_tpos_payment_by_hash(payment_hash: str) -> TposPayment | None:
+    return await db.fetchone(
+        "SELECT * FROM tpos.payments WHERE payment_hash = :payment_hash",
+        {"payment_hash": payment_hash},
+        TposPayment,
+    )
+
+
+async def get_tpos_payment_by_onchain_address(address: str) -> TposPayment | None:
+    return await db.fetchone(
+        "SELECT * FROM tpos.payments WHERE onchain_address = :address",
+        {"address": address},
+        TposPayment,
+    )
+
+
+async def get_pending_tpos_payments() -> list[TposPayment]:
+    return await db.fetchall(
+        """
+        SELECT * FROM tpos.payments
+        WHERE paid = false AND onchain_address IS NOT NULL
+        ORDER BY created_at ASC
+        """,
+        model=TposPayment,
+    )
+
+
+async def get_latest_tpos_payments(tpos_id: str, limit: int = 5) -> list[TposPayment]:
+    return await db.fetchall(
+        f"""
+        SELECT * FROM tpos.payments
+        WHERE tpos_id = :tpos_id AND paid = true
+        ORDER BY updated_at DESC LIMIT {int(limit)}
+        """,
+        {"tpos_id": tpos_id},
+        TposPayment,
+    )
+
+
+async def update_tpos_payment(payment: TposPayment) -> TposPayment:
+    await db.update("tpos.payments", payment)
+    return payment

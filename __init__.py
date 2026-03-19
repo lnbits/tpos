@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from loguru import logger
 
 from .crud import db
-from .tasks import wait_for_paid_invoices
+from .tasks import poll_onchain_payments, wait_for_paid_invoices
 from .views import tpos_generic_router
 from .views_api import tpos_api_router
 from .views_atm import tpos_atm_router
@@ -37,8 +37,11 @@ def tpos_stop():
 def tpos_start():
     from lnbits.tasks import create_permanent_unique_task
 
-    task = create_permanent_unique_task("ext_tpos", wait_for_paid_invoices)
-    scheduled_tasks.append(task)
+    invoice_task = create_permanent_unique_task("ext_tpos", wait_for_paid_invoices)
+    onchain_task = create_permanent_unique_task(
+        "ext_tpos_onchain", poll_onchain_payments
+    )
+    scheduled_tasks.extend([invoice_task, onchain_task])
 
 
 __all__ = [
