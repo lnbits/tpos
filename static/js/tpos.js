@@ -1457,9 +1457,22 @@ window.app = Vue.createApp({
         'lnbits.tpos.header',
         this.headerHidden ? 'hidden' : 'shown'
       )
+      this.applyHeaderVisibility()
+    },
+    applyHeaderVisibility() {
+      this.headerHidden =
+        this.$q.localStorage.getItem('lnbits.tpos.header') !== 'shown'
       if (this.headerElement) {
         this.headerElement.style.display = this.headerHidden ? 'none' : ''
       }
+    },
+    bindHeaderVisibilityRefresh() {
+      const refresh = () => this.applyHeaderVisibility()
+      window.addEventListener('focus', refresh)
+      window.addEventListener('pageshow', refresh)
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refresh()
+      })
     }
   },
   async created() {
@@ -1509,9 +1522,8 @@ window.app = Vue.createApp({
       }
     })
     this.headerElement = document.querySelector('.q-header')
-    if (this.headerElement) {
-      this.headerElement.style.display = this.headerHidden ? 'none' : ''
-    }
+    this.applyHeaderVisibility()
+    this.bindHeaderVisibilityRefresh()
     this.connectRemoteInvoiceWS()
   },
   beforeUnmount() {
@@ -1522,9 +1534,7 @@ window.app = Vue.createApp({
     if (!this.headerElement) {
       this.headerElement = document.querySelector('.q-header')
     }
-    if (this.headerElement) {
-      this.headerElement.style.display = this.headerHidden ? 'none' : ''
-    }
+    this.applyHeaderVisibility()
     setInterval(() => {
       this.getRates()
     }, 120000)

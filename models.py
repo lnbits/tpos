@@ -300,6 +300,7 @@ class ReceiptData(BaseModel):
         details["exchangeRate"] = details.pop("exchange_rate", 1.0)
         details["taxValue"] = details.pop("tax_value", 0.0)
         details["taxIncluded"] = details.pop("tax_included", False)
+        data["created_at"] = self.formatted_created_at()
         data["print_text"] = self.render_text("receipt")
         data["order_print_text"] = self.render_text("order_receipt")
         return data
