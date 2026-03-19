@@ -353,10 +353,10 @@
         >
         apk (Android only).<br />
         * Create a location for a terminal in Stripe.<br />
-        * Create an ACL token in LNbits with permissions for "fiat"
-        <a href="/account">Access Control List</a>.<br />
-        * Click the QR for the PoS record and add a Stripe terminal location ID
-        and ACL token.<br />
+        * Click the QR for the PoS record, enable the wrapper option, and add a
+        Stripe terminal location ID.<br />
+        * LNbits will generate a 2-year ACL token with /fiat permissions and add
+        it to the wrapper URL automatically.<br />
         * Scan the QR in the TPoS Wrapper app.<br />
       </q-card-section>
     </q-card>
@@ -760,40 +760,62 @@
   </q-dialog>
   <q-dialog v-model="urlDialog.show" position="top">
     <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
-      <lnbits-qrcode
-        :value="urlDialog.data.shareUrl + '?pos=' + urlDialog.data.posLocation + '&auth=' + urlDialog.data.auth"
-      ></lnbits-qrcode>
+      <lnbits-qrcode :value="buildTposShareUrl(urlDialog.data)"></lnbits-qrcode>
       <div class="text-center q-mb-xl">
         <p style="word-break: break-all">
-          <strong v-text="urlDialog.data.name"></strong><br />
-          <span v-text="urlDialog.data.shareUrl"></span>
+          <strong v-text="urlDialog.data.name"></strong>
         </p>
       </div>
       <div v-if="urlDialog.data.stripe_card_payments">
         <div class="row q-mt-lg">
           <div class="col">
+            <q-toggle
+              v-model="urlDialog.data.useWrapper"
+              label="Use with TPoS-Wrapper Android app"
+            ></q-toggle>
+          </div>
+        </div>
+        <div class="row q-mt-sm" v-if="urlDialog.data.useWrapper">
+          <div class="col">
+            <q-btn
+              outline
+              color="primary"
+              type="a"
+              href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper-Stripev5"
+              target="_blank"
+              rel="noopener noreferrer"
+              label="GET THE TPOS-WRAPPER"
+            ></q-btn>
+          </div>
+        </div>
+        <div class="row q-mt-lg">
+          <div class="col" v-if="urlDialog.data.useWrapper">
             <q-input
               v-model="urlDialog.data.posLocation"
               label="PoS Stripe Location"
             >
             </q-input>
           </div>
-          <div class="col">
+          <div class="col q-pl-md" v-if="urlDialog.data.useWrapper">
             <small>
-              Create a new location and copy the ID here
-              https://dashboard.stripe.com/terminal
+              If accepting Stripe payments, visit
+              https://dashboard.stripe.com/terminal and grab a new location ID
             </small>
           </div>
         </div>
-        <div class="row q-mt-lg">
+        <div class="row q-mt-lg" v-if="urlDialog.data.useWrapper">
           <div class="col">
-            <q-input v-model="urlDialog.data.auth" label="ACL Token"> </q-input>
+            <q-btn
+              outline
+              color="primary"
+              :disable="!urlDialog.data.posLocation"
+              :loading="urlDialog.data.loadingWrapperToken"
+              @click="generateWrapperToken(urlDialog.data)"
+              label="Generate ACL token"
+            ></q-btn>
           </div>
           <div class="col">
-            <small>
-              Go to /account and set a new auth token with /fiat read and write
-              permissions.
-            </small>
+            <small>Press if accepting Stripe payments.</small>
           </div>
         </div>
       </div>
@@ -801,7 +823,8 @@
         <q-btn
           outline
           color="grey"
-          @click="copyText(urlDialog.data.shareUrl, 'TPoS URL copied to clipboard!')"
+          :disable="urlDialog.data.loadingWrapperToken"
+          @click="copyText(buildTposShareUrl(urlDialog.data), 'TPoS URL copied to clipboard!')"
           >Copy URL</q-btn
         >
         <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
