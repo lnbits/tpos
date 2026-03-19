@@ -650,7 +650,8 @@ window.app = Vue.createApp({
       }
 
       const url = new URL(
-        `https://quickskink4974.lnpro.xyz/tpos/${encodeURIComponent(tpos.id)}`
+        `/tpos/${encodeURIComponent(tpos.id)}`,
+        window.location.origin
       )
       url.searchParams.set('wrapper', 'true')
 
