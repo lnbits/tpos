@@ -244,14 +244,6 @@ window.app = Vue.createApp({
             .includes(this.searchTerm.toLowerCase())
         })
       }
-      // if categoryFilter entered, filter out items that don't match
-      if (this.categoryFilter) {
-        items = items.filter(item => {
-          return item.categories
-            .map(c => c.toLowerCase())
-            .includes(this.categoryFilter.toLowerCase())
-        })
-      }
       return items
     },
     drawerWidth() {
@@ -1269,6 +1261,12 @@ window.app = Vue.createApp({
       } else {
         this.categoryFilter = category == 'All' ? '' : category
       }
+    },
+    matchesCategoryFilter(item) {
+      if (!this.categoryFilter) return true
+      return item.categories
+        .map(c => c.toLowerCase())
+        .includes(this.categoryFilter.toLowerCase())
     },
     formatAmount(amount, currency) {
       if (g.settings.denomination != 'sats') {

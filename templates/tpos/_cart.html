@@ -195,7 +195,12 @@
     <div v-if="isGridView">
       <!-- xs: 4 per row, fill width -->
       <div class="row q-col-gutter-sm q-mt-md lt-sm">
-        <div class="col-3" v-for="item in filteredItems" :key="item.id">
+        <div
+          class="col-3"
+          v-for="item in filteredItems"
+          :key="item.id"
+          v-show="matchesCategoryFilter(item)"
+        >
           <q-card class="full-height" flat bordered v-ripple>
             <div @click="addToCart(item)">
               <q-img :src="item.image || null" :ratio="4/3" fit="contain">
@@ -217,6 +222,7 @@
           style="height: 150px; width: 150px"
           v-for="item in filteredItems"
           :key="item.id"
+          v-show="matchesCategoryFilter(item)"
         >
           <q-card class="full-height" flat bordered v-ripple>
             <div @click="addToCart(item)">
@@ -236,7 +242,12 @@
     </div>
     <!-- Items List Small -->
     <q-list v-else class="col-12">
-      <q-item v-for="item in filteredItems" :key="item.id" v-ripple>
+      <q-item
+        v-for="item in filteredItems"
+        :key="item.id"
+        v-ripple
+        v-show="matchesCategoryFilter(item)"
+      >
         <q-item-section avatar @click="addToCart(item)">
           <q-avatar rounded>
             <q-img
