@@ -9,7 +9,6 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from lnbits.core.crud import (
     get_account,
-    get_latest_payments_by_extension,
     get_standalone_payment,
     get_user,
     get_wallet,
@@ -41,8 +40,11 @@ from lnurl import handle as lnurl_handle
 
 from .crud import (
     create_tpos,
+    create_tpos_payment,
     delete_tpos,
+    get_latest_tpos_payments,
     get_tpos,
+    get_tpos_payment_by_hash,
     get_tposs,
     update_tpos,
 )
@@ -65,11 +67,18 @@ from .models import (
     ReceiptPrint,
     TapToPay,
     Tpos,
+    TposInvoiceResponse,
+    TposPayment,
 )
 from .services import (
+    fetch_onchain_address,
+    fetch_watchonly_config,
+    fetch_watchonly_wallet,
+    fetch_watchonly_wallets,
     get_default_inventory,
     get_inventory_items_for_tpos,
     inventory_available_for_user,
+    watchonly_available_for_user,
 )
 
 tpos_api_router = APIRouter()
@@ -85,7 +94,9 @@ def _two_year_token_expiry_minutes() -> int:
     return max(1, int((expires_at - now).total_seconds() // 60))
 
 
-def _build_receipt_data(tpos: Tpos, payment: Payment) -> ReceiptData:
+def _build_receipt_data(
+    tpos: Tpos, payment: Payment, tpos_payment: TposPayment | None = None
+) -> ReceiptData:
     extra = payment.extra or {}
     details = extra.get("details") or {}
     items = details.get("items") or []
@@ -101,7 +112,7 @@ def _build_receipt_data(tpos: Tpos, payment: Payment) -> ReceiptData:
     ]
 
     return ReceiptData(
-        paid=payment.success,
+        paid=payment.success or bool(tpos_payment and tpos_payment.paid),
         extra=ReceiptExtraData(
             amount=int(extra.get("amount") or 0),
             paid_in_fiat=bool(extra.get("paid_in_fiat")),
@@ -120,6 +131,129 @@ def _build_receipt_data(tpos: Tpos, payment: Payment) -> ReceiptData:
         business_address=tpos.business_address,
         business_vat_id=tpos.business_vat_id,
         only_show_sats_on_bitcoin=tpos.only_show_sats_on_bitcoin,
+    )
+
+
+async def _get_watchonly_status(wallet) -> dict[str, Any]:
+    if not await watchonly_available_for_user(wallet.user):
+        return {
+            "available": False,
+            "message": "Watchonly extension must be enabled for this user.",
+            "network": None,
+            "wallets": [],
+        }
+
+    try:
+        config = await fetch_watchonly_config(wallet.inkey)
+        network = config.get("network")
+        wallets = await fetch_watchonly_wallets(wallet.inkey, network)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail=f"Watchonly extension is not reachable: {exc!s}",
+        ) from exc
+
+    return {
+        "available": True,
+        "message": None,
+        "network": network,
+        "wallets": wallets,
+        "mempool_endpoint": config.get("mempool_endpoint"),
+    }
+
+
+async def _validate_watchonly_settings(
+    *,
+    wallet,
+    onchain_enabled: bool,
+    onchain_wallet_id: str | None,
+) -> dict[str, Any] | None:
+    if not onchain_enabled:
+        return None
+    if not onchain_wallet_id:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Watchonly wallet is required when onchain payments are enabled.",
+        )
+
+    status = await _get_watchonly_status(wallet)
+    if not status["available"]:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail=status["message"] or "Watchonly extension is not available.",
+        )
+
+    try:
+        watch_wallet = await fetch_watchonly_wallet(wallet.inkey, onchain_wallet_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail=f"Cannot access watchonly wallet: {exc!s}",
+        ) from exc
+
+    if watch_wallet.get("network") != status["network"]:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Watchonly wallet network does not match the user watchonly config.",
+        )
+
+    return {
+        "watch_wallet": watch_wallet,
+        "network": status["network"],
+        "mempool_endpoint": status["mempool_endpoint"],
+    }
+
+
+def _build_bip21(onchain_address: str, amount_sat: int, bolt11: str | None = None) -> str:
+    amount_btc = amount_sat / 100_000_000
+    bip21 = f"bitcoin:{onchain_address.upper()}?amount={amount_btc:.8f}"
+    if bolt11:
+        bip21 += f"&lightning={bolt11.upper()}"
+    return bip21
+
+
+def _payment_method_from_payment(payment: Payment) -> str:
+    if payment.extra.get("fiat_method") == "cash":
+        return "cash"
+    if payment.extra.get("fiat_payment_request", "").startswith("pi_"):
+        return "fiat"
+    return "lightning"
+
+
+def _serialize_tpos_invoice_response(
+    payment: Payment, tpos_payment: TposPayment
+) -> TposInvoiceResponse:
+    payment_method = _payment_method_from_payment(payment)
+    payment_request = "lightning:" + payment.bolt11.upper()
+    if payment_method == "cash":
+        payment_request = "cash"
+    elif payment.extra.get("fiat_payment_request") and not payment.extra.get(
+        "fiat_payment_request", ""
+    ).startswith("pi_"):
+        payment_request = payment.extra["fiat_payment_request"]
+    elif payment_method == "fiat":
+        payment_request = "tap_to_pay"
+
+    options = [payment_method]
+    unified_qr = None
+    if tpos_payment.onchain_address:
+        options = ["uqr", "lightning", "onchain"]
+        unified_qr = _build_bip21(
+            tpos_payment.onchain_address,
+            tpos_payment.amount,
+            payment.bolt11 if payment_method == "lightning" else payment.bolt11,
+        )
+
+    return TposInvoiceResponse(
+        payment_hash=payment.payment_hash,
+        bolt11=payment.bolt11,
+        payment_request=payment_request,
+        tpos_payment_id=tpos_payment.id,
+        payment_options=options,
+        onchain_address=tpos_payment.onchain_address,
+        unified_qr=unified_qr,
+        payment_method=payment_method,
+        extra=payment.extra or {},
     )
 
 
@@ -153,11 +287,23 @@ async def api_inventory_status(
     }
 
 
+@tpos_api_router.get("/api/v1/onchain/status", status_code=HTTPStatus.OK)
+async def api_onchain_status(
+    key_info: WalletTypeInfo = Depends(require_admin_key),
+) -> dict[str, Any]:
+    return await _get_watchonly_status(key_info.wallet)
+
+
 @tpos_api_router.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
 async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
 ):
     data.wallet = wallet.wallet.id
+    await _validate_watchonly_settings(
+        wallet=wallet.wallet,
+        onchain_enabled=data.onchain_enabled,
+        onchain_wallet_id=data.onchain_wallet_id,
+    )
     user = await get_user(wallet.wallet.user)
     if not (user and user.super_user):
         data.allow_cash_settlement = False
@@ -192,6 +338,15 @@ async def api_tpos_update(
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
     user = await get_user(wallet.wallet.user)
     update_payload = data.dict(exclude_unset=True)
+    desired_onchain_enabled = update_payload.get("onchain_enabled", tpos.onchain_enabled)
+    desired_onchain_wallet_id = update_payload.get(
+        "onchain_wallet_id", tpos.onchain_wallet_id
+    )
+    await _validate_watchonly_settings(
+        wallet=wallet.wallet,
+        onchain_enabled=desired_onchain_enabled,
+        onchain_wallet_id=desired_onchain_wallet_id,
+    )
     desired_currency = update_payload.get("currency", tpos.currency)
     if desired_currency == "sats":
         update_payload["allow_cash_settlement"] = False
@@ -331,7 +486,7 @@ async def api_tpos_create_wrapper_token(
 )
 async def api_tpos_create_invoice(
     tpos_id: str, data: CreateTposInvoice, request: Request
-) -> Payment:
+) -> dict[str, Any]:
     tpos = await get_tpos(tpos_id)
 
     if not tpos:
@@ -440,25 +595,57 @@ async def api_tpos_create_invoice(
             new_checking_id = f"internal_cash_{payment.payment_hash}"
             await update_payment_checking_id(payment.checking_id, new_checking_id)
             payment.checking_id = new_checking_id
-        payment_request_for_display = "lightning:" + payment.bolt11.upper()
-        fiat_payment_request = payment.extra.get("fiat_payment_request")
-        if cash_method:
-            payment_request_for_display = "cash"
-        elif fiat_payment_request and not fiat_payment_request.startswith("pi_"):
-            payment_request_for_display = fiat_payment_request
-        elif fiat_payment_request and fiat_payment_request.startswith("pi_"):
-            payment_request_for_display = "tap_to_pay"
+
+        onchain_address = None
+        mempool_endpoint = None
+        if tpos.onchain_enabled and not data.pay_in_fiat:
+            wallet_record = await get_wallet(tpos.wallet)
+            if not wallet_record:
+                raise HTTPException(
+                    status_code=HTTPStatus.BAD_REQUEST,
+                    detail="Wallet not found for this TPoS.",
+                )
+            validation = await _validate_watchonly_settings(
+                wallet=wallet_record,
+                onchain_enabled=tpos.onchain_enabled,
+                onchain_wallet_id=tpos.onchain_wallet_id,
+            )
+            assert validation
+            address_data = await fetch_onchain_address(
+                wallet_record.inkey, tpos.onchain_wallet_id or ""
+            )
+            onchain_address = address_data.get("address")
+            mempool_endpoint = validation.get("mempool_endpoint")
+
+        tpos_payment = await create_tpos_payment(
+            TposPayment(
+                id=uuid4().hex,
+                tpos_id=tpos_id,
+                payment_hash=payment.payment_hash,
+                amount=int(data.amount + (data.tip_amount or 0)),
+                onchain_address=onchain_address,
+                onchain_wallet_id=tpos.onchain_wallet_id,
+                onchain_zero_conf=tpos.onchain_zero_conf,
+                mempool_endpoint=mempool_endpoint,
+            )
+        )
+        response_payload = _serialize_tpos_invoice_response(payment, tpos_payment)
 
         if tpos.enable_remote:
             payload = {
                 "type": "invoice_created",
                 "tpos_id": tpos_id,
                 "payment_hash": payment.payment_hash,
-                "payment_request": payment_request_for_display,
+                "payment_request": response_payload.payment_request,
                 "paid_in_fiat": data.pay_in_fiat,
                 "amount_fiat": data.amount_fiat,
                 "tip_amount": data.tip_amount,
                 "exchange_rate": data.exchange_rate if data.exchange_rate else None,
+                "tpos_payment_id": response_payload.tpos_payment_id,
+                "payment_options": response_payload.payment_options,
+                "onchain_address": response_payload.onchain_address,
+                "unified_qr": response_payload.unified_qr,
+                "payment_method": response_payload.payment_method,
             }
             await websocket_updater(tpos_id, json.dumps(payload))
 
@@ -476,7 +663,7 @@ async def api_tpos_create_invoice(
                     payment_hash=payment.payment_hash,
                 )
                 await websocket_updater(tpos_id, json.dumps(tap_to_pay_payload.dict()))
-        return payment
+        return response_payload.dict()
 
     except Exception as exc:
         raise HTTPException(
@@ -486,9 +673,12 @@ async def api_tpos_create_invoice(
 
 @tpos_api_router.get("/api/v1/tposs/{tpos_id}/invoices")
 async def api_tpos_get_latest_invoices(tpos_id: str):
-    payments = await get_latest_payments_by_extension(ext_name="tpos", ext_id=tpos_id)
+    tpos_payments = await get_latest_tpos_payments(tpos_id)
     result = []
-    for payment in payments:
+    for tpos_payment in tpos_payments:
+        payment = await get_standalone_payment(tpos_payment.payment_hash, incoming=True)
+        if not payment:
+            continue
         details = payment.extra.get("details", {})
         currency = details.get("currency", None)
         exchange_rate = details.get("exchangeRate") or payment.extra.get("exchangeRate")
@@ -497,9 +687,10 @@ async def api_tpos_get_latest_invoices(tpos_id: str):
                 "checking_id": payment.checking_id,
                 "amount": payment.amount,
                 "time": payment.time,
-                "pending": payment.pending,
+                "pending": not tpos_payment.paid,
                 "currency": currency,
                 "exchange_rate": exchange_rate,
+                "payment_method": tpos_payment.payment_method,
             }
         )
     return result
@@ -594,10 +785,11 @@ async def api_tpos_check_invoice(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
         )
+    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
 
     if extra:
-        return _build_receipt_data(tpos, payment).to_api_dict()
-    return {"paid": payment.success}
+        return _build_receipt_data(tpos, payment, tpos_payment).to_api_dict()
+    return {"paid": payment.success or bool(tpos_payment and tpos_payment.paid)}
 
 
 @tpos_api_router.post(
@@ -626,7 +818,8 @@ async def api_tpos_print_invoice(
     receipt_type: Literal["receipt", "order_receipt"] = (
         "order_receipt" if data.receipt_type == "order_receipt" else "receipt"
     )
-    receipt = _build_receipt_data(tpos, payment)
+    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
+    receipt = _build_receipt_data(tpos, payment, tpos_payment)
     payload = ReceiptPrint(
         tpos_id=tpos_id,
         payment_hash=payment_hash,
