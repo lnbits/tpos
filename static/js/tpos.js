@@ -73,7 +73,15 @@ window.app = Vue.createApp({
       },
       invoiceDialog: {
         show: false,
-        data: {},
+        data: {
+          payment_hash: null,
+          payment_request: null,
+          lightning_payment_request: null,
+          onchain_address: null,
+          unified_qr: null,
+          payment_options: [],
+          payment_method: null
+        },
         dismissMsg: null,
         paymentChecker: null,
         internalMemo: null
@@ -380,20 +388,60 @@ window.app = Vue.createApp({
       this.tipAmount = payload.tip_amount || this.tipAmount
       this.exchangeRate = payload.exchange_rate || this.exchangeRate
 
-      this.openInvoiceDialog(payload.payment_hash, payload.payment_request)
+      this.openInvoiceDialog(payload)
       this.subscribeToPaymentWS(payload.payment_hash)
     },
-    openInvoiceDialog(paymentHash, paymentRequest) {
+    normalizeInvoiceDialogData(paymentData, paymentRequest = null) {
+      if (typeof paymentData === 'string') {
+        return {
+          payment_hash: paymentData,
+          payment_request: paymentRequest,
+          lightning_payment_request:
+            paymentRequest &&
+            paymentRequest !== 'cash' &&
+            paymentRequest !== 'tap_to_pay'
+              ? paymentRequest
+              : null,
+          onchain_address: null,
+          unified_qr: null,
+          payment_options: ['lightning'],
+          payment_method: 'lightning'
+        }
+      }
+
+      const lightningPaymentRequest =
+        paymentData.payment_request &&
+        paymentData.payment_request !== 'cash' &&
+        paymentData.payment_request !== 'tap_to_pay'
+          ? paymentData.payment_request
+          : paymentData.bolt11
+            ? 'lightning:' + paymentData.bolt11.toUpperCase()
+            : null
+
+      return {
+        payment_hash: paymentData.payment_hash,
+        payment_request: paymentData.payment_request,
+        lightning_payment_request: lightningPaymentRequest,
+        onchain_address: paymentData.onchain_address || null,
+        unified_qr: paymentData.unified_qr || null,
+        payment_options: paymentData.payment_options || ['lightning'],
+        payment_method: paymentData.payment_method || 'lightning'
+      }
+    },
+    openInvoiceDialog(paymentData, paymentRequest = null) {
+      const dialogData = this.normalizeInvoiceDialogData(
+        paymentData,
+        paymentRequest
+      )
       if (
         this.invoiceDialog.show &&
-        this.invoiceDialog.data.payment_hash === paymentHash
+        this.invoiceDialog.data.payment_hash === dialogData.payment_hash
       ) {
         return
       }
-      this.invoiceDialog.data.payment_hash = paymentHash
-      this.invoiceDialog.data.payment_request = paymentRequest
+      this.invoiceDialog.data = dialogData
       this.invoiceDialog.show = true
-      if (paymentRequest !== 'cash') {
+      if (dialogData.lightning_payment_request) {
         this.readNfcTag()
         this.invoiceDialog.dismissMsg = Quasar.Notify.create({
           timeout: 0,
@@ -1018,27 +1066,7 @@ window.app = Vue.createApp({
           null,
           params
         )
-        let paymentRequest = 'lightning:' + data.bolt11.toUpperCase()
-        if (data.extra?.fiat_method === 'cash') {
-          paymentRequest = 'cash'
-        } else if (
-          data.extra?.fiat_payment_request &&
-          !data.extra.fiat_payment_request.startsWith('pi_')
-        ) {
-          paymentRequest = data.extra.fiat_payment_request
-        } else if (
-          data.extra?.fiat_payment_request &&
-          data.extra.fiat_payment_request.startsWith('pi_')
-        ) {
-          paymentRequest = 'tap_to_pay'
-        }
-        if (
-          !data.extra?.fiat_payment_request &&
-          data.extra?.fiat_method !== 'cash'
-        ) {
-          paymentRequest = 'lightning:' + data.bolt11.toUpperCase()
-        }
-        this.openInvoiceDialog(data.payment_hash, paymentRequest)
+        this.openInvoiceDialog(data)
         this.subscribeToPaymentWS(data.payment_hash)
       } catch (error) {
         console.error(error)
@@ -1221,7 +1249,7 @@ window.app = Vue.createApp({
         })
     },
     payInvoice(lnurl) {
-      const payment_request = this.invoiceDialog.data.payment_request
+      const payment_request = this.invoiceDialog.data.lightning_payment_request
         .toLowerCase()
         .replace('lightning:', '')
       return axios

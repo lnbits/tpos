@@ -459,6 +459,58 @@
             </q-checkbox>
           </div>
         </div>
+        <div class="row q-mt-sm">
+          <div class="col">
+            <q-checkbox
+              v-model="formDialog.data.onchain_enabled"
+              :disable="!onchainStatus.available"
+              label="Enable onchain payments"
+            >
+              <q-tooltip v-if="!onchainStatus.available">
+                <span
+                  v-text="onchainStatus.message || 'Watchonly extension must be enabled and working.'"
+                ></span>
+              </q-tooltip>
+            </q-checkbox>
+          </div>
+        </div>
+        <div v-if="formDialog.data.onchain_enabled" class="row q-col-gutter-md">
+          <div class="col-12">
+            <q-banner
+              v-if="!onchainStatus.available"
+              dense
+              rounded
+              class="bg-orange-2 text-dark"
+            >
+              <span
+                v-text="onchainStatus.message || 'Watchonly extension must be enabled and working.'"
+              ></span>
+            </q-banner>
+          </div>
+          <div class="col-12">
+            <q-select
+              filled
+              dense
+              emit-value
+              map-options
+              v-model="formDialog.data.onchain_wallet_id"
+              :options="onchainWalletOptions"
+              :disable="!onchainStatus.available"
+              label="Watchonly wallet *"
+              hint="Select the watchonly wallet used to derive fresh onchain addresses."
+            ></q-select>
+          </div>
+          <div class="col-12">
+            <q-toggle
+              v-model="formDialog.data.onchain_zero_conf"
+              label="Accept onchain payment at 0-conf"
+            >
+              <q-tooltip>
+                If disabled, TPoS waits for the first confirmation before completing the sale.
+              </q-tooltip>
+            </q-toggle>
+          </div>
+        </div>
         <div class="row">
           <div class="col">
             <q-checkbox
