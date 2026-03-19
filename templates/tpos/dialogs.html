@@ -25,9 +25,9 @@
         class="text-center q-mb-xl"
       >
         <h3>CASH ${ currency }</h3>
-        <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
+        <h3 class="q-my-md">${ activePaymentAmountWithTipFormatted }</h3>
         <h5 class="q-mt-none q-mb-sm">
-          ${ amountFormatted }
+          ${ activePaymentAmountFormatted }
           <span v-show="tip_options" style="font-size: 0.75rem"
             >(+ ${ tipAmountFormatted } tip)</span
           >
@@ -51,9 +51,9 @@
           :href="invoiceDialog.data.payment_request"
         ></lnbits-qrcode>
         <div class="text-center">
-          <h3 class="q-my-md">${ amountWithTipFormatted }</h3>
+          <h3 class="q-my-md">${ activePaymentAmountWithTipFormatted }</h3>
           <h5 class="q-mt-none q-mb-sm">
-            ${ amountFormatted }
+            ${ activePaymentAmountFormatted }
             <span v-show="tip_options" style="font-size: 0.75rem"
               >(+ ${ tipAmountFormatted } tip)</span
             >
