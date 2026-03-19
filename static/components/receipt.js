@@ -65,6 +65,11 @@ window.app.component('receipt', {
         return amount
       }
       return amount / this.exchangeRate
+    },
+    formatCurrencyAmount(amount) {
+      return roundTposCurrencyAmount(amount, this.currency).toFixed(
+        getTposCurrencyFractionDigits(this.currency)
+      )
     }
   },
   created() {
@@ -137,7 +142,7 @@ window.app.component('receipt', {
           <span v-if="currency != 'sats'" v-text="currencyText"></span>
         </div>
         <div class="col-6 text-right">
-        <span v-text="cartSubtotal.toFixed(2)"></span>
+        <span v-text="formatCurrencyAmount(cartSubtotal)"></span>
         </div>
       </div>
       <div class="row">
@@ -146,7 +151,7 @@ window.app.component('receipt', {
           <span v-if="currency != 'sats'" v-text="currencyText"></span>
         </div>
         <div class="col-6 text-right">
-        <span v-text="data.extra.details.taxValue.toFixed(2)"></span>
+        <span v-text="formatCurrencyAmount(data.extra.details.taxValue)"></span>
         </div>
       </div>
       <div class="row">
@@ -155,7 +160,7 @@ window.app.component('receipt', {
           <span v-if="currency != 'sats'" v-text="currencyText"></span>
         </div>
         <div class="col-6 text-right">
-        <span v-text="cartTotal.toFixed(2)"></span>
+        <span v-text="formatCurrencyAmount(cartTotal)"></span>
         </div>
       </div>
       <div class="row" v-if="showBitcoinDetails">

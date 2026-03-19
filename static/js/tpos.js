@@ -1,3 +1,39 @@
+const getTposCurrencyFractionDigits = currency => {
+  const code = (currency || '').toUpperCase()
+  if (code === 'SAT' || code === 'SATS') {
+    return 0
+  }
+  try {
+    return new Intl.NumberFormat(window.i18n.global.locale, {
+      style: 'currency',
+      currency: code
+    }).resolvedOptions().maximumFractionDigits
+  } catch (e) {
+    return 2
+  }
+}
+
+const getTposCurrencyScale = currency =>
+  10 ** getTposCurrencyFractionDigits(currency)
+
+const roundTposCurrencyAmount = (amount, currency) => {
+  const value = Number(amount) || 0
+  if ((currency || '').toLowerCase() === 'sats') {
+    return Math.ceil(value)
+  }
+  const scale = getTposCurrencyScale(currency)
+  return Math.round(value * scale) / scale
+}
+
+const amountToTposStack = (amount, currency) => {
+  const value = Math.max(0, Number(amount) || 0)
+  if ((currency || '').toLowerCase() === 'sats') {
+    return Array.from(String(Math.ceil(value)), Number)
+  }
+  const scale = getTposCurrencyScale(currency)
+  return Array.from(String(Math.round(value * scale)), Number)
+}
+
 window.app = Vue.createApp({
   el: '#vue',
   mixins: [window.windowMixin],
@@ -121,6 +157,7 @@ window.app = Vue.createApp({
       amountFormatted: 0,
       totalFormatted: 0,
       amountWithTipFormatted: 0,
+      paymentAmount: null,
       sat: 0,
       fsat: 0,
       totalfsat: 0,
@@ -167,7 +204,8 @@ window.app = Vue.createApp({
           this.amount = Number(this.stack.join(''))
         } else {
           this.amount =
-            this.stack.reduce((acc, dig) => acc * 10 + dig, 0) * 0.01
+            this.stack.reduce((acc, dig) => acc * 10 + dig, 0) /
+            this.currencyScale
         }
       },
       immediate: true,
@@ -197,6 +235,18 @@ window.app = Vue.createApp({
     }
   },
   computed: {
+    activePaymentAmount() {
+      return this.paymentAmount !== null ? this.paymentAmount : this.amount
+    },
+    activePaymentAmountFormatted() {
+      return this.formatAmount(this.activePaymentAmount, this.currency)
+    },
+    activePaymentAmountWithTipFormatted() {
+      return this.formatAmount(
+        this.activePaymentAmount + this.tipAmount,
+        this.currency
+      )
+    },
     tipAmountSat() {
       if (!this.exchangeRate) return 0
       return Math.ceil(this.tipAmount * this.exchangeRate)
@@ -206,21 +256,24 @@ window.app = Vue.createApp({
     },
     roundToSugestion() {
       switch (true) {
-        case this.amount > 50:
+        case this.activePaymentAmount > 50:
           toNext = 10
           break
-        case this.amount > 6:
+        case this.activePaymentAmount > 6:
           toNext = 5
           break
-        case this.amount > 2.5:
+        case this.activePaymentAmount > 2.5:
           toNext = 1
           break
         default:
-          toNext = 0.5
+          toNext = this.currencyFractionDigits === 0 ? 1 : 0.5
           break
       }
 
-      return Math.ceil(this.amount / toNext) * toNext
+      return roundTposCurrencyAmount(
+        Math.ceil(this.activePaymentAmount / toNext) * toNext,
+        this.currency
+      )
     },
     fullScreenIcon() {
       return this.isFullScreen ? 'fullscreen_exit' : 'fullscreen'
@@ -230,6 +283,12 @@ window.app = Vue.createApp({
     },
     currencySymbol() {
       return LNbits.utils.getCurrencySymbol(this.currency)
+    },
+    currencyFractionDigits() {
+      return getTposCurrencyFractionDigits(this.currency)
+    },
+    currencyScale() {
+      return getTposCurrencyScale(this.currency)
     },
     filteredItems() {
       // filter out disabled items
@@ -264,7 +323,7 @@ window.app = Vue.createApp({
     taxSubtotal() {
       if (this.taxInclusive) return this.totalFormatted
       return this.formatAmount(
-        Math.floor(this.total - this.cartTax),
+        roundTposCurrencyAmount(this.total - this.cartTax, this.currency),
         this.currency
       )
     },
@@ -366,11 +425,17 @@ window.app = Vue.createApp({
     },
     addAmount() {
       this.addedAmount += this.amount
-      this.total = +(this.total + this.amount).toFixed(2)
+      this.total = roundTposCurrencyAmount(
+        this.total + this.amount,
+        this.currency
+      )
       this.stack = []
     },
     cancelAddAmount() {
-      this.total = +(this.total - this.addedAmount).toFixed(2)
+      this.total = roundTposCurrencyAmount(
+        this.total - this.addedAmount,
+        this.currency
+      )
       this.addedAmount = 0
       this.stack = []
     },
@@ -404,7 +469,10 @@ window.app = Vue.createApp({
           note: item.note || null
         })
       }
-      this.total = this.total + this.calculateItemPrice(priceSource, quantity)
+      this.total = roundTposCurrencyAmount(
+        this.total + this.calculateItemPrice(priceSource, quantity),
+        this.currency
+      )
       this.cartTaxTotal()
     },
     removeFromCart(item, quantity = 1) {
@@ -419,7 +487,10 @@ window.app = Vue.createApp({
         })
       }
       const priceSource = existing || item
-      this.total = this.total - this.calculateItemPrice(priceSource, quantity)
+      this.total = roundTposCurrencyAmount(
+        this.total - this.calculateItemPrice(priceSource, quantity),
+        this.currency
+      )
       this.cartTaxTotal()
     },
     promptItemPrice(item) {
@@ -434,7 +505,7 @@ window.app = Vue.createApp({
             model:
               this.currency === 'sats'
                 ? String(cartItem.price)
-                : cartItem.price.toFixed(2),
+                : cartItem.price.toFixed(this.currencyFractionDigits),
             type: 'number'
           },
           cancel: true
@@ -473,7 +544,9 @@ window.app = Vue.createApp({
     },
     updateCartItemPrice(cartItem, newPrice) {
       const roundedPrice =
-        this.currency === 'sats' ? Math.ceil(newPrice) : +newPrice.toFixed(2)
+        this.currency === 'sats'
+          ? Math.ceil(newPrice)
+          : roundTposCurrencyAmount(newPrice, this.currency)
       const existing = this.cart.get(cartItem.id)
       if (!existing) return
       const oldItemTotal = this.calculateItemPrice(existing, existing.quantity)
@@ -487,7 +560,10 @@ window.app = Vue.createApp({
         updatedItem,
         updatedItem.quantity
       )
-      this.total = +(this.total - oldItemTotal + newItemTotal).toFixed(2)
+      this.total = roundTposCurrencyAmount(
+        this.total - oldItemTotal + newItemTotal,
+        this.currency
+      )
       this.cartTaxTotal()
     },
     updateCartItemNote(cartItem, note) {
@@ -515,7 +591,7 @@ window.app = Vue.createApp({
           total += item.price * item.quantity * (tax * 0.01)
         }
       }
-      this.cartTax = total
+      this.cartTax = roundTposCurrencyAmount(total, this.currency)
     },
     itemCartQty(item_id) {
       if (this.cart.has(item_id)) {
@@ -528,6 +604,7 @@ window.app = Vue.createApp({
       this.cartTax = 0.0
       this.total = 0.0
       this.addedAmount = 0.0
+      this.resetPaymentAttempt()
       if (this.$q.screen.lt.md) {
         this.cartDrawer = false
       }
@@ -768,7 +845,10 @@ window.app = Vue.createApp({
       this.$nextTick(() => this.$refs.inputRounding.focus())
     },
     calculatePercent() {
-      const change = ((this.tipRounding - this.amount) / this.amount) * 100
+      const change =
+        ((this.tipRounding - this.activePaymentAmount) /
+          this.activePaymentAmount) *
+        100
       if (change < 0) {
         Quasar.Notify.create({
           type: 'warning',
@@ -781,8 +861,8 @@ window.app = Vue.createApp({
     },
     closeInvoiceDialog() {
       this.stack = []
-      this.tipAmount = 0.0
       this.cashValidating = false
+      this.resetPaymentAttempt()
       const dialog = this.invoiceDialog
       setTimeout(() => {
         clearInterval(dialog.paymentChecker)
@@ -796,24 +876,26 @@ window.app = Vue.createApp({
         return this.showInvoice()
       }
 
-      this.tipAmount = (selectedTipOption / 100) * this.amount
+      this.tipAmount = roundTposCurrencyAmount(
+        (selectedTipOption / 100) * this.activePaymentAmount,
+        this.currency
+      )
       this.showInvoice()
     },
+    resetPaymentAttempt() {
+      this.paymentAmount = null
+      this.tipAmount = 0.0
+      this.rounding = false
+      this.tipRounding = null
+    },
     submitForm() {
-      if (this.total != 0.0) {
-        if (this.amount > 0.0) {
-          this.total += this.amount
-        }
-        if (this.currency == 'sats') {
-          this.stack = Array.from(String(Math.ceil(this.total), Number))
-        } else {
-          this.stack = Array.from(
-            String(this.total.toFixed(2).replace('.', '')),
-            Number
-          )
-        }
-        this.sat = this.totalSat
-      }
+      const paymentAmount =
+        this.total > 0.0
+          ? roundTposCurrencyAmount(this.total + this.amount, this.currency)
+          : this.amount
+
+      this.paymentAmount = paymentAmount
+      this.sat = Math.ceil(paymentAmount * this.exchangeRate)
 
       if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
         Quasar.Notify.create({
@@ -864,16 +946,18 @@ window.app = Vue.createApp({
       }
     },
     buildInvoiceParams() {
+      const paymentAmount =
+        this.paymentAmount !== null ? this.paymentAmount : this.amount
       const params = {
         amount: this.sat,
-        memo: this.total > 0 ? this.totalFormatted : this.amountFormatted,
+        memo: this.formatAmount(paymentAmount, this.currency),
         exchange_rate: this.exchangeRate,
         internal_memo: this.invoiceDialog.internalMemo || null,
         pay_in_fiat: this.payInFiat,
         fiat_method: this.fiatMethod
       }
       if (this.currency != g.settings.denomination) {
-        params.amount_fiat = this.total > 0 ? this.total : this.amount
+        params.amount_fiat = paymentAmount
         params.tip_amount_fiat = this.tipAmount > 0 ? this.tipAmount : 0.0
       }
       if (this.tipAmountSat > 0) {
@@ -1270,15 +1354,19 @@ window.app = Vue.createApp({
     },
     formatAmount(amount, currency) {
       if (g.settings.denomination != 'sats') {
+        const scale = getTposCurrencyScale(g.settings.denomination)
         return LNbits.utils.formatCurrency(
-          amount / 100,
+          roundTposCurrencyAmount(amount / scale, g.settings.denomination),
           g.settings.denomination
         )
       }
       if (currency == 'sats') {
         return LNbits.utils.formatSat(amount) + ' sats'
       } else {
-        return LNbits.utils.formatCurrency(Number(amount).toFixed(2), currency)
+        return LNbits.utils.formatCurrency(
+          roundTposCurrencyAmount(amount, currency),
+          currency
+        )
       }
     },
     formatDate(timestamp) {
