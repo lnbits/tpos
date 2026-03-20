@@ -1088,37 +1088,67 @@ window.app = Vue.createApp({
         this.cashValidating = false
       }
     },
+    finalizeSuccessfulPayment(paymentHash) {
+      Quasar.Notify.create({
+        type: 'positive',
+        message: 'Invoice Paid!'
+      })
+      this.invoiceDialog.show = false
+      this.invoiceDialog.internalMemo = null
+      this.clearCart()
+      this.showComplete()
+      if (this.enablePrint) {
+        this.promptPrintType(paymentHash)
+      }
+    },
+    startPaymentChecker(paymentHash) {
+      if (this.invoiceDialog.paymentChecker) {
+        clearInterval(this.invoiceDialog.paymentChecker)
+      }
+      this.invoiceDialog.paymentChecker = setInterval(async () => {
+        try {
+          const {data} = await LNbits.api.request(
+            'GET',
+            `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}`
+          )
+          if (data.paid) {
+            clearInterval(this.invoiceDialog.paymentChecker)
+            this.invoiceDialog.paymentChecker = null
+            this.finalizeSuccessfulPayment(paymentHash)
+          }
+        } catch (error) {
+          console.warn('TPoS payment status check failed:', error)
+        }
+      }, 3000)
+    },
     subscribeToPaymentWS(paymentHash) {
       if (this.paymentWsByHash[paymentHash]) return
+      this.startPaymentChecker(paymentHash)
       try {
-        const url = new URL(window.location)
-        url.protocol = url.protocol === 'https:' ? 'wss' : 'ws'
-        url.pathname = `/api/v1/ws/${paymentHash}`
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const url = new URL(`/api/v1/ws/${paymentHash}`, window.location.origin)
+        url.protocol = wsProtocol
         const ws = new WebSocket(url)
         this.paymentWsByHash[paymentHash] = ws
         ws.onmessage = async ({data}) => {
           const payment = JSON.parse(data)
           if (payment.pending === false) {
-            Quasar.Notify.create({
-              type: 'positive',
-              message: 'Invoice Paid!'
-            })
-            this.invoiceDialog.show = false
-            this.invoiceDialog.internalMemo = null
-            this.clearCart()
-            this.showComplete()
-            if (this.enablePrint) {
-              this.promptPrintType(paymentHash)
+            if (this.invoiceDialog.paymentChecker) {
+              clearInterval(this.invoiceDialog.paymentChecker)
+              this.invoiceDialog.paymentChecker = null
             }
+            this.finalizeSuccessfulPayment(paymentHash)
             ws.close()
           }
+        }
+        ws.onerror = err => {
+          console.warn('TPoS payment websocket error:', err)
         }
         ws.onclose = () => {
           delete this.paymentWsByHash[paymentHash]
         }
       } catch (err) {
-        console.warn(err)
-        LNbits.utils.notifyApiError(err)
+        console.warn('TPoS payment websocket setup failed:', err)
       }
     },
     readNfcTag() {

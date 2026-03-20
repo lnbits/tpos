@@ -174,8 +174,19 @@ async def fetch_onchain_address(api_key: str, wallet_id: str) -> dict[str, Any]:
         return resp.json()
 
 
-async def fetch_onchain_balance(mempool_endpoint: str, onchain_address: str) -> dict[str, Any]:
+def normalize_mempool_endpoint(mempool_endpoint: str | None, onchain_address: str) -> str:
     endpoint = (mempool_endpoint or "https://mempool.space").rstrip("/")
+    if "/testnet" in endpoint or "/signet" in endpoint:
+        return endpoint
+    if onchain_address.lower().startswith("tb1"):
+        return f"{endpoint}/testnet"
+    return endpoint
+
+
+async def fetch_onchain_balance(
+    mempool_endpoint: str, onchain_address: str
+) -> dict[str, Any]:
+    endpoint = normalize_mempool_endpoint(mempool_endpoint, onchain_address)
     async with httpx.AsyncClient() as client:
         resp = await client.get(f"{endpoint}/api/address/{onchain_address}/txs")
         resp.raise_for_status()
