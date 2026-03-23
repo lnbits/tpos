@@ -174,7 +174,9 @@ async def fetch_onchain_address(api_key: str, wallet_id: str) -> dict[str, Any]:
         return resp.json()
 
 
-def normalize_mempool_endpoint(mempool_endpoint: str | None, onchain_address: str) -> str:
+def normalize_mempool_endpoint(
+    mempool_endpoint: str | None, onchain_address: str
+) -> str:
     endpoint = (mempool_endpoint or "https://mempool.space").rstrip("/")
     if "/testnet" in endpoint or "/signet" in endpoint:
         return endpoint
