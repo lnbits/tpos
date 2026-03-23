@@ -28,6 +28,7 @@ class CreateTposInvoice(BaseModel):
     internal_memo: str | None = Query(None, max_length=512)
     pay_in_fiat: bool = Query(False)
     fiat_method: str | None = Query(None)
+    payment_method: str | None = Query(None)
     amount_fiat: float | None = Query(None, ge=0.0)
     tip_amount_fiat: float | None = Query(None, ge=0.0)
 
@@ -162,7 +163,7 @@ class TposInvoiceResponse(BaseModel):
     tpos_payment_id: str
     payment_options: list[str] = Field(default_factory=list)
     onchain_address: str | None = None
-    unified_qr: str | None = None
+    onchain_amount_sat: int | None = None
     payment_method: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
 

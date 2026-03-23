@@ -44,6 +44,7 @@ window.app = Vue.createApp({
       currency: null,
       fiatProvider: null,
       allowCashSettlement: false,
+      onchainEnabled: false,
       payInFiat: false,
       fiatMethod: 'checkout',
       atmPremium: tpos.withdraw_premium / 100,
@@ -78,7 +79,7 @@ window.app = Vue.createApp({
           payment_request: null,
           lightning_payment_request: null,
           onchain_address: null,
-          unified_qr: null,
+          onchain_amount_sat: null,
           payment_options: [],
           payment_method: null
         },
@@ -403,27 +404,29 @@ window.app = Vue.createApp({
               ? paymentRequest
               : null,
           onchain_address: null,
-          unified_qr: null,
+          onchain_amount_sat: null,
           payment_options: ['lightning'],
           payment_method: 'lightning'
         }
       }
 
       const lightningPaymentRequest =
-        paymentData.payment_request &&
-        paymentData.payment_request !== 'cash' &&
-        paymentData.payment_request !== 'tap_to_pay'
-          ? paymentData.payment_request
-          : paymentData.bolt11
-            ? 'lightning:' + paymentData.bolt11.toUpperCase()
-            : null
+        paymentData.payment_method === 'onchain'
+          ? null
+          : paymentData.payment_request &&
+              paymentData.payment_request !== 'cash' &&
+              paymentData.payment_request !== 'tap_to_pay'
+            ? paymentData.payment_request
+            : paymentData.bolt11
+              ? 'lightning:' + paymentData.bolt11.toUpperCase()
+              : null
 
       return {
         payment_hash: paymentData.payment_hash,
         payment_request: paymentData.payment_request,
         lightning_payment_request: lightningPaymentRequest,
         onchain_address: paymentData.onchain_address || null,
-        unified_qr: paymentData.unified_qr || null,
+        onchain_amount_sat: paymentData.onchain_amount_sat || null,
         payment_options: paymentData.payment_options || ['lightning'],
         payment_method: paymentData.payment_method || 'lightning'
       }
@@ -972,16 +975,22 @@ window.app = Vue.createApp({
     selectPaymentMethod(method) {
       this.currency_choice = false
       if (this._currencyResolver) {
-        if (method == 'fiat_tap') {
-          this.fiatMethod = 'terminal'
-          method = 'fiat'
-        } else if (method == 'fiat') {
-          this.fiatMethod = 'checkout'
-        } else if (method == 'cash') {
-          this.fiatMethod = 'cash'
-          method = 'fiat'
-        } else if (method == 'btc') {
-          this.fiatMethod = 'checkout'
+        switch (method) {
+          case 'fiat_tap':
+            this.fiatMethod = 'terminal'
+            method = 'fiat'
+            break
+          case 'fiat':
+            this.fiatMethod = 'checkout'
+            break
+          case 'cash':
+            this.fiatMethod = 'cash'
+            method = 'fiat'
+            break
+          case 'btc':
+          case 'btc_onchain':
+            this.fiatMethod = 'checkout'
+            break
         }
         this._currencyResolver(method)
         this._currencyResolver = null
@@ -996,7 +1005,8 @@ window.app = Vue.createApp({
         exchange_rate: this.exchangeRate,
         internal_memo: this.invoiceDialog.internalMemo || null,
         pay_in_fiat: this.payInFiat,
-        fiat_method: this.fiatMethod
+        fiat_method: this.fiatMethod,
+        payment_method: this.invoiceDialog.data.payment_method || 'btc'
       }
       if (this.currency != g.settings.denomination) {
         params.amount_fiat = paymentAmount
@@ -1053,9 +1063,16 @@ window.app = Vue.createApp({
         return
       }
 
-      if (this.fiatProvider || this.allowCashSettlement) {
+      if (
+        this.fiatProvider ||
+        this.allowCashSettlement ||
+        this.onchainEnabled
+      ) {
         const method = await this.showPaymentMethod()
         this.payInFiat = method === 'fiat'
+        this.invoiceDialog.data.payment_method = method
+      } else {
+        this.invoiceDialog.data.payment_method = 'btc'
       }
 
       const params = this.buildInvoiceParams()
@@ -1125,7 +1142,8 @@ window.app = Vue.createApp({
       if (this.paymentWsByHash[paymentHash]) return
       this.startPaymentChecker(paymentHash)
       try {
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const wsProtocol =
+          window.location.protocol === 'https:' ? 'wss:' : 'ws:'
         const url = new URL(`/api/v1/ws/${paymentHash}`, window.location.origin)
         url.protocol = wsProtocol
         const ws = new WebSocket(url)
@@ -1638,6 +1656,7 @@ window.app = Vue.createApp({
       new URL(window.location.href).searchParams.get('wrapper') === 'true'
     this.fiatProvider = tpos.fiat_provider
     this.allowCashSettlement = Boolean(tpos.allow_cash_settlement)
+    this.onchainEnabled = Boolean(tpos.onchain_enabled)
 
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
 

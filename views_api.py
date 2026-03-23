@@ -204,15 +204,9 @@ async def _validate_watchonly_settings(
     }
 
 
-def _build_bip21(onchain_address: str, amount_sat: int, bolt11: str | None = None) -> str:
-    amount_btc = amount_sat / 100_000_000
-    bip21 = f"bitcoin:{onchain_address.upper()}?amount={amount_btc:.8f}"
-    if bolt11:
-        bip21 += f"&lightning={bolt11.upper()}"
-    return bip21
-
-
 def _payment_method_from_payment(payment: Payment) -> str:
+    if payment.extra.get("payment_method"):
+        return str(payment.extra["payment_method"])
     if payment.extra.get("fiat_method") == "cash":
         return "cash"
     if payment.extra.get("fiat_payment_request", "").startswith("pi_"):
@@ -233,16 +227,12 @@ def _serialize_tpos_invoice_response(
         payment_request = payment.extra["fiat_payment_request"]
     elif payment_method == "fiat":
         payment_request = "tap_to_pay"
+    elif payment_method == "onchain" and tpos_payment.onchain_address:
+        payment_request = tpos_payment.onchain_address
 
     options = [payment_method]
-    unified_qr = None
     if tpos_payment.onchain_address:
-        options = ["uqr", "lightning", "onchain"]
-        unified_qr = _build_bip21(
-            tpos_payment.onchain_address,
-            tpos_payment.amount,
-            payment.bolt11 if payment_method == "lightning" else payment.bolt11,
-        )
+        options = ["btc", "btc_onchain"]
 
     return TposInvoiceResponse(
         payment_hash=payment.payment_hash,
@@ -251,7 +241,9 @@ def _serialize_tpos_invoice_response(
         tpos_payment_id=tpos_payment.id,
         payment_options=options,
         onchain_address=tpos_payment.onchain_address,
-        unified_qr=unified_qr,
+        onchain_amount_sat=(
+            tpos_payment.amount if tpos_payment.onchain_address else None
+        ),
         payment_method=payment_method,
         extra=payment.extra or {},
     )
@@ -338,7 +330,9 @@ async def api_tpos_update(
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
     user = await get_user(wallet.wallet.user)
     update_payload = data.dict(exclude_unset=True)
-    desired_onchain_enabled = update_payload.get("onchain_enabled", tpos.onchain_enabled)
+    desired_onchain_enabled = update_payload.get(
+        "onchain_enabled", tpos.onchain_enabled
+    )
     desired_onchain_wallet_id = update_payload.get(
         "onchain_wallet_id", tpos.onchain_wallet_id
     )
@@ -533,10 +527,16 @@ async def api_tpos_create_invoice(
         }
 
     cash_method = data.pay_in_fiat and data.fiat_method == "cash"
+    onchain_method = data.payment_method == "btc_onchain"
     if cash_method and not tpos.allow_cash_settlement:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN,
             detail="Cash settlement is not enabled for this TPoS.",
+        )
+    if onchain_method and not tpos.onchain_enabled:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail="Onchain payments are not enabled for this TPoS.",
         )
     currency = tpos.currency if data.pay_in_fiat else "sat"
     amount = data.amount + (data.tip_amount or 0.0)
@@ -557,18 +557,23 @@ async def api_tpos_create_invoice(
             "paid_in_fiat": data.pay_in_fiat,
             "base_url": str(request.base_url),
         }
-        if cash_method:
+        if cash_method or onchain_method:
             wallet = await get_wallet(tpos.wallet)
             if wallet:
                 account = await get_account(wallet.user)
                 if account:
                     existing = {label.name for label in account.extra.labels or []}
-                    if "cash" not in existing:
+                    label_name = "cash" if cash_method else "onchain"
+                    label_description = (
+                        "Cash payment" if cash_method else "Onchain payment"
+                    )
+                    label_color = "#FFC107" if cash_method else "#ED8403"
+                    if label_name not in existing:
                         account.extra.labels.append(
                             UserLabel(
-                                name="cash",
-                                description="Cash payment",
-                                color="#FFC107",
+                                name=label_name,
+                                description=label_description,
+                                color=label_color,
                             )
                         )
                         await update_account(account)
@@ -578,6 +583,8 @@ async def api_tpos_create_invoice(
             extra["fiat_method"] = data.fiat_method if data.fiat_method else "checkout"
             if data.fiat_method == "terminal" and tpos.stripe_reader_id:
                 extra["terminal"] = {"reader_id": tpos.stripe_reader_id}
+        if onchain_method:
+            extra["payment_method"] = "onchain"
         invoice_data = CreateInvoice(
             unit=currency,
             out=False,
@@ -587,18 +594,22 @@ async def api_tpos_create_invoice(
             fiat_provider=(
                 tpos.fiat_provider if data.pay_in_fiat and not cash_method else None
             ),
-            internal=bool(cash_method),
-            labels=["cash"] if cash_method else [],
+            internal=bool(cash_method or onchain_method),
+            labels=["cash"] if cash_method else (["onchain"] if onchain_method else []),
         )
         payment = await create_payment_request(tpos.wallet, invoice_data)
         if cash_method:
             new_checking_id = f"internal_cash_{payment.payment_hash}"
             await update_payment_checking_id(payment.checking_id, new_checking_id)
             payment.checking_id = new_checking_id
+        elif onchain_method:
+            new_checking_id = f"internal_onchain_{payment.payment_hash}"
+            await update_payment_checking_id(payment.checking_id, new_checking_id)
+            payment.checking_id = new_checking_id
 
         onchain_address = None
         mempool_endpoint = None
-        if tpos.onchain_enabled and not data.pay_in_fiat:
+        if onchain_method:
             wallet_record = await get_wallet(tpos.wallet)
             if not wallet_record:
                 raise HTTPException(
@@ -644,7 +655,7 @@ async def api_tpos_create_invoice(
                 "tpos_payment_id": response_payload.tpos_payment_id,
                 "payment_options": response_payload.payment_options,
                 "onchain_address": response_payload.onchain_address,
-                "unified_qr": response_payload.unified_qr,
+                "onchain_amount_sat": response_payload.onchain_amount_sat,
                 "payment_method": response_payload.payment_method,
             }
             await websocket_updater(tpos_id, json.dumps(payload))

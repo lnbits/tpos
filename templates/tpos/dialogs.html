@@ -375,7 +375,7 @@
             size="xl"
             color="primary"
             rounded
-            aria-label="Bitcoin"
+            aria-label="Lightning Network"
             @click="selectPaymentMethod('btc')"
           >
             <div class="row items-center no-wrap q-gutter-x-sm">
@@ -383,6 +383,26 @@
                 class="text-h4 text-weight-bold"
                 v-text="bitcoinSymbol"
               ></span>
+              <span class="text-subtitle1 text-weight-medium">Lightning</span>
+            </div>
+          </q-btn>
+        </div>
+        <div class="col-6" v-if="onchainEnabled">
+          <q-btn
+            class="full-width q-px-lg q-py-sm"
+            size="xl"
+            color="primary"
+            outline
+            rounded
+            aria-label="Bitcoin Onchain"
+            @click="selectPaymentMethod('btc_onchain')"
+          >
+            <div class="row items-center no-wrap q-gutter-x-sm">
+              <span
+                class="text-h4 text-weight-bold"
+                v-text="bitcoinSymbol"
+              ></span>
+              <span class="text-subtitle1 text-weight-medium">Onchain</span>
             </div>
           </q-btn>
         </div>

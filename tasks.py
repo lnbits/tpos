@@ -10,7 +10,7 @@ from lnbits.core.services import (
     pay_invoice,
     websocket_updater,
 )
-from lnbits.tasks import register_invoice_listener
+from lnbits.tasks import internal_invoice_queue_put, register_invoice_listener
 from loguru import logger
 
 from .crud import (
@@ -108,13 +108,13 @@ async def settle_onchain_tpos_payment(tpos_payment) -> None:
     if not payment or not payment.extra or payment.extra.get("tag") != "tpos":
         return
 
-    if payment.extra.get("tpos_processed"):
+    if payment.success:
         return
 
     payment.extra["payment_method"] = "onchain"
     payment.extra["settled_by_onchain"] = True
     await update_payment(payment)
-    await process_paid_tpos_payment(payment, payment_method="onchain")
+    await internal_invoice_queue_put(payment.checking_id)
 
 
 async def process_paid_tpos_payment(
@@ -180,9 +180,6 @@ async def process_paid_tpos_payment(
 
     if not tip_amount:
         return
-    if payment_method == "onchain":
-        logger.warning("tpos: skipping tip split for onchain payment.")
-        return
 
     wallet_id = tpos.tip_wallet
     if not wallet_id:
@@ -205,6 +202,8 @@ async def process_paid_tpos_payment(
 
 
 def _payment_method(payment: Payment) -> str:
+    if payment.extra.get("payment_method"):
+        return str(payment.extra["payment_method"])
     if payment.extra.get("fiat_method") == "cash":
         return "cash"
     if payment.extra.get("fiat_payment_request", "").startswith("pi_"):
