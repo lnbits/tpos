@@ -14,9 +14,34 @@ window.app.component('tpos-payment-dialog', {
     isOnchain() {
       return this.dialogData?.payment_method === 'onchain'
     },
+    onchainUri() {
+      const address = this.dialogData?.onchain_address
+      if (!address) return null
+
+      const params = new URLSearchParams()
+      const satAmount = Number(this.dialogData?.onchain_amount_sat || 0)
+
+      if (satAmount > 0) {
+        const btcAmount = (satAmount / 100000000)
+          .toFixed(8)
+          .replace(/\.?0+$/, '')
+        params.set('amount', btcAmount)
+      }
+
+      if (tpos?.name) {
+        params.set('label', `LNbits TPoS ${tpos.name}`)
+      } else {
+        params.set('label', 'LNbits TPoS')
+      }
+
+      params.set('message', 'Thank you for your order')
+
+      const query = params.toString()
+      return `bitcoin:${address}${query ? `?${query}` : ''}`
+    },
     qrValue() {
       if (this.isOnchain) {
-        return this.dialogData?.onchain_address || null
+        return this.onchainUri
       }
       return this.dialogData?.lightning_payment_request || null
     },
@@ -30,9 +55,7 @@ window.app.component('tpos-payment-dialog', {
       return this.tipOptions ? `(+ ${this.tipAmountFormatted} tip)` : ''
     },
     onchainHref() {
-      return this.dialogData?.onchain_address
-        ? `bitcoin:${this.dialogData.onchain_address}`
-        : ''
+      return this.onchainUri || ''
     }
   },
   methods: {
