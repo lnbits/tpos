@@ -145,8 +145,16 @@ async def _get_watchonly_status(wallet) -> dict[str, Any]:
 
     try:
         config = await fetch_watchonly_config(wallet.inkey)
-        network = config.get("network")
+        network_value = config.get("network")
+        if not isinstance(network_value, str) or not network_value:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Watchonly extension returned an invalid network configuration.",
+            )
+        network = network_value
         wallets = await fetch_watchonly_wallets(wallet.inkey, network)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
