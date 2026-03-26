@@ -828,47 +828,51 @@
             ></q-toggle>
           </div>
         </div>
-        <div class="row q-mt-sm" v-if="urlDialog.data.useWrapper">
-          <div class="col">
-            <q-btn
-              outline
-              color="primary"
-              type="a"
-              href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper-Stripev5"
-              target="_blank"
-              rel="noopener noreferrer"
-              label="GET THE TPOS-WRAPPER"
-            ></q-btn>
+        <div
+          v-if="urlDialog.data.useWrapper && urlDialog.data.stripe_card_payments"
+        >
+          <div class="row q-mt-sm">
+            <div class="col">
+              <q-btn
+                outline
+                color="primary"
+                type="a"
+                href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper-Stripev5"
+                target="_blank"
+                rel="noopener noreferrer"
+                label="GET THE TPOS-WRAPPER"
+              ></q-btn>
+            </div>
           </div>
-        </div>
-        <div class="row q-mt-lg">
-          <div class="col" v-if="urlDialog.data.useWrapper">
-            <q-input
-              v-model="urlDialog.data.posLocation"
-              label="PoS Stripe Location"
-            >
-            </q-input>
+          <div class="row q-mt-lg">
+            <div class="col">
+              <q-input
+                v-model="urlDialog.data.posLocation"
+                label="PoS Stripe Location"
+              >
+              </q-input>
+            </div>
+            <div class="col q-pl-md">
+              <small>
+                If accepting Stripe payments, visit
+                https://dashboard.stripe.com/terminal and grab a new location ID
+              </small>
+            </div>
           </div>
-          <div class="col q-pl-md" v-if="urlDialog.data.useWrapper">
-            <small>
-              If accepting Stripe payments, visit
-              https://dashboard.stripe.com/terminal and grab a new location ID
-            </small>
-          </div>
-        </div>
-        <div class="row q-mt-lg" v-if="urlDialog.data.useWrapper">
-          <div class="col">
-            <q-btn
-              outline
-              color="primary"
-              :disable="!urlDialog.data.posLocation"
-              :loading="urlDialog.data.loadingWrapperToken"
-              @click="generateWrapperToken(urlDialog.data)"
-              label="Generate ACL token"
-            ></q-btn>
-          </div>
-          <div class="col">
-            <small>Press if accepting Stripe payments.</small>
+          <div class="row q-mt-lg">
+            <div class="col">
+              <q-btn
+                outline
+                color="primary"
+                :disable="!urlDialog.data.posLocation"
+                :loading="urlDialog.data.loadingWrapperToken"
+                @click="generateWrapperToken(urlDialog.data)"
+                label="Generate ACL token"
+              ></q-btn>
+            </div>
+            <div class="col">
+              <small>Press if accepting Stripe payments.</small>
+            </div>
           </div>
         </div>
       </div>
