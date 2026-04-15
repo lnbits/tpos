@@ -77,6 +77,8 @@ class CreateTposData(BaseModel):
     onchain_enabled: bool = Field(False)
     onchain_wallet_id: str | None = None
     onchain_zero_conf: bool = Field(True)
+    tabs_enabled: bool = Field(False)
+    tabs_allow_create: bool = Field(False)
 
     @validator("tax_default", pre=True, always=True)
     def default_tax_when_none(cls, v):
@@ -117,6 +119,8 @@ class TposClean(BaseModel):
     onchain_enabled: bool = False
     onchain_wallet_id: str | None = None
     onchain_zero_conf: bool = True
+    tabs_enabled: bool = False
+    tabs_allow_create: bool = False
 
     @property
     def withdraw_maximum(self) -> int:
@@ -168,6 +172,40 @@ class TposInvoiceResponse(BaseModel):
     onchain_amount_sat: int | None = None
     payment_method: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
+
+
+class TposTab(BaseModel):
+    id: str
+    wallet: str
+    name: str
+    customer_name: str | None = None
+    reference: str | None = None
+    currency: str = "sats"
+    status: str = "open"
+    balance: float = 0
+    is_archived: bool = False
+
+
+class TposTabList(BaseModel):
+    data: list[TposTab] = Field(default_factory=list)
+
+
+class CreateTposTabData(BaseModel):
+    name: str
+    customer_name: str | None = None
+    reference: str | None = None
+    currency: str | None = None
+    limit_type: str = "none"
+    limit_amount: float | None = None
+
+
+class CreateTposTabCharge(BaseModel):
+    amount: float
+    description: str | None = None
+    items: list[dict[str, Any]] = Field(default_factory=list)
+    notes: dict[str, Any] | None = None
+    internal_memo: str | None = Field(None, max_length=512)
+    idempotency_key: str | None = None
 
 
 class LnurlCharge(BaseModel):

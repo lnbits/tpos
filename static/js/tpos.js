@@ -46,6 +46,8 @@ window.app = Vue.createApp({
       allowPriceAdjustment: true,
       allowCashSettlement: false,
       onchainEnabled: false,
+      tabsEnabled: false,
+      tabsAllowCreate: false,
       payInFiat: false,
       fiatMethod: 'checkout',
       atmPremium: tpos.withdraw_premium / 100,
@@ -87,6 +89,21 @@ window.app = Vue.createApp({
         dismissMsg: null,
         paymentChecker: null,
         internalMemo: null
+      },
+      tabsDialog: {
+        show: false,
+        loading: false,
+        creating: false,
+        posting: false,
+        tabs: [],
+        selectedTabId: null,
+        query: '',
+        createMode: false,
+        newTab: {
+          name: '',
+          customer_name: '',
+          reference: ''
+        }
       },
       cashValidating: false,
       tipDialog: {
@@ -994,10 +1011,149 @@ window.app = Vue.createApp({
           case 'btc_onchain':
             this.fiatMethod = 'checkout'
             break
+          case 'tab':
+            this.fiatMethod = 'checkout'
+            break
         }
         this._currencyResolver(method)
         this._currencyResolver = null
       }
+    },
+    buildTabChargeParams() {
+      const paymentAmount =
+        this.paymentAmount !== null ? this.paymentAmount : this.amount
+      const notes = {}
+      const items = this.cart.size
+        ? [...this.cart.values()].map(item => {
+            if (item.note) {
+              notes[item.title] = item.note
+            }
+            return {
+              id: item.id,
+              price: item.price,
+              formattedPrice: item.formattedPrice,
+              quantity: item.quantity,
+              title: item.title,
+              tax: item.tax || this.taxDefault,
+              note: item.note || null
+            }
+          })
+        : []
+      const normalizedAmount =
+        this.currency === 'sats'
+          ? Math.ceil(paymentAmount)
+          : roundTposCurrencyAmount(paymentAmount, this.currency)
+      const randomSuffix =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : Date.now().toString()
+
+      return {
+        amount: normalizedAmount,
+        description: this.invoiceDialog.internalMemo || 'TPoS order charge',
+        items,
+        notes: Object.keys(notes).length ? notes : null,
+        internal_memo: this.invoiceDialog.internalMemo || null,
+        idempotency_key: `tpos:${this.tposId}:${randomSuffix}`
+      }
+    },
+    closeTabsDialog() {
+      this.tabsDialog.show = false
+      this.tabsDialog.createMode = false
+      this.tabsDialog.query = ''
+      this.tabsDialog.newTab = {
+        name: '',
+        customer_name: '',
+        reference: ''
+      }
+    },
+    async loadTabsForCharge() {
+      this.tabsDialog.loading = true
+      try {
+        const query = this.tabsDialog.query
+          ? `&q=${encodeURIComponent(this.tabsDialog.query)}`
+          : ''
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/tpos/api/v1/tposs/${this.tposId}/tabs?status=open${query}`
+        )
+        this.tabsDialog.tabs = data.data || []
+        if (!this.tabsDialog.tabs.length) {
+          this.tabsDialog.selectedTabId = null
+          this.tabsDialog.createMode = this.tabsAllowCreate
+          return
+        }
+        if (
+          !this.tabsDialog.selectedTabId ||
+          !this.tabsDialog.tabs.find(
+            tab => tab.id === this.tabsDialog.selectedTabId
+          )
+        ) {
+          this.tabsDialog.selectedTabId = this.tabsDialog.tabs[0].id
+        }
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+      } finally {
+        this.tabsDialog.loading = false
+      }
+    },
+    async createTabFromDialog() {
+      if (!this.tabsDialog.newTab.name || this.tabsDialog.creating) return
+      this.tabsDialog.creating = true
+      try {
+        const payload = {
+          name: this.tabsDialog.newTab.name,
+          customer_name: this.tabsDialog.newTab.customer_name || null,
+          reference: this.tabsDialog.newTab.reference || null,
+          currency: this.currency
+        }
+        const {data} = await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/tposs/${this.tposId}/tabs`,
+          null,
+          payload
+        )
+        this.tabsDialog.createMode = false
+        this.tabsDialog.newTab = {
+          name: '',
+          customer_name: '',
+          reference: ''
+        }
+        await this.loadTabsForCharge()
+        this.tabsDialog.selectedTabId = data.id
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+      } finally {
+        this.tabsDialog.creating = false
+      }
+    },
+    async submitTabCharge() {
+      if (!this.tabsDialog.selectedTabId || this.tabsDialog.posting) return
+      this.tabsDialog.posting = true
+      try {
+        const payload = this.buildTabChargeParams()
+        const {data} = await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/tposs/${this.tposId}/tabs/${this.tabsDialog.selectedTabId}/charges`,
+          null,
+          payload
+        )
+        this.closeTabsDialog()
+        this.clearCart()
+        this.showComplete()
+        Quasar.Notify.create({
+          type: 'positive',
+          message: `Added to tab: ${data.tab?.name || data.tab_id}`
+        })
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+      } finally {
+        this.tabsDialog.posting = false
+      }
+    },
+    async openTabChargeDialog() {
+      await this.loadTabsForCharge()
+      this.tabsDialog.show = true
     },
     buildInvoiceParams() {
       const paymentAmount =
@@ -1069,9 +1225,14 @@ window.app = Vue.createApp({
       if (
         this.fiatProvider ||
         this.allowCashSettlement ||
-        this.onchainEnabled
+        this.onchainEnabled ||
+        this.tabsEnabled
       ) {
         const method = await this.showPaymentMethod()
+        if (method === 'tab') {
+          await this.openTabChargeDialog()
+          return
+        }
         this.payInFiat = method === 'fiat'
         this.invoiceDialog.data.payment_method = method
       } else {
@@ -1653,6 +1814,8 @@ window.app = Vue.createApp({
     this.allowPriceAdjustment = tpos.allow_price_adjustment ?? true
     this.allowCashSettlement = Boolean(tpos.allow_cash_settlement)
     this.onchainEnabled = Boolean(tpos.onchain_enabled)
+    this.tabsEnabled = Boolean(tpos.tabs_enabled)
+    this.tabsAllowCreate = Boolean(tpos.tabs_allow_create)
 
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
 

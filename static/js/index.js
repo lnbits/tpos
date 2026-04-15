@@ -51,6 +51,8 @@ const mapTpos = obj => {
   obj.onchain_enabled = Boolean(obj.onchain_enabled)
   obj.onchain_wallet_id = obj.onchain_wallet_id || null
   obj.onchain_zero_conf = obj.onchain_zero_conf ?? true
+  obj.tabs_enabled = Boolean(obj.tabs_enabled)
+  obj.tabs_allow_create = Boolean(obj.tabs_allow_create)
   obj.useWrapper = false
   obj.posLocation = ''
   obj.auth = ''
@@ -156,7 +158,9 @@ window.app = Vue.createApp({
           allow_cash_settlement: false,
           onchain_enabled: false,
           onchain_wallet_id: null,
-          onchain_zero_conf: true
+          onchain_zero_conf: true,
+          tabs_enabled: false,
+          tabs_allow_create: false
         },
         advanced: {
           tips: false,
@@ -312,7 +316,9 @@ window.app = Vue.createApp({
         allow_cash_settlement: false,
         onchain_enabled: false,
         onchain_wallet_id: null,
-        onchain_zero_conf: true
+        onchain_zero_conf: true,
+        tabs_enabled: false,
+        tabs_allow_create: false
       }
       this.formDialog.advanced = {tips: false, otc: false}
     },
@@ -404,6 +410,9 @@ window.app = Vue.createApp({
       if (!data.onchain_enabled) {
         data.onchain_wallet_id = null
         data.onchain_zero_conf = true
+      }
+      if (!data.tabs_enabled) {
+        data.tabs_allow_create = false
       }
       const wallet = _.findWhere(this.g.user.wallets, {
         id: this.formDialog.data.wallet

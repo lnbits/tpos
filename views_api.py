@@ -57,6 +57,8 @@ from .helpers import (
 from .models import (
     CreateTposData,
     CreateTposInvoice,
+    CreateTposTabCharge,
+    CreateTposTabData,
     CreateUpdateItemData,
     InventorySale,
     PayLnurlWData,
@@ -70,9 +72,15 @@ from .models import (
     Tpos,
     TposInvoiceResponse,
     TposPayment,
+    TposTab,
+    TposTabList,
 )
 from .services import (
+    create_tab_charge_for_tpos,
+    create_tab_for_tpos,
     fetch_onchain_address,
+    fetch_single_tab_for_tpos,
+    fetch_tabs_for_tpos,
     fetch_watchonly_config,
     fetch_watchonly_wallet,
     fetch_watchonly_wallets,
@@ -80,6 +88,7 @@ from .services import (
     get_default_inventory,
     get_inventory_items_for_tpos,
     inventory_available_for_user,
+    tabs_available_for_user,
     watchonly_available_for_user,
 )
 
@@ -271,6 +280,47 @@ def _serialize_tpos_invoice_response(
     )
 
 
+def _extract_error_detail(exc: httpx.HTTPStatusError) -> str:
+    response = exc.response
+    if not response:
+        return str(exc)
+    try:
+        payload = response.json()
+    except Exception:
+        payload = None
+    if isinstance(payload, dict):
+        detail = payload.get("detail")
+        if detail:
+            return str(detail)
+    body_text = response.text.strip() if response.text else ""
+    return body_text or str(exc)
+
+
+async def _get_tpos_owner_user_id(tpos: Tpos) -> str:
+    wallet = await get_wallet(tpos.wallet)
+    if not wallet:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Wallet not found for this TPoS.",
+        )
+    return wallet.user
+
+
+async def _validate_tpos_tabs_enabled(tpos: Tpos) -> str:
+    if not tpos.tabs_enabled:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Tabs integration is not enabled for this TPoS.",
+        )
+    user_id = await _get_tpos_owner_user_id(tpos)
+    if not await tabs_available_for_user(user_id):
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Tabs extension must be enabled for this user.",
+        )
+    return user_id
+
+
 @tpos_api_router.get("/api/v1/tposs", status_code=HTTPStatus.OK)
 async def api_tposs(
     all_wallets: bool = Query(False),
@@ -308,6 +358,136 @@ async def api_onchain_status(
     return await _get_watchonly_status(key_info.wallet)
 
 
+@tpos_api_router.get("/api/v1/tposs/{tpos_id}/tabs", response_model=TposTabList)
+async def api_tpos_tabs(
+    tpos_id: str,
+    status: str = Query("open"),
+    q: str | None = Query(None),
+) -> TposTabList:
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+
+    user_id = await _validate_tpos_tabs_enabled(tpos)
+    try:
+        tabs = await fetch_tabs_for_tpos(
+            user_id=user_id,
+            wallet_id=tpos.wallet,
+            status=status,
+            query=q,
+        )
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=exc.response.status_code
+            if exc.response
+            else HTTPStatus.BAD_GATEWAY,
+            detail=_extract_error_detail(exc),
+        ) from exc
+    return TposTabList(data=[TposTab(**tab) for tab in tabs])
+
+
+@tpos_api_router.post("/api/v1/tposs/{tpos_id}/tabs", response_model=TposTab)
+async def api_tpos_create_tab(
+    tpos_id: str,
+    data: CreateTposTabData,
+) -> TposTab:
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+    user_id = await _validate_tpos_tabs_enabled(tpos)
+    if not tpos.tabs_allow_create:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN,
+            detail="Tab creation is not enabled for this TPoS.",
+        )
+    tab_currency = (data.currency or tpos.currency or "sats").lower()
+    if tab_currency != (tpos.currency or "sats").lower():
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Tab currency must match TPoS currency.",
+        )
+
+    payload = {
+        "wallet": tpos.wallet,
+        "name": data.name,
+        "customer_name": data.customer_name,
+        "reference": data.reference,
+        "currency": tab_currency,
+        "limit_type": data.limit_type,
+        "limit_amount": data.limit_amount,
+    }
+    try:
+        tab = await create_tab_for_tpos(user_id=user_id, payload=payload)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=exc.response.status_code
+            if exc.response
+            else HTTPStatus.BAD_GATEWAY,
+            detail=_extract_error_detail(exc),
+        ) from exc
+    return TposTab(**tab)
+
+
+@tpos_api_router.post("/api/v1/tposs/{tpos_id}/tabs/{tab_id}/charges")
+async def api_tpos_add_tab_charge(
+    tpos_id: str,
+    tab_id: str,
+    data: CreateTposTabCharge,
+) -> dict[str, Any]:
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+    user_id = await _validate_tpos_tabs_enabled(tpos)
+    if data.amount <= 0:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Amount must be greater than zero.",
+        )
+
+    metadata = {
+        "source": "tpos",
+        "tpos_id": tpos.id,
+        "tpos_name": tpos.name,
+        "currency": tpos.currency,
+        "amount": data.amount,
+        "items": data.items,
+        "notes": data.notes,
+        "internal_memo": data.internal_memo,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    payload = {
+        "entry_type": "charge",
+        "amount": data.amount,
+        "description": data.description or "TPoS order charge",
+        "metadata": json.dumps(metadata),
+        "source": "tpos",
+        "source_id": tpos.id,
+        "source_action": "order_charge",
+        "idempotency_key": data.idempotency_key or f"tpos:{tpos.id}:{uuid4().hex}",
+    }
+    try:
+        entry = await create_tab_charge_for_tpos(
+            user_id=user_id,
+            tab_id=tab_id,
+            payload=payload,
+        )
+        tab = await fetch_single_tab_for_tpos(user_id=user_id, tab_id=tab_id)
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=exc.response.status_code
+            if exc.response
+            else HTTPStatus.BAD_GATEWAY,
+            detail=_extract_error_detail(exc),
+        ) from exc
+    return {"tab_id": tab_id, "entry": entry, "tab": tab}
+
+
 @tpos_api_router.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
 async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
@@ -318,6 +498,8 @@ async def api_tpos_create(
         onchain_enabled=data.onchain_enabled,
         onchain_wallet_id=data.onchain_wallet_id,
     )
+    if not data.tabs_enabled:
+        data.tabs_allow_create = False
     user = await get_user(wallet.wallet.user)
     if not (user and user.super_user):
         data.allow_cash_settlement = False
@@ -363,6 +545,9 @@ async def api_tpos_update(
         onchain_enabled=desired_onchain_enabled,
         onchain_wallet_id=desired_onchain_wallet_id,
     )
+    desired_tabs_enabled = update_payload.get("tabs_enabled", tpos.tabs_enabled)
+    if not desired_tabs_enabled:
+        update_payload["tabs_allow_create"] = False
     desired_currency = update_payload.get("currency", tpos.currency)
     if desired_currency == "sats":
         update_payload["allow_cash_settlement"] = False
