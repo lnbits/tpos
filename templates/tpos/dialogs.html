@@ -460,7 +460,126 @@
             </div>
           </q-btn>
         </div>
+        <div class="col-6" v-if="tabsEnabled">
+          <q-btn
+            class="full-width q-px-lg q-py-sm"
+            size="xl"
+            color="accent"
+            rounded
+            aria-label="Add to tab"
+            @click="selectPaymentMethod('tab')"
+          >
+            <div class="row items-center no-wrap q-gutter-x-xs">
+              <q-icon name="assignment" size="30px"></q-icon>
+              <span class="text-subtitle1 text-weight-bold">Tab</span>
+            </div>
+          </q-btn>
+        </div>
       </div>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="tabsDialog.show" position="top" @hide="closeTabsDialog">
+    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
+      <q-card-section class="row items-center q-pb-sm">
+        <div class="text-h6">Add to Tab</div>
+        <q-space></q-space>
+        <q-btn icon="close" size="sm" flat round dense v-close-popup></q-btn>
+      </q-card-section>
+
+      <q-card-section>
+        <q-input
+          filled
+          dense
+          v-model.trim="tabsDialog.query"
+          label="Search tabs"
+          @keyup.enter="loadTabsForCharge"
+        >
+          <template v-slot:append>
+            <q-btn dense flat icon="search" @click="loadTabsForCharge"></q-btn>
+          </template>
+        </q-input>
+      </q-card-section>
+
+      <q-card-section v-if="tabsDialog.loading" class="text-center">
+        <q-spinner-gears size="36px"></q-spinner-gears>
+      </q-card-section>
+
+      <q-card-section v-else>
+        <q-select
+          v-if="tabsDialog.tabs.length"
+          filled
+          dense
+          emit-value
+          map-options
+          option-value="id"
+          option-label="name"
+          v-model="tabsDialog.selectedTabId"
+          :options="tabsDialog.tabs"
+          label="Select tab"
+        >
+          <template v-slot:option="scope">
+            <q-item v-bind="scope.itemProps">
+              <q-item-section>
+                <q-item-label>
+                  ${ scope.opt.name } (${ scope.opt.balance } ${ scope.opt.currency })
+                </q-item-label>
+                <q-item-label caption>
+                  ${ scope.opt.customer_name || scope.opt.reference || scope.opt.id }
+                </q-item-label>
+              </q-item-section>
+            </q-item>
+          </template>
+        </q-select>
+
+        <div class="q-mt-md" v-if="tabsAllowCreate">
+          <q-btn
+            flat
+            color="primary"
+            :label="tabsDialog.createMode ? 'Hide create form' : 'Create new tab'"
+            @click="tabsDialog.createMode = !tabsDialog.createMode"
+          ></q-btn>
+        </div>
+
+        <div v-if="tabsDialog.createMode" class="q-gutter-sm q-mt-sm">
+          <q-input
+            filled
+            dense
+            v-model.trim="tabsDialog.newTab.name"
+            label="Tab name"
+          ></q-input>
+          <q-input
+            filled
+            dense
+            v-model.trim="tabsDialog.newTab.customer_name"
+            label="Customer name"
+          ></q-input>
+          <q-input
+            filled
+            dense
+            v-model.trim="tabsDialog.newTab.reference"
+            label="Reference"
+          ></q-input>
+          <q-btn
+            color="primary"
+            :loading="tabsDialog.creating"
+            :disable="!tabsDialog.newTab.name"
+            @click="createTabFromDialog"
+            label="Create Tab"
+          ></q-btn>
+        </div>
+      </q-card-section>
+
+      <q-card-actions align="right">
+        <q-btn flat color="grey" v-close-popup label="Cancel"></q-btn>
+        <q-btn
+          color="primary"
+          label="Add charge"
+          :disable="!tabsDialog.selectedTabId"
+          :loading="tabsDialog.posting"
+          @click="submitTabCharge"
+        ></q-btn>
+      </q-card-actions>
     </q-card>
   </q-dialog>
 </template>

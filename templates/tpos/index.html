@@ -516,6 +516,21 @@
             ></q-checkbox>
           </div>
         </div>
+        <div class="row">
+          <div class="col">
+            <q-checkbox
+              v-model="formDialog.data.tabs_enabled"
+              label="Enable Tabs integration"
+            ></q-checkbox>
+          </div>
+          <div class="col">
+            <q-checkbox
+              v-model="formDialog.data.tabs_allow_create"
+              :disable="!formDialog.data.tabs_enabled"
+              label="Allow creating tabs from TPoS"
+            ></q-checkbox>
+          </div>
+        </div>
         <template v-if="formDialog.data.enable_receipt_print">
           <p class="text-caption">
             Receipt printing is an experimental feature. Not all devices work

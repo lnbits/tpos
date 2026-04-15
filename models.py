@@ -72,6 +72,8 @@ class CreateTposData(BaseModel):
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
     allow_cash_settlement: bool = Field(False)
+    tabs_enabled: bool = Field(False)
+    tabs_allow_create: bool = Field(False)
 
     @validator("tax_default", pre=True, always=True)
     def default_tax_when_none(cls, v):
@@ -108,6 +110,8 @@ class TposClean(BaseModel):
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
     allow_cash_settlement: bool = False
+    tabs_enabled: bool = False
+    tabs_allow_create: bool = False
 
     @property
     def withdraw_maximum(self) -> int:
@@ -130,6 +134,40 @@ class TposClean(BaseModel):
 class Tpos(TposClean, BaseModel):
     wallet: str
     tip_wallet: str | None = None
+
+
+class TposTab(BaseModel):
+    id: str
+    wallet: str
+    name: str
+    customer_name: str | None = None
+    reference: str | None = None
+    currency: str = "sats"
+    status: str = "open"
+    balance: float = 0
+    is_archived: bool = False
+
+
+class TposTabList(BaseModel):
+    data: list[TposTab] = Field(default_factory=list)
+
+
+class CreateTposTabData(BaseModel):
+    name: str
+    customer_name: str | None = None
+    reference: str | None = None
+    currency: str | None = None
+    limit_type: str = "none"
+    limit_amount: float | None = None
+
+
+class CreateTposTabCharge(BaseModel):
+    amount: float
+    description: str | None = None
+    items: list[dict[str, Any]] = Field(default_factory=list)
+    notes: dict[str, Any] | None = None
+    internal_memo: str | None = Field(None, max_length=512)
+    idempotency_key: str | None = None
 
 
 class LnurlCharge(BaseModel):

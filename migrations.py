@@ -260,3 +260,15 @@ async def m021_add_cash_settlement(db: Database):
     await db.execute("""
         ALTER TABLE tpos.pos ADD allow_cash_settlement BOOLEAN DEFAULT false;
     """)
+
+
+async def m022_add_tabs_integration_settings(db: Database):
+    """
+    Add tabs integration settings.
+    """
+    await db.execute("""
+        ALTER TABLE tpos.pos ADD tabs_enabled BOOLEAN DEFAULT false;
+    """)
+    await db.execute("""
+        ALTER TABLE tpos.pos ADD tabs_allow_create BOOLEAN DEFAULT false;
+    """)

@@ -1,7 +1,11 @@
 from typing import Any
 
 import httpx
-from lnbits.core.crud import get_wallet
+from lnbits.core.crud import (
+    get_installed_extension,
+    get_user_active_extensions_ids,
+    get_wallet,
+)
 from lnbits.core.models import User
 from lnbits.helpers import create_access_token
 from lnbits.settings import settings
@@ -119,6 +123,89 @@ async def get_inventory_items_for_tpos(
 
 def inventory_available_for_user(user: User | None) -> bool:
     return bool(user and "inventory" in (user.extensions or []))
+
+
+def _create_internal_user_access_token(user_id: str) -> str:
+    return create_access_token({"sub": "", "usr": user_id}, token_expire_minutes=1)
+
+
+async def tabs_available_for_user(user_id: str) -> bool:
+    installed = await get_installed_extension("tabs")
+    if not installed or not installed.active:
+        return False
+    active_extensions = await get_user_active_extensions_ids(user_id)
+    return "tabs" in active_extensions
+
+
+async def fetch_tabs_for_tpos(
+    user_id: str,
+    wallet_id: str,
+    status: str | None = "open",
+    query: str | None = None,
+) -> list[dict[str, Any]]:
+    access = _create_internal_user_access_token(user_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            url=f"http://{settings.host}:{settings.port}/tabs/api/v1/tabs",
+            headers={"Authorization": f"Bearer {access}"},
+        )
+    resp.raise_for_status()
+    tabs = resp.json()
+    if not isinstance(tabs, list):
+        return []
+    filtered_tabs = [tab for tab in tabs if tab.get("wallet") == wallet_id]
+    if status:
+        filtered_tabs = [tab for tab in filtered_tabs if tab.get("status") == status]
+    if query:
+        needle = query.lower()
+        filtered_tabs = [
+            tab
+            for tab in filtered_tabs
+            if needle in (tab.get("name") or "").lower()
+            or needle in (tab.get("customer_name") or "").lower()
+            or needle in (tab.get("reference") or "").lower()
+            or needle in (tab.get("id") or "").lower()
+        ]
+    return filtered_tabs
+
+
+async def create_tab_for_tpos(user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    access = _create_internal_user_access_token(user_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            url=f"http://{settings.host}:{settings.port}/tabs/api/v1/tabs",
+            headers={"Authorization": f"Bearer {access}"},
+            json=payload,
+        )
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def create_tab_charge_for_tpos(
+    user_id: str,
+    tab_id: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    access = _create_internal_user_access_token(user_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            url=f"http://{settings.host}:{settings.port}/tabs/api/v1/tabs/{tab_id}/entries",
+            headers={"Authorization": f"Bearer {access}"},
+            json=payload,
+        )
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def fetch_single_tab_for_tpos(user_id: str, tab_id: str) -> dict[str, Any]:
+    access = _create_internal_user_access_token(user_id)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            url=f"http://{settings.host}:{settings.port}/tabs/api/v1/tabs/{tab_id}",
+            headers={"Authorization": f"Bearer {access}"},
+        )
+    resp.raise_for_status()
+    return resp.json()
 
 
 async def push_order_to_orders(

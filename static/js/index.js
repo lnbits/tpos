@@ -47,6 +47,8 @@ const mapTpos = obj => {
     : []
   obj.only_show_sats_on_bitcoin = obj.only_show_sats_on_bitcoin ?? true
   obj.allow_cash_settlement = Boolean(obj.allow_cash_settlement)
+  obj.tabs_enabled = Boolean(obj.tabs_enabled)
+  obj.tabs_allow_create = Boolean(obj.tabs_allow_create)
   obj.useWrapper = false
   obj.posLocation = ''
   obj.auth = ''
@@ -141,7 +143,9 @@ window.app = Vue.createApp({
           fiat: false,
           stripe_card_payments: false,
           stripe_reader_id: '',
-          allow_cash_settlement: false
+          allow_cash_settlement: false,
+          tabs_enabled: false,
+          tabs_allow_create: false
         },
         advanced: {
           tips: false,
@@ -285,7 +289,9 @@ window.app = Vue.createApp({
         fiat: false,
         stripe_card_payments: false,
         stripe_reader_id: '',
-        allow_cash_settlement: false
+        allow_cash_settlement: false,
+        tabs_enabled: false,
+        tabs_allow_create: false
       }
       this.formDialog.advanced = {tips: false, otc: false}
     },
@@ -354,6 +360,9 @@ window.app = Vue.createApp({
       }
       if (data.currency === 'sats') {
         data.allow_cash_settlement = false
+      }
+      if (!data.tabs_enabled) {
+        data.tabs_allow_create = false
       }
       const wallet = _.findWhere(this.g.user.wallets, {
         id: this.formDialog.data.wallet
