@@ -85,6 +85,8 @@ window.app = Vue.createApp({
         loading: false,
         creating: false,
         posting: false,
+        settling: false,
+        mode: 'charge',
         tabs: [],
         selectedTabId: null,
         query: '',
@@ -903,7 +905,7 @@ window.app = Vue.createApp({
       const paymentAmount =
         this.total > 0.0
           ? roundTposCurrencyAmount(this.total + this.amount, this.currency)
-          : this.amount
+          : roundTposCurrencyAmount(this.amount, this.currency)
 
       this.paymentAmount = paymentAmount
       this.sat = Math.ceil(paymentAmount * this.exchangeRate)
@@ -996,9 +998,24 @@ window.app = Vue.createApp({
         idempotency_key: `tpos:${this.tposId}:${randomSuffix}`
       }
     },
+    buildTabSettlementParams() {
+      const randomSuffix =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : Date.now().toString()
+      return {
+        amount: null,
+        description: this.invoiceDialog.internalMemo || 'TPoS settlement',
+        reference: `tpos-${this.tposId}`,
+        idempotency_key: `tpos:settlement:${this.tposId}:${randomSuffix}`
+      }
+    },
     closeTabsDialog() {
       this.tabsDialog.show = false
       this.tabsDialog.createMode = false
+      this.tabsDialog.posting = false
+      this.tabsDialog.settling = false
+      this.tabsDialog.mode = 'charge'
       this.tabsDialog.query = ''
       this.tabsDialog.newTab = {
         name: '',
@@ -1079,6 +1096,8 @@ window.app = Vue.createApp({
         )
         this.closeTabsDialog()
         this.clearCart()
+        this.stack = []
+        this.amount = 0.0
         this.showComplete()
         Quasar.Notify.create({
           type: 'positive',
@@ -1090,7 +1109,45 @@ window.app = Vue.createApp({
         this.tabsDialog.posting = false
       }
     },
+    async submitTabSettlement() {
+      if (!this.tabsDialog.selectedTabId || this.tabsDialog.settling) return
+      this.tabsDialog.settling = true
+      try {
+        const payload = this.buildTabSettlementParams()
+        const {data} = await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/tposs/${this.tposId}/tabs/${this.tabsDialog.selectedTabId}/settlements`,
+          null,
+          payload
+        )
+        const paymentRequest = data?.payment_request
+        const paymentHash = data?.settlement?.payment_hash
+        if (!paymentRequest || !paymentHash) {
+          Quasar.Notify.create({
+            type: 'warning',
+            message: 'Settlement created, but no invoice was returned.'
+          })
+          return
+        }
+        this.closeTabsDialog()
+        this.openInvoiceDialog(
+          paymentHash,
+          'lightning:' + String(paymentRequest).toUpperCase()
+        )
+        this.subscribeToPaymentWS(paymentHash)
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+      } finally {
+        this.tabsDialog.settling = false
+      }
+    },
     async openTabChargeDialog() {
+      this.tabsDialog.mode = 'charge'
+      await this.loadTabsForCharge()
+      this.tabsDialog.show = true
+    },
+    async openTabSettlementDialog() {
+      this.tabsDialog.mode = 'settlement'
       await this.loadTabsForCharge()
       this.tabsDialog.show = true
     },

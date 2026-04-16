@@ -482,7 +482,10 @@
   <q-dialog v-model="tabsDialog.show" position="top" @hide="closeTabsDialog">
     <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
       <q-card-section class="row items-center q-pb-sm">
-        <div class="text-h6">Add to Tab</div>
+        <div
+          class="text-h6"
+          v-text="tabsDialog.mode === 'settlement' ? 'Settle Tab' : 'Add to Tab'"
+        ></div>
         <q-space></q-space>
         <q-btn icon="close" size="sm" flat round dense v-close-popup></q-btn>
       </q-card-section>
@@ -506,31 +509,35 @@
       </q-card-section>
 
       <q-card-section v-else>
-        <q-select
-          v-if="tabsDialog.tabs.length"
-          filled
-          dense
-          emit-value
-          map-options
-          option-value="id"
-          option-label="name"
-          v-model="tabsDialog.selectedTabId"
-          :options="tabsDialog.tabs"
-          label="Select tab"
-        >
-          <template v-slot:option="scope">
-            <q-item v-bind="scope.itemProps">
+        <div v-if="tabsDialog.tabs.length">
+          <div class="text-caption text-grey-7 q-mb-sm">
+            Latest updated open tabs
+          </div>
+          <q-list bordered separator>
+            <q-item
+              v-for="tab in tabsDialog.tabs"
+              :key="tab.id"
+              clickable
+              :active="tabsDialog.selectedTabId === tab.id"
+              active-class="bg-primary text-white"
+              @click="tabsDialog.selectedTabId = tab.id"
+            >
               <q-item-section>
-                <q-item-label>
-                  ${ scope.opt.name } (${ scope.opt.balance } ${ scope.opt.currency })
-                </q-item-label>
-                <q-item-label caption>
-                  ${ scope.opt.customer_name || scope.opt.reference || scope.opt.id }
-                </q-item-label>
+                <q-item-label
+                  v-text="tab.name + ' (' + formatAmount(tab.balance, tab.currency) + ')'"
+                ></q-item-label>
+                <q-item-label
+                  caption
+                  :class="tabsDialog.selectedTabId === tab.id ? 'text-white' : ''"
+                  v-text="tab.customer_name || tab.reference || tab.id"
+                ></q-item-label>
               </q-item-section>
             </q-item>
-          </template>
-        </q-select>
+          </q-list>
+        </div>
+        <div v-else class="text-caption text-grey-7">
+          No open tabs found.
+        </div>
 
         <div class="q-mt-md" v-if="tabsAllowCreate">
           <q-btn
@@ -573,11 +580,20 @@
       <q-card-actions align="right">
         <q-btn flat color="grey" v-close-popup label="Cancel"></q-btn>
         <q-btn
+          v-if="tabsDialog.mode !== 'settlement'"
           color="primary"
           label="Add charge"
           :disable="!tabsDialog.selectedTabId"
           :loading="tabsDialog.posting"
           @click="submitTabCharge"
+        ></q-btn>
+        <q-btn
+          v-else
+          color="secondary"
+          label="Settle tab"
+          :disable="!tabsDialog.selectedTabId"
+          :loading="tabsDialog.settling"
+          @click="submitTabSettlement"
         ></q-btn>
       </q-card-actions>
     </q-card>

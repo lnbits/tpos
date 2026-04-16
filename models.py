@@ -138,7 +138,6 @@ class Tpos(TposClean, BaseModel):
 
 class TposTab(BaseModel):
     id: str
-    wallet: str
     name: str
     customer_name: str | None = None
     reference: str | None = None
@@ -153,7 +152,7 @@ class TposTabList(BaseModel):
 
 
 class CreateTposTabData(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=120)
     customer_name: str | None = None
     reference: str | None = None
     currency: str | None = None
@@ -162,12 +161,19 @@ class CreateTposTabData(BaseModel):
 
 
 class CreateTposTabCharge(BaseModel):
-    amount: float
-    description: str | None = None
-    items: list[dict[str, Any]] = Field(default_factory=list)
+    amount: float = Field(..., gt=0)
+    description: str | None = Field(None, max_length=512)
+    items: list[dict[str, Any]] = Field(default_factory=list, max_items=200)
     notes: dict[str, Any] | None = None
     internal_memo: str | None = Field(None, max_length=512)
-    idempotency_key: str | None = None
+    idempotency_key: str = Field(..., min_length=8, max_length=128)
+
+
+class CreateTposTabSettlement(BaseModel):
+    amount: float | None = Field(None, gt=0)
+    reference: str | None = Field(None, max_length=120)
+    description: str | None = Field(None, max_length=512)
+    idempotency_key: str = Field(..., min_length=8, max_length=128)
 
 
 class LnurlCharge(BaseModel):
