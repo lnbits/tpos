@@ -86,6 +86,27 @@ from .services import (
 tpos_api_router = APIRouter()
 
 
+async def _get_tpos_or_404(tpos_id: str) -> Tpos:
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+    return tpos
+
+
+def _tpos_currency(tpos: Tpos) -> str:
+    return (tpos.currency or "sats").lower()
+
+
+def _ensure_tab_matches_tpos_currency(tab: dict[str, Any], tpos: Tpos) -> None:
+    if (tab.get("currency") or "sats").lower() != _tpos_currency(tpos):
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Tab currency must match TPoS currency.",
+        )
+
+
 def _two_year_token_expiry_minutes() -> int:
     now = datetime.now(timezone.utc)
     try:
@@ -170,12 +191,7 @@ async def api_tpos_tabs(
     status: str = Query("open"),
     q: str | None = Query(None),
 ) -> TposTabList:
-    tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-
+    tpos = await _get_tpos_or_404(tpos_id)
     user_id = await ensure_tpos_tabs_access(tpos)
     tabs = await fetch_tabs_for_tpos(
         user_id=user_id,
@@ -191,19 +207,15 @@ async def api_tpos_create_tab(
     tpos_id: str,
     data: CreateTposTabData,
 ) -> TposTab:
-    tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
+    tpos = await _get_tpos_or_404(tpos_id)
     user_id = await ensure_tpos_tabs_access(tpos)
     if not tpos.tabs_allow_create:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN,
             detail="Tab creation is not enabled for this TPoS.",
         )
-    tab_currency = (data.currency or tpos.currency or "sats").lower()
-    if tab_currency != (tpos.currency or "sats").lower():
+    tab_currency = (data.currency or _tpos_currency(tpos)).lower()
+    if tab_currency != _tpos_currency(tpos):
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Tab currency must match TPoS currency.",
@@ -228,19 +240,11 @@ async def api_tpos_add_tab_charge(
     tab_id: str,
     data: CreateTposTabCharge,
 ) -> dict[str, Any]:
-    tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
+    tpos = await _get_tpos_or_404(tpos_id)
     user_id = await ensure_tpos_tabs_access(tpos)
 
     tab = await fetch_single_tab_for_tpos(user_id=user_id, tab_id=tab_id)
-    if (tab.get("currency") or "sats").lower() != (tpos.currency or "sats").lower():
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Tab currency must match TPoS currency.",
-        )
+    _ensure_tab_matches_tpos_currency(tab, tpos)
 
     metadata = {
         "source": "tpos",
@@ -278,18 +282,10 @@ async def api_tpos_create_tab_settlement(
     tab_id: str,
     data: CreateTposTabSettlement,
 ) -> dict[str, Any]:
-    tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
+    tpos = await _get_tpos_or_404(tpos_id)
     user_id = await ensure_tpos_tabs_access(tpos)
     tab = await fetch_single_tab_for_tpos(user_id=user_id, tab_id=tab_id)
-    if (tab.get("currency") or "sats").lower() != (tpos.currency or "sats").lower():
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Tab currency must match TPoS currency.",
-        )
+    _ensure_tab_matches_tpos_currency(tab, tpos)
 
     settlement_payload = {
         "amount": data.amount,

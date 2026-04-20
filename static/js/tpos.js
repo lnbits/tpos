@@ -960,6 +960,35 @@ window.app = Vue.createApp({
         this._currencyResolver = null
       }
     },
+    normalizeApiAmount(currency, value) {
+      if (value === null || value === undefined || value === '') return null
+      const parsed = Number(value)
+      if (Number.isNaN(parsed)) return null
+      if ((currency || '').toLowerCase() === 'sats') return Math.round(parsed)
+      return roundTposCurrencyAmount(parsed, currency)
+    },
+    mapTabFromApi(tab) {
+      const currency = tab?.currency || this.currency || 'sats'
+      return {
+        ...tab,
+        currency,
+        balance: this.normalizeApiAmount(currency, tab?.balance) ?? 0
+      }
+    },
+    generateTabsIdempotencyKey(prefix) {
+      const randomSuffix =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : Date.now().toString()
+      return `${prefix}:${this.tposId}:${randomSuffix}`
+    },
+    resetTabsDialogNewTab() {
+      this.tabsDialog.newTab = {
+        name: '',
+        customer_name: '',
+        reference: ''
+      }
+    },
     buildTabChargeParams() {
       const paymentAmount =
         this.paymentAmount !== null ? this.paymentAmount : this.amount
@@ -984,10 +1013,6 @@ window.app = Vue.createApp({
         this.currency === 'sats'
           ? Math.ceil(paymentAmount)
           : roundTposCurrencyAmount(paymentAmount, this.currency)
-      const randomSuffix =
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : Date.now().toString()
 
       return {
         amount: normalizedAmount,
@@ -995,19 +1020,15 @@ window.app = Vue.createApp({
         items,
         notes: Object.keys(notes).length ? notes : null,
         internal_memo: this.invoiceDialog.internalMemo || null,
-        idempotency_key: `tpos:${this.tposId}:${randomSuffix}`
+        idempotency_key: this.generateTabsIdempotencyKey('tpos')
       }
     },
     buildTabSettlementParams() {
-      const randomSuffix =
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : Date.now().toString()
       return {
         amount: null,
         description: this.invoiceDialog.internalMemo || 'TPoS settlement',
         reference: `tpos-${this.tposId}`,
-        idempotency_key: `tpos:settlement:${this.tposId}:${randomSuffix}`
+        idempotency_key: this.generateTabsIdempotencyKey('tpos:settlement')
       }
     },
     closeTabsDialog() {
@@ -1017,11 +1038,7 @@ window.app = Vue.createApp({
       this.tabsDialog.settling = false
       this.tabsDialog.mode = 'charge'
       this.tabsDialog.query = ''
-      this.tabsDialog.newTab = {
-        name: '',
-        customer_name: '',
-        reference: ''
-      }
+      this.resetTabsDialogNewTab()
     },
     async loadTabsForCharge() {
       this.tabsDialog.loading = true
@@ -1033,7 +1050,9 @@ window.app = Vue.createApp({
           'GET',
           `/tpos/api/v1/tposs/${this.tposId}/tabs?status=open${query}`
         )
-        this.tabsDialog.tabs = data.data || []
+        this.tabsDialog.tabs = (data.data || []).map(tab =>
+          this.mapTabFromApi(tab)
+        )
         if (!this.tabsDialog.tabs.length) {
           this.tabsDialog.selectedTabId = null
           this.tabsDialog.createMode = this.tabsAllowCreate
@@ -1070,11 +1089,7 @@ window.app = Vue.createApp({
           payload
         )
         this.tabsDialog.createMode = false
-        this.tabsDialog.newTab = {
-          name: '',
-          customer_name: '',
-          reference: ''
-        }
+        this.resetTabsDialogNewTab()
         await this.loadTabsForCharge()
         this.tabsDialog.selectedTabId = data.id
       } catch (error) {
@@ -1122,6 +1137,10 @@ window.app = Vue.createApp({
         )
         const paymentRequest = data?.payment_request
         const paymentHash = data?.settlement?.payment_hash
+        const settlementAmount = this.normalizeApiAmount(
+          this.currency,
+          data?.settlement?.amount
+        )
         if (!paymentRequest || !paymentHash) {
           Quasar.Notify.create({
             type: 'warning',
@@ -1130,6 +1149,10 @@ window.app = Vue.createApp({
           return
         }
         this.closeTabsDialog()
+        if (settlementAmount !== null) {
+          this.paymentAmount = settlementAmount
+          this.total = settlementAmount
+        }
         this.openInvoiceDialog(
           paymentHash,
           'lightning:' + String(paymentRequest).toUpperCase()
@@ -1142,12 +1165,13 @@ window.app = Vue.createApp({
       }
     },
     async openTabChargeDialog() {
-      this.tabsDialog.mode = 'charge'
-      await this.loadTabsForCharge()
-      this.tabsDialog.show = true
+      await this.openTabsDialog('charge')
     },
     async openTabSettlementDialog() {
-      this.tabsDialog.mode = 'settlement'
+      await this.openTabsDialog('settlement')
+    },
+    async openTabsDialog(mode) {
+      this.tabsDialog.mode = mode
       await this.loadTabsForCharge()
       this.tabsDialog.show = true
     },
