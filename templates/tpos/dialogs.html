@@ -45,8 +45,8 @@
       <div v-else :class="isMobileLandscaped ? 'row flex-center' : ''">
         <lnbits-qrcode
           :show-buttons="false"
-          :value="isLNURL(invoiceDialog.data.payment_request) 
-          ? invoiceDialog.data.fallback 
+          :value="isLNURL(invoiceDialog.data.payment_request)
+          ? invoiceDialog.data.fallback
           : invoiceDialog.data.payment_request"
           :href="invoiceDialog.data.payment_request"
         ></lnbits-qrcode>
@@ -464,7 +464,7 @@
           <q-btn
             class="full-width q-px-lg q-py-sm"
             size="xl"
-            color="accent"
+            color="secondary"
             rounded
             aria-label="Add to tab"
             @click="selectPaymentMethod('tab')"
@@ -535,9 +535,7 @@
             </q-item>
           </q-list>
         </div>
-        <div v-else class="text-caption text-grey-7">
-          No open tabs found.
-        </div>
+        <div v-else class="text-caption text-grey-7">No open tabs found.</div>
 
         <div class="q-mt-md" v-if="tabsAllowCreate">
           <q-btn
