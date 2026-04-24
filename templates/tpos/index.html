@@ -446,7 +446,7 @@
             ></q-input>
           </div>
         </div>
-        <div v-if="g.user.super_user" class="row q-mt-sm">
+        <div class="row q-mt-sm">
           <div class="col">
             <q-checkbox
               v-model="formDialog.data.allow_cash_settlement"
@@ -457,10 +457,23 @@
                 currency must be set to fiat
               </q-tooltip>
             </q-checkbox>
+            <sup>
+              <q-icon right size="xs" name="info" color="grey"></q-icon>
+              <q-tooltip>
+                <span
+                  v-if="g.user.super_user"
+                  v-text="'Cash payments will create and settle an internal invoice, crediting this LNbits wallet for accounting.'"
+                ></span>
+                <span
+                  v-else
+                  v-text="'Cash payments record the TPoS sale only. They will not credit this LNbits wallet balance.'"
+                ></span>
+              </q-tooltip>
+            </sup>
           </div>
         </div>
         <div class="row q-mt-sm">
-          <div class="col">
+          <div class="col-12">
             <q-checkbox
               v-model="formDialog.data.onchain_enabled"
               :disable="!onchainStatus.available"
@@ -472,21 +485,22 @@
                 ></span>
               </q-tooltip>
             </q-checkbox>
+            <sup>
+              <q-icon right size="xs" name="info" color="grey"></q-icon>
+              <q-tooltip>
+                <span
+                  v-if="g.user.super_user"
+                  v-text="'Onchain payments will create and settle an internal invoice after detection, crediting this LNbits wallet for accounting.'"
+                ></span>
+                <span
+                  v-else
+                  v-text="'Onchain payments record the TPoS sale only. They will not credit this LNbits wallet balance.'"
+                ></span>
+              </q-tooltip>
+            </sup>
           </div>
         </div>
-        <div v-if="formDialog.data.onchain_enabled" class="row q-col-gutter-md">
-          <div class="col-12">
-            <q-banner
-              v-if="!onchainStatus.available"
-              dense
-              rounded
-              class="bg-orange-2 text-dark"
-            >
-              <span
-                v-text="onchainStatus.message || 'Watchonly extension must be enabled and working.'"
-              ></span>
-            </q-banner>
-          </div>
+        <div v-if="formDialog.data.onchain_enabled" class="row q-mt-sm">
           <div class="col-12">
             <q-select
               filled
@@ -511,6 +525,7 @@
               </q-tooltip>
             </q-toggle>
           </div>
+          <q-separator class="full-width q-my-sm"></q-separator>
         </div>
         <div class="row">
           <div class="col">

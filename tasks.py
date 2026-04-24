@@ -110,11 +110,16 @@ async def settle_onchain_tpos_payment(tpos_payment) -> None:
 
     if payment.success:
         return
+    if payment.extra.get("tpos_processed"):
+        return
 
     payment.extra["payment_method"] = "onchain"
     payment.extra["settled_by_onchain"] = True
     await update_payment(payment)
-    await internal_invoice_queue_put(payment.checking_id)
+    if payment.is_internal:
+        await internal_invoice_queue_put(payment.checking_id)
+    else:
+        await process_paid_tpos_payment(payment, payment_method="onchain")
 
 
 async def process_paid_tpos_payment(
@@ -124,6 +129,7 @@ async def process_paid_tpos_payment(
         not payment.extra
         or payment.extra.get("tag") != "tpos"
         or payment.extra.get("tipSplitted")
+        or payment.extra.get("tpos_processed")
     ):
         return
 
@@ -147,7 +153,12 @@ async def process_paid_tpos_payment(
 
     tpos = await get_tpos(tpos_id)
     assert tpos
-    if payment.extra.get("lnaddress") and payment.extra["lnaddress"] != "":
+    credits_wallet_balance = payment.extra.get("credits_wallet_balance") is not False
+    if (
+        credits_wallet_balance
+        and payment.extra.get("lnaddress")
+        and payment.extra["lnaddress"] != ""
+    ):
         calc_amount = payment.amount - ((payment.amount / 100) * tpos.lnaddress_cut)
         address = payment.extra.get("lnaddress")
         if address:
@@ -178,7 +189,7 @@ async def process_paid_tpos_payment(
         except Exception as exc:
             logger.warning(f"tpos: inventory deduction failed: {exc}")
 
-    if not tip_amount:
+    if not credits_wallet_balance or not tip_amount:
         return
 
     wallet_id = tpos.tip_wallet

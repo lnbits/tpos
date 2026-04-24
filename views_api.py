@@ -47,6 +47,7 @@ from .crud import (
     get_tpos_payment_by_hash,
     get_tposs,
     update_tpos,
+    update_tpos_payment,
 )
 from .helpers import (
     first_image,
@@ -305,8 +306,6 @@ async def api_tpos_create(
         onchain_wallet_id=data.onchain_wallet_id,
     )
     user = await get_user(wallet.wallet.user)
-    if not (user and user.super_user):
-        data.allow_cash_settlement = False
     if data.currency == "sats":
         data.allow_cash_settlement = False
     if data.use_inventory and not inventory_available_for_user(user):
@@ -353,11 +352,9 @@ async def api_tpos_update(
     if desired_currency == "sats":
         update_payload["allow_cash_settlement"] = False
     if "allow_cash_settlement" in update_payload:
-        if update_payload["allow_cash_settlement"] and not (user and user.super_user):
-            raise HTTPException(
-                status_code=HTTPStatus.FORBIDDEN,
-                detail="Cash settlement can only be enabled by super users.",
-            )
+        update_payload["allow_cash_settlement"] = bool(
+            update_payload["allow_cash_settlement"]
+        )
     if update_payload.get("use_inventory") and not update_payload.get("inventory_id"):
         inventory = await get_default_inventory(wallet.wallet.user)
         if inventory:
@@ -552,6 +549,11 @@ async def api_tpos_create_invoice(
         amount = (data.amount_fiat or 0.0) + (data.tip_amount_fiat or 0.0)
 
     try:
+        wallet_record = await get_wallet(tpos.wallet)
+        user = await get_user(wallet_record.user) if wallet_record else None
+        credits_wallet_balance = not (cash_method or onchain_method) or bool(
+            user and user.super_user
+        )
         extra = {
             "tag": "tpos",
             "tip_amount": data.tip_amount,
@@ -564,11 +566,11 @@ async def api_tpos_create_invoice(
             "internal_memo": data.internal_memo if data.internal_memo else None,
             "paid_in_fiat": data.pay_in_fiat,
             "base_url": str(request.base_url),
+            "credits_wallet_balance": credits_wallet_balance,
         }
         if cash_method or onchain_method:
-            wallet = await get_wallet(tpos.wallet)
-            if wallet:
-                account = await get_account(wallet.user)
+            if wallet_record:
+                account = await get_account(wallet_record.user)
                 if account:
                     existing = {label.name for label in account.extra.labels or []}
                     label_name = "cash" if cash_method else "onchain"
@@ -602,15 +604,15 @@ async def api_tpos_create_invoice(
             fiat_provider=(
                 tpos.fiat_provider if data.pay_in_fiat and not cash_method else None
             ),
-            internal=bool(cash_method or onchain_method),
+            internal=bool((cash_method or onchain_method) and credits_wallet_balance),
             labels=["cash"] if cash_method else (["onchain"] if onchain_method else []),
         )
         payment = await create_payment_request(tpos.wallet, invoice_data)
-        if cash_method:
+        if cash_method and credits_wallet_balance:
             new_checking_id = f"internal_cash_{payment.payment_hash}"
             await update_payment_checking_id(payment.checking_id, new_checking_id)
             payment.checking_id = new_checking_id
-        elif onchain_method:
+        elif onchain_method and credits_wallet_balance:
             new_checking_id = f"internal_onchain_{payment.payment_hash}"
             await update_payment_checking_id(payment.checking_id, new_checking_id)
             payment.checking_id = new_checking_id
@@ -618,7 +620,6 @@ async def api_tpos_create_invoice(
         onchain_address = None
         mempool_endpoint = None
         if onchain_method:
-            wallet_record = await get_wallet(tpos.wallet)
             if not wallet_record:
                 raise HTTPException(
                     status_code=HTTPStatus.BAD_REQUEST,
@@ -878,14 +879,19 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST, detail="Payment is not cash."
         )
-    if not payment.is_internal:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Payment is not an internal cash invoice.",
-        )
-    if payment.success:
+    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
+    if payment.success or (tpos_payment and tpos_payment.paid):
         return {"success": True}
-    await internal_invoice_queue_put(payment.checking_id)
+    if payment.is_internal:
+        await internal_invoice_queue_put(payment.checking_id)
+    else:
+        if tpos_payment:
+            tpos_payment.paid = True
+            tpos_payment.payment_method = "cash"
+            await update_tpos_payment(tpos_payment)
+        from .tasks import process_paid_tpos_payment
+
+        await process_paid_tpos_payment(payment, payment_method="cash")
     return {"success": True}
 
 
