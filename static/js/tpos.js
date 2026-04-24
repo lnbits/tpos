@@ -44,6 +44,7 @@ window.app = Vue.createApp({
       currency: null,
       fiatProvider: null,
       allowCashSettlement: false,
+      onchainEnabled: false,
       payInFiat: false,
       fiatMethod: 'checkout',
       atmPremium: tpos.withdraw_premium / 100,
@@ -73,7 +74,15 @@ window.app = Vue.createApp({
       },
       invoiceDialog: {
         show: false,
-        data: {},
+        data: {
+          payment_hash: null,
+          payment_request: null,
+          lightning_payment_request: null,
+          onchain_address: null,
+          onchain_amount_sat: null,
+          payment_options: [],
+          payment_method: null
+        },
         dismissMsg: null,
         paymentChecker: null,
         internalMemo: null
@@ -380,20 +389,62 @@ window.app = Vue.createApp({
       this.tipAmount = payload.tip_amount || this.tipAmount
       this.exchangeRate = payload.exchange_rate || this.exchangeRate
 
-      this.openInvoiceDialog(payload.payment_hash, payload.payment_request)
+      this.openInvoiceDialog(payload)
       this.subscribeToPaymentWS(payload.payment_hash)
     },
-    openInvoiceDialog(paymentHash, paymentRequest) {
+    normalizeInvoiceDialogData(paymentData, paymentRequest = null) {
+      if (typeof paymentData === 'string') {
+        return {
+          payment_hash: paymentData,
+          payment_request: paymentRequest,
+          lightning_payment_request:
+            paymentRequest &&
+            paymentRequest !== 'cash' &&
+            paymentRequest !== 'tap_to_pay'
+              ? paymentRequest
+              : null,
+          onchain_address: null,
+          onchain_amount_sat: null,
+          payment_options: ['lightning'],
+          payment_method: 'lightning'
+        }
+      }
+
+      const lightningPaymentRequest =
+        paymentData.payment_method === 'onchain'
+          ? null
+          : paymentData.payment_request &&
+              paymentData.payment_request !== 'cash' &&
+              paymentData.payment_request !== 'tap_to_pay'
+            ? paymentData.payment_request
+            : paymentData.bolt11
+              ? 'lightning:' + paymentData.bolt11.toUpperCase()
+              : null
+
+      return {
+        payment_hash: paymentData.payment_hash,
+        payment_request: paymentData.payment_request,
+        lightning_payment_request: lightningPaymentRequest,
+        onchain_address: paymentData.onchain_address || null,
+        onchain_amount_sat: paymentData.onchain_amount_sat || null,
+        payment_options: paymentData.payment_options || ['lightning'],
+        payment_method: paymentData.payment_method || 'lightning'
+      }
+    },
+    openInvoiceDialog(paymentData, paymentRequest = null) {
+      const dialogData = this.normalizeInvoiceDialogData(
+        paymentData,
+        paymentRequest
+      )
       if (
         this.invoiceDialog.show &&
-        this.invoiceDialog.data.payment_hash === paymentHash
+        this.invoiceDialog.data.payment_hash === dialogData.payment_hash
       ) {
         return
       }
-      this.invoiceDialog.data.payment_hash = paymentHash
-      this.invoiceDialog.data.payment_request = paymentRequest
+      this.invoiceDialog.data = dialogData
       this.invoiceDialog.show = true
-      if (paymentRequest !== 'cash') {
+      if (dialogData.lightning_payment_request) {
         this.readNfcTag()
         this.invoiceDialog.dismissMsg = Quasar.Notify.create({
           timeout: 0,
@@ -924,16 +975,22 @@ window.app = Vue.createApp({
     selectPaymentMethod(method) {
       this.currency_choice = false
       if (this._currencyResolver) {
-        if (method == 'fiat_tap') {
-          this.fiatMethod = 'terminal'
-          method = 'fiat'
-        } else if (method == 'fiat') {
-          this.fiatMethod = 'checkout'
-        } else if (method == 'cash') {
-          this.fiatMethod = 'cash'
-          method = 'fiat'
-        } else if (method == 'btc') {
-          this.fiatMethod = 'checkout'
+        switch (method) {
+          case 'fiat_tap':
+            this.fiatMethod = 'terminal'
+            method = 'fiat'
+            break
+          case 'fiat':
+            this.fiatMethod = 'checkout'
+            break
+          case 'cash':
+            this.fiatMethod = 'cash'
+            method = 'fiat'
+            break
+          case 'btc':
+          case 'btc_onchain':
+            this.fiatMethod = 'checkout'
+            break
         }
         this._currencyResolver(method)
         this._currencyResolver = null
@@ -948,7 +1005,8 @@ window.app = Vue.createApp({
         exchange_rate: this.exchangeRate,
         internal_memo: this.invoiceDialog.internalMemo || null,
         pay_in_fiat: this.payInFiat,
-        fiat_method: this.fiatMethod
+        fiat_method: this.fiatMethod,
+        payment_method: this.invoiceDialog.data.payment_method || 'btc'
       }
       if (this.currency != g.settings.denomination) {
         params.amount_fiat = paymentAmount
@@ -1005,9 +1063,16 @@ window.app = Vue.createApp({
         return
       }
 
-      if (this.fiatProvider || this.allowCashSettlement) {
+      if (
+        this.fiatProvider ||
+        this.allowCashSettlement ||
+        this.onchainEnabled
+      ) {
         const method = await this.showPaymentMethod()
         this.payInFiat = method === 'fiat'
+        this.invoiceDialog.data.payment_method = method
+      } else {
+        this.invoiceDialog.data.payment_method = 'btc'
       }
 
       const params = this.buildInvoiceParams()
@@ -1018,27 +1083,7 @@ window.app = Vue.createApp({
           null,
           params
         )
-        let paymentRequest = 'lightning:' + data.bolt11.toUpperCase()
-        if (data.extra?.fiat_method === 'cash') {
-          paymentRequest = 'cash'
-        } else if (
-          data.extra?.fiat_payment_request &&
-          !data.extra.fiat_payment_request.startsWith('pi_')
-        ) {
-          paymentRequest = data.extra.fiat_payment_request
-        } else if (
-          data.extra?.fiat_payment_request &&
-          data.extra.fiat_payment_request.startsWith('pi_')
-        ) {
-          paymentRequest = 'tap_to_pay'
-        }
-        if (
-          !data.extra?.fiat_payment_request &&
-          data.extra?.fiat_method !== 'cash'
-        ) {
-          paymentRequest = 'lightning:' + data.bolt11.toUpperCase()
-        }
-        this.openInvoiceDialog(data.payment_hash, paymentRequest)
+        this.openInvoiceDialog(data)
         this.subscribeToPaymentWS(data.payment_hash)
       } catch (error) {
         console.error(error)
@@ -1060,37 +1105,68 @@ window.app = Vue.createApp({
         this.cashValidating = false
       }
     },
+    finalizeSuccessfulPayment(paymentHash) {
+      Quasar.Notify.create({
+        type: 'positive',
+        message: 'Invoice Paid!'
+      })
+      this.invoiceDialog.show = false
+      this.invoiceDialog.internalMemo = null
+      this.clearCart()
+      this.showComplete()
+      if (this.enablePrint) {
+        this.promptPrintType(paymentHash)
+      }
+    },
+    startPaymentChecker(paymentHash) {
+      if (this.invoiceDialog.paymentChecker) {
+        clearInterval(this.invoiceDialog.paymentChecker)
+      }
+      this.invoiceDialog.paymentChecker = setInterval(async () => {
+        try {
+          const {data} = await LNbits.api.request(
+            'GET',
+            `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}`
+          )
+          if (data.paid) {
+            clearInterval(this.invoiceDialog.paymentChecker)
+            this.invoiceDialog.paymentChecker = null
+            this.finalizeSuccessfulPayment(paymentHash)
+          }
+        } catch (error) {
+          console.warn('TPoS payment status check failed:', error)
+        }
+      }, 3000)
+    },
     subscribeToPaymentWS(paymentHash) {
       if (this.paymentWsByHash[paymentHash]) return
+      this.startPaymentChecker(paymentHash)
       try {
-        const url = new URL(window.location)
-        url.protocol = url.protocol === 'https:' ? 'wss' : 'ws'
-        url.pathname = `/api/v1/ws/${paymentHash}`
+        const wsProtocol =
+          window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const url = new URL(`/api/v1/ws/${paymentHash}`, window.location.origin)
+        url.protocol = wsProtocol
         const ws = new WebSocket(url)
         this.paymentWsByHash[paymentHash] = ws
         ws.onmessage = async ({data}) => {
           const payment = JSON.parse(data)
           if (payment.pending === false) {
-            Quasar.Notify.create({
-              type: 'positive',
-              message: 'Invoice Paid!'
-            })
-            this.invoiceDialog.show = false
-            this.invoiceDialog.internalMemo = null
-            this.clearCart()
-            this.showComplete()
-            if (this.enablePrint) {
-              this.promptPrintType(paymentHash)
+            if (this.invoiceDialog.paymentChecker) {
+              clearInterval(this.invoiceDialog.paymentChecker)
+              this.invoiceDialog.paymentChecker = null
             }
+            this.finalizeSuccessfulPayment(paymentHash)
             ws.close()
           }
+        }
+        ws.onerror = err => {
+          console.warn('TPoS payment websocket error:', err)
         }
         ws.onclose = () => {
           delete this.paymentWsByHash[paymentHash]
         }
       } catch (err) {
-        console.warn(err)
-        LNbits.utils.notifyApiError(err)
+        console.warn('TPoS payment websocket setup failed:', err)
       }
     },
     readNfcTag() {
@@ -1221,7 +1297,7 @@ window.app = Vue.createApp({
         })
     },
     payInvoice(lnurl) {
-      const payment_request = this.invoiceDialog.data.payment_request
+      const payment_request = this.invoiceDialog.data.lightning_payment_request
         .toLowerCase()
         .replace('lightning:', '')
       return axios
@@ -1580,6 +1656,7 @@ window.app = Vue.createApp({
       new URL(window.location.href).searchParams.get('wrapper') === 'true'
     this.fiatProvider = tpos.fiat_provider
     this.allowCashSettlement = Boolean(tpos.allow_cash_settlement)
+    this.onchainEnabled = Boolean(tpos.onchain_enabled)
 
     this.tip_options = tpos.tip_options == 'null' ? null : tpos.tip_options
 

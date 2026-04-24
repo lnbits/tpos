@@ -43,36 +43,16 @@
         </div>
       </div>
       <div v-else :class="isMobileLandscaped ? 'row flex-center' : ''">
-        <lnbits-qrcode
-          :show-buttons="false"
-          :value="isLNURL(invoiceDialog.data.payment_request) 
-          ? invoiceDialog.data.fallback 
-          : invoiceDialog.data.payment_request"
-          :href="invoiceDialog.data.payment_request"
-        ></lnbits-qrcode>
-        <div class="text-center">
-          <h3 class="q-my-md">${ activePaymentAmountWithTipFormatted }</h3>
-          <h5 class="q-mt-none q-mb-sm">
-            ${ activePaymentAmountFormatted }
-            <span v-show="tip_options" style="font-size: 0.75rem"
-              >(+ ${ tipAmountFormatted } tip)</span
-            >
-          </h5>
-          <q-chip v-if="nfcTagReading" square>
-            <q-avatar icon="nfc" color="positive" text-color="white"></q-avatar>
-            NFC supported
-          </q-chip>
-          <span v-else class="text-caption text-grey">NFC not supported</span>
-        </div>
-        <div class="row q-mt-lg full-width">
-          <q-btn
-            outline
-            color="grey"
-            @click="copyText(invoiceDialog.data.payment_request)"
-            >Copy invoice</q-btn
-          >
-          <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
-        </div>
+        <tpos-payment-dialog
+          :dialog-data="invoiceDialog.data"
+          :is-mobile-landscaped="isMobileLandscaped"
+          :active-payment-amount-formatted="activePaymentAmountFormatted"
+          :active-payment-amount-with-tip-formatted="activePaymentAmountWithTipFormatted"
+          :tip-options="tip_options"
+          :tip-amount-formatted="tipAmountFormatted"
+          :nfc-tag-reading="nfcTagReading"
+          @copy="copyText($event)"
+        ></tpos-payment-dialog>
       </div>
     </q-card>
   </q-dialog>
@@ -395,7 +375,7 @@
             size="xl"
             color="primary"
             rounded
-            aria-label="Bitcoin"
+            aria-label="Lightning Network"
             @click="selectPaymentMethod('btc')"
           >
             <div class="row items-center no-wrap q-gutter-x-sm">
@@ -403,6 +383,25 @@
                 class="text-h4 text-weight-bold"
                 v-text="bitcoinSymbol"
               ></span>
+              <span class="text-subtitle1 text-weight-medium">Lightning</span>
+            </div>
+          </q-btn>
+        </div>
+        <div class="col-6" v-if="onchainEnabled">
+          <q-btn
+            class="full-width q-px-lg q-py-sm"
+            size="xl"
+            color="primary"
+            rounded
+            aria-label="Bitcoin Onchain"
+            @click="selectPaymentMethod('btc_onchain')"
+          >
+            <div class="row items-center no-wrap q-gutter-x-sm">
+              <span
+                class="text-h4 text-weight-bold"
+                v-text="bitcoinSymbol"
+              ></span>
+              <span class="text-subtitle1 text-weight-medium">Onchain</span>
             </div>
           </q-btn>
         </div>

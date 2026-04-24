@@ -446,7 +446,7 @@
             ></q-input>
           </div>
         </div>
-        <div v-if="g.user.super_user" class="row q-mt-sm">
+        <div class="row q-mt-sm">
           <div class="col">
             <q-checkbox
               v-model="formDialog.data.allow_cash_settlement"
@@ -457,7 +457,75 @@
                 currency must be set to fiat
               </q-tooltip>
             </q-checkbox>
+            <sup>
+              <q-icon right size="xs" name="info" color="grey"></q-icon>
+              <q-tooltip>
+                <span
+                  v-if="g.user.super_user"
+                  v-text="'Cash payments will create and settle an internal invoice, crediting this LNbits wallet for accounting.'"
+                ></span>
+                <span
+                  v-else
+                  v-text="'Cash payments record the TPoS sale only. They will not credit this LNbits wallet balance.'"
+                ></span>
+              </q-tooltip>
+            </sup>
           </div>
+        </div>
+        <div class="row q-mt-sm">
+          <div class="col-12">
+            <q-checkbox
+              v-model="formDialog.data.onchain_enabled"
+              :disable="!onchainStatus.available"
+              label="Enable onchain payments"
+            >
+              <q-tooltip v-if="!onchainStatus.available">
+                <span
+                  v-text="onchainStatus.message || 'Watchonly extension must be enabled and working.'"
+                ></span>
+              </q-tooltip>
+            </q-checkbox>
+            <sup>
+              <q-icon right size="xs" name="info" color="grey"></q-icon>
+              <q-tooltip>
+                <span
+                  v-if="g.user.super_user"
+                  v-text="'Onchain payments will create and settle an internal invoice after detection, crediting this LNbits wallet for accounting.'"
+                ></span>
+                <span
+                  v-else
+                  v-text="'Onchain payments record the TPoS sale only. They will not credit this LNbits wallet balance.'"
+                ></span>
+              </q-tooltip>
+            </sup>
+          </div>
+        </div>
+        <div v-if="formDialog.data.onchain_enabled" class="row q-mt-sm">
+          <div class="col-12">
+            <q-select
+              filled
+              dense
+              emit-value
+              map-options
+              v-model="formDialog.data.onchain_wallet_id"
+              :options="onchainWalletOptions"
+              :disable="!onchainStatus.available"
+              label="Watchonly wallet *"
+              hint="Select the watchonly wallet used to derive fresh onchain addresses."
+            ></q-select>
+          </div>
+          <div class="col-12">
+            <q-toggle
+              v-model="formDialog.data.onchain_zero_conf"
+              label="Accept onchain payment at 0-conf"
+            >
+              <q-tooltip>
+                If disabled, TPoS waits for the first confirmation before
+                completing the sale.
+              </q-tooltip>
+            </q-toggle>
+          </div>
+          <q-separator class="full-width q-my-sm"></q-separator>
         </div>
         <div class="row">
           <div class="col">
@@ -766,7 +834,7 @@
           <strong v-text="urlDialog.data.name"></strong>
         </p>
       </div>
-      <div v-if="urlDialog.data.stripe_card_payments">
+      <div>
         <div class="row q-mt-lg">
           <div class="col">
             <q-toggle
@@ -775,47 +843,51 @@
             ></q-toggle>
           </div>
         </div>
-        <div class="row q-mt-sm" v-if="urlDialog.data.useWrapper">
-          <div class="col">
-            <q-btn
-              outline
-              color="primary"
-              type="a"
-              href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper-Stripev5"
-              target="_blank"
-              rel="noopener noreferrer"
-              label="GET THE TPOS-WRAPPER"
-            ></q-btn>
+        <div
+          v-if="urlDialog.data.useWrapper && urlDialog.data.stripe_card_payments"
+        >
+          <div class="row q-mt-sm">
+            <div class="col">
+              <q-btn
+                outline
+                color="primary"
+                type="a"
+                href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper-Stripev5"
+                target="_blank"
+                rel="noopener noreferrer"
+                label="GET THE TPOS-WRAPPER"
+              ></q-btn>
+            </div>
           </div>
-        </div>
-        <div class="row q-mt-lg">
-          <div class="col" v-if="urlDialog.data.useWrapper">
-            <q-input
-              v-model="urlDialog.data.posLocation"
-              label="PoS Stripe Location"
-            >
-            </q-input>
+          <div class="row q-mt-lg">
+            <div class="col">
+              <q-input
+                v-model="urlDialog.data.posLocation"
+                label="PoS Stripe Location"
+              >
+              </q-input>
+            </div>
+            <div class="col q-pl-md">
+              <small>
+                If accepting Stripe payments, visit
+                https://dashboard.stripe.com/terminal and grab a new location ID
+              </small>
+            </div>
           </div>
-          <div class="col q-pl-md" v-if="urlDialog.data.useWrapper">
-            <small>
-              If accepting Stripe payments, visit
-              https://dashboard.stripe.com/terminal and grab a new location ID
-            </small>
-          </div>
-        </div>
-        <div class="row q-mt-lg" v-if="urlDialog.data.useWrapper">
-          <div class="col">
-            <q-btn
-              outline
-              color="primary"
-              :disable="!urlDialog.data.posLocation"
-              :loading="urlDialog.data.loadingWrapperToken"
-              @click="generateWrapperToken(urlDialog.data)"
-              label="Generate ACL token"
-            ></q-btn>
-          </div>
-          <div class="col">
-            <small>Press if accepting Stripe payments.</small>
+          <div class="row q-mt-lg">
+            <div class="col">
+              <q-btn
+                outline
+                color="primary"
+                :disable="!urlDialog.data.posLocation"
+                :loading="urlDialog.data.loadingWrapperToken"
+                @click="generateWrapperToken(urlDialog.data)"
+                label="Generate ACL token"
+              ></q-btn>
+            </div>
+            <div class="col">
+              <small>Press if accepting Stripe payments.</small>
+            </div>
           </div>
         </div>
       </div>

@@ -260,3 +260,33 @@ async def m021_add_cash_settlement(db: Database):
     await db.execute("""
         ALTER TABLE tpos.pos ADD allow_cash_settlement BOOLEAN DEFAULT false;
     """)
+
+
+async def m022_add_onchain_settings_and_payments(db: Database):
+    await db.execute("""
+        ALTER TABLE tpos.pos ADD onchain_enabled BOOLEAN DEFAULT false;
+    """)
+    await db.execute("""
+        ALTER TABLE tpos.pos ADD onchain_wallet_id TEXT NULL;
+    """)
+    await db.execute("""
+        ALTER TABLE tpos.pos ADD onchain_zero_conf BOOLEAN DEFAULT true;
+    """)
+    await db.execute("""
+        CREATE TABLE tpos.payments (
+            id TEXT PRIMARY KEY,
+            tpos_id TEXT NOT NULL,
+            payment_hash TEXT NOT NULL UNIQUE,
+            amount INTEGER NOT NULL DEFAULT 0,
+            paid BOOLEAN DEFAULT false,
+            payment_method TEXT NULL,
+            onchain_address TEXT NULL,
+            onchain_wallet_id TEXT NULL,
+            onchain_zero_conf BOOLEAN DEFAULT true,
+            mempool_endpoint TEXT NULL,
+            balance INTEGER NOT NULL DEFAULT 0,
+            pending INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+    """)

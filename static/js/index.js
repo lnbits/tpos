@@ -47,6 +47,9 @@ const mapTpos = obj => {
     : []
   obj.only_show_sats_on_bitcoin = obj.only_show_sats_on_bitcoin ?? true
   obj.allow_cash_settlement = Boolean(obj.allow_cash_settlement)
+  obj.onchain_enabled = Boolean(obj.onchain_enabled)
+  obj.onchain_wallet_id = obj.onchain_wallet_id || null
+  obj.onchain_zero_conf = obj.onchain_zero_conf ?? true
   obj.useWrapper = false
   obj.posLocation = ''
   obj.auth = ''
@@ -73,6 +76,13 @@ window.app = Vue.createApp({
         inventory_id: null,
         tags: [],
         omit_tags: []
+      },
+      onchainStatus: {
+        available: false,
+        message: null,
+        network: null,
+        wallets: [],
+        mempool_endpoint: null
       },
       tpossTable: {
         columns: [
@@ -141,7 +151,10 @@ window.app = Vue.createApp({
           fiat: false,
           stripe_card_payments: false,
           stripe_reader_id: '',
-          allow_cash_settlement: false
+          allow_cash_settlement: false,
+          onchain_enabled: false,
+          onchain_wallet_id: null,
+          onchain_zero_conf: true
         },
         advanced: {
           tips: false,
@@ -233,7 +246,9 @@ window.app = Vue.createApp({
         !data.name ||
         !data.currency ||
         !data.wallet ||
-        (this.formDialog.advanced.otc && !data.withdraw_limit)
+        (this.formDialog.advanced.otc && !data.withdraw_limit) ||
+        (data.onchain_enabled &&
+          (!this.onchainStatus.available || !data.onchain_wallet_id))
       )
     },
     inventoryModeOptions() {
@@ -263,6 +278,12 @@ window.app = Vue.createApp({
         !!this.formDialog.data.currency &&
         this.formDialog.data.currency !== 'sats'
       )
+    },
+    onchainWalletOptions() {
+      return (this.onchainStatus.wallets || []).map(wallet => ({
+        label: wallet.title,
+        value: wallet.id
+      }))
     }
   },
   methods: {
@@ -285,7 +306,10 @@ window.app = Vue.createApp({
         fiat: false,
         stripe_card_payments: false,
         stripe_reader_id: '',
-        allow_cash_settlement: false
+        allow_cash_settlement: false,
+        onchain_enabled: false,
+        onchain_wallet_id: null,
+        onchain_zero_conf: true
       }
       this.formDialog.advanced = {tips: false, otc: false}
     },
@@ -321,6 +345,25 @@ window.app = Vue.createApp({
         console.error(error)
       }
     },
+    async loadOnchainStatus() {
+      if (!this.g.user.wallets.length) return
+      try {
+        const {data} = await LNbits.api.request(
+          'GET',
+          '/tpos/api/v1/onchain/status',
+          this.g.user.wallets[0].adminkey
+        )
+        this.onchainStatus = data
+      } catch (error) {
+        this.onchainStatus = {
+          available: false,
+          message: error.response?.data?.detail || 'Watchonly unavailable.',
+          network: null,
+          wallets: [],
+          mempool_endpoint: null
+        }
+      }
+    },
     sendTposData() {
       const data = {
         ...this.formDialog.data,
@@ -354,6 +397,10 @@ window.app = Vue.createApp({
       }
       if (data.currency === 'sats') {
         data.allow_cash_settlement = false
+      }
+      if (!data.onchain_enabled) {
+        data.onchain_wallet_id = null
+        data.onchain_zero_conf = true
       }
       const wallet = _.findWhere(this.g.user.wallets, {
         id: this.formDialog.data.wallet
@@ -760,6 +807,7 @@ window.app = Vue.createApp({
     if (this.g.user.wallets.length) {
       this.getTposs()
       this.loadInventoryStatus()
+      this.loadOnchainStatus()
     }
     LNbits.api
       .request('GET', '/api/v1/currencies')
