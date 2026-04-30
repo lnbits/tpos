@@ -459,7 +459,7 @@
             </q-checkbox>
           </div>
         </div>
-        <div class="row q-mt-sm">
+        <div v-if="g.user.super_user" class="row q-mt-sm">
           <div class="col">
             <q-checkbox
               v-model="formDialog.data.onchain_enabled"
