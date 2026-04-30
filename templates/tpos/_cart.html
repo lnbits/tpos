@@ -169,11 +169,11 @@
         class="cursor-pointer"
       ></q-icon>
     </q-input>
-    <div class="col-auto lt-md">{% include "tpos/_options_fab.html" %}</div>
+    <div class="col-auto lt-lg">{% include "tpos/_options_fab.html" %}</div>
 
     <!-- categories: drop under on xs -->
     <div
-      class="col-12 col-sm-auto row wrap justify-center q-pa-sm q-mx-md"
+      class="col-12 col-sm-12 col-md-12 col-lg-auto row wrap justify-center q-pa-sm q-mx-md"
       v-if="categories && categories.length"
     >
       <template v-for="category in Array.from(categories.values())">
@@ -187,7 +187,7 @@
     </div>
     <q-space></q-space>
     <!-- right: don't stretch -->
-    <div class="col-auto gt-sm">{% include "tpos/_options_fab.html" %}</div>
+    <div class="col-auto gt-md">{% include "tpos/_options_fab.html" %}</div>
   </div>
 
   <div class="q-mx-auto q-pa-md" :class="{'dimmed': moreBtn}">

@@ -28,6 +28,7 @@ class CreateTposInvoice(BaseModel):
     internal_memo: str | None = Query(None, max_length=512)
     pay_in_fiat: bool = Query(False)
     fiat_method: str | None = Query(None)
+    payment_method: str | None = Query(None)
     amount_fiat: float | None = Query(None, ge=0.0)
     tip_amount_fiat: float | None = Query(None, ge=0.0)
 
@@ -72,6 +73,9 @@ class CreateTposData(BaseModel):
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
     allow_cash_settlement: bool = Field(False)
+    onchain_enabled: bool = Field(False)
+    onchain_wallet_id: str | None = None
+    onchain_zero_conf: bool = Field(True)
 
     @validator("tax_default", pre=True, always=True)
     def default_tax_when_none(cls, v):
@@ -108,6 +112,9 @@ class TposClean(BaseModel):
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
     allow_cash_settlement: bool = False
+    onchain_enabled: bool = False
+    onchain_wallet_id: str | None = None
+    onchain_zero_conf: bool = True
 
     @property
     def withdraw_maximum(self) -> int:
@@ -130,6 +137,35 @@ class TposClean(BaseModel):
 class Tpos(TposClean, BaseModel):
     wallet: str
     tip_wallet: str | None = None
+
+
+class TposPayment(BaseModel):
+    id: str
+    tpos_id: str
+    payment_hash: str
+    amount: int = 0
+    paid: bool = False
+    payment_method: str | None = None
+    onchain_address: str | None = None
+    onchain_wallet_id: str | None = None
+    onchain_zero_conf: bool = True
+    mempool_endpoint: str | None = None
+    balance: int = 0
+    pending: int = 0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class TposInvoiceResponse(BaseModel):
+    payment_hash: str
+    bolt11: str
+    payment_request: str
+    tpos_payment_id: str
+    payment_options: list[str] = Field(default_factory=list)
+    onchain_address: str | None = None
+    onchain_amount_sat: int | None = None
+    payment_method: str | None = None
+    extra: dict[str, Any] = Field(default_factory=dict)
 
 
 class LnurlCharge(BaseModel):
