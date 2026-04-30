@@ -1459,7 +1459,6 @@ window.app = Vue.createApp({
         type: 'positive',
         message: 'Print request sent to wrapper.'
       })
-      this.closePrintDialog()
     },
     async printReceipt(paymentHash) {
       try {

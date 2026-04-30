@@ -766,44 +766,46 @@
           <strong v-text="urlDialog.data.name"></strong>
         </p>
       </div>
-      <div v-if="urlDialog.data.stripe_card_payments">
+      <div class="row q-mt-lg">
+        <div class="col">
+          <q-toggle
+            v-model="urlDialog.data.useWrapper"
+            label="Use with TPoS-Wrapper Android app"
+          ></q-toggle>
+        </div>
+      </div>
+      <div class="row q-mt-sm" v-if="urlDialog.data.useWrapper">
+        <div class="col">
+          <q-btn
+            outline
+            color="primary"
+            type="a"
+            href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper-Stripev5"
+            target="_blank"
+            rel="noopener noreferrer"
+            label="GET THE TPOS-WRAPPER"
+          ></q-btn>
+        </div>
+      </div>
+      <div
+        v-if="urlDialog.data.useWrapper && urlDialog.data.stripe_card_payments"
+      >
         <div class="row q-mt-lg">
           <div class="col">
-            <q-toggle
-              v-model="urlDialog.data.useWrapper"
-              label="Use with TPoS-Wrapper Android app"
-            ></q-toggle>
-          </div>
-        </div>
-        <div class="row q-mt-sm" v-if="urlDialog.data.useWrapper">
-          <div class="col">
-            <q-btn
-              outline
-              color="primary"
-              type="a"
-              href="https://github.com/lnbits/TPoS-Stripe-Tap-to-Pay-Wrapper-Stripev5"
-              target="_blank"
-              rel="noopener noreferrer"
-              label="GET THE TPOS-WRAPPER"
-            ></q-btn>
-          </div>
-        </div>
-        <div class="row q-mt-lg">
-          <div class="col" v-if="urlDialog.data.useWrapper">
             <q-input
               v-model="urlDialog.data.posLocation"
               label="PoS Stripe Location"
             >
             </q-input>
           </div>
-          <div class="col q-pl-md" v-if="urlDialog.data.useWrapper">
+          <div class="col q-pl-md">
             <small>
               If accepting Stripe payments, visit
               https://dashboard.stripe.com/terminal and grab a new location ID
             </small>
           </div>
         </div>
-        <div class="row q-mt-lg" v-if="urlDialog.data.useWrapper">
+        <div class="row q-mt-lg">
           <div class="col">
             <q-btn
               outline
