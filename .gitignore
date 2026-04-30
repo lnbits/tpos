@@ -2,3 +2,9 @@ __pycache__
 node_modules
 .mypy_cache
 .venv
+
+# test data
+data/
+
+# AI
+.codex
