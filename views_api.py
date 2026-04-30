@@ -7,6 +7,10 @@ from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from lnurl import LnurlPayResponse
+from lnurl import decode as decode_lnurl
+from lnurl import handle as lnurl_handle
+
 from lnbits.core.crud import (
     get_account,
     get_standalone_payment,
@@ -34,9 +38,6 @@ from lnbits.decorators import (
 )
 from lnbits.helpers import create_access_token, get_api_routes
 from lnbits.tasks import internal_invoice_queue_put
-from lnurl import LnurlPayResponse
-from lnurl import decode as decode_lnurl
-from lnurl import handle as lnurl_handle
 
 from .crud import (
     create_tpos,
@@ -570,6 +571,11 @@ async def api_tpos_create_invoice(
             if wallet:
                 account = await get_account(wallet.user)
                 if account:
+                    if not account.is_super_user:
+                        raise HTTPException(
+                            status_code=HTTPStatus.BAD_REQUEST,
+                            detail="This tpos cannot create cash or onchain invoices.",
+                        )
                     existing = {label.name for label in account.extra.labels or []}
                     label_name = "cash" if cash_method else "onchain"
                     label_description = (
