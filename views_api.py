@@ -7,10 +7,6 @@ from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from lnurl import LnurlPayResponse
-from lnurl import decode as decode_lnurl
-from lnurl import handle as lnurl_handle
-
 from lnbits.core.crud import (
     get_account,
     get_standalone_payment,
@@ -38,6 +34,9 @@ from lnbits.decorators import (
 )
 from lnbits.helpers import create_access_token, get_api_routes
 from lnbits.tasks import internal_invoice_queue_put
+from lnurl import LnurlPayResponse
+from lnurl import decode as decode_lnurl
+from lnurl import handle as lnurl_handle
 
 from .crud import (
     create_tpos,
