@@ -59,7 +59,6 @@ from .models import (
     CreateTposInvoice,
     CreateTposTabCharge,
     CreateTposTabData,
-    CreateTposTabSettlement,
     CreateUpdateItemData,
     InventorySale,
     PayLnurlWData,
@@ -79,7 +78,6 @@ from .models import (
 from .services import (
     create_tab_charge_for_tpos,
     create_tab_for_tpos,
-    create_tab_settlement_for_tpos,
     ensure_tpos_tabs_access,
     fetch_onchain_address,
     fetch_single_tab_for_tpos,
@@ -116,6 +114,10 @@ def _ensure_tab_matches_tpos_currency(tab: dict[str, Any], tpos: Tpos) -> None:
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Tab currency must match TPoS currency.",
         )
+
+
+def _tab_settlement_tolerance(currency: str | None) -> float:
+    return 1 if (currency or "sats").lower() == "sats" else 0.01
 
 
 def _two_year_token_expiry_minutes() -> int:
@@ -431,40 +433,6 @@ async def api_tpos_add_tab_charge(
     return {"tab_id": tab_id, "entry": entry, "tab": TposTab(**updated_tab).dict()}
 
 
-@tpos_api_router.post("/api/v1/tposs/{tpos_id}/tabs/{tab_id}/settlements")
-async def api_tpos_create_tab_settlement(
-    tpos_id: str,
-    tab_id: str,
-    data: CreateTposTabSettlement,
-) -> dict[str, Any]:
-    tpos = await _get_tpos_or_404(tpos_id)
-    user_id = await ensure_tpos_tabs_access(tpos)
-    tab = await fetch_single_tab_for_tpos(user_id=user_id, tab_id=tab_id)
-    _ensure_tab_matches_tpos_currency(tab, tpos)
-
-    settlement_payload = {
-        "amount": data.amount,
-        "method": "lightning",
-        "reference": data.reference,
-        "description": data.description or "TPoS settlement",
-        "metadata": json.dumps(
-            {
-                "source": "tpos",
-                "source_id": tpos.id,
-                "source_action": "settlement_requested",
-                "requested_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ),
-        "idempotency_key": data.idempotency_key,
-    }
-    result = await create_tab_settlement_for_tpos(
-        user_id=user_id,
-        tab_id=tab_id,
-        payload=settlement_payload,
-    )
-    return result
-
-
 @tpos_api_router.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
 async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
@@ -722,6 +690,32 @@ async def api_tpos_create_invoice(
             status_code=HTTPStatus.FORBIDDEN,
             detail="Onchain payments are not enabled for this TPoS.",
         )
+    tab_settlement = data.tab_settlement
+    if tab_settlement:
+        user_id = await ensure_tpos_tabs_access(tpos)
+        tab = await fetch_single_tab_for_tpos(
+            user_id=user_id, tab_id=tab_settlement.tab_id
+        )
+        _ensure_tab_matches_tpos_currency(tab, tpos)
+        if tab.get("status") == "closed":
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Closed tabs cannot be settled.",
+            )
+        tab_balance = float(tab.get("balance") or 0)
+        if tab_balance <= 0:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="This tab has no outstanding balance to settle.",
+            )
+        amount_over_balance = tab_settlement.amount - tab_balance
+        if amount_over_balance > _tab_settlement_tolerance(tab.get("currency")):
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="Settlement amount cannot exceed the outstanding balance.",
+            )
+        if amount_over_balance > 0:
+            tab_settlement.amount = tab_balance
     currency = tpos.currency if data.pay_in_fiat else "sat"
     amount = data.amount + (data.tip_amount or 0.0)
     if data.pay_in_fiat:
@@ -741,6 +735,8 @@ async def api_tpos_create_invoice(
             "paid_in_fiat": data.pay_in_fiat,
             "base_url": str(request.base_url),
         }
+        if tab_settlement:
+            extra["tab_settlement"] = tab_settlement.dict()
         if cash_method or onchain_method:
             wallet = await get_wallet(tpos.wallet)
             if wallet:

@@ -107,6 +107,7 @@ window.app = Vue.createApp({
           reference: ''
         }
       },
+      pendingTabSettlement: null,
       cashValidating: false,
       tipDialog: {
         show: false
@@ -277,6 +278,9 @@ window.app = Vue.createApp({
         this.activePaymentAmount + this.tipAmount,
         this.currency
       )
+    },
+    isSettlingTab() {
+      return Boolean(this.pendingTabSettlement)
     },
     tipAmountSat() {
       if (!this.exchangeRate) return 0
@@ -669,6 +673,7 @@ window.app = Vue.createApp({
       this.total = 0.0
       this.addedAmount = 0.0
       this.resetPaymentAttempt()
+      this.pendingTabSettlement = null
       if (this.$q.screen.lt.md) {
         this.cartDrawer = false
       }
@@ -1085,8 +1090,16 @@ window.app = Vue.createApp({
       }
     },
     buildTabSettlementParams() {
+      const selectedTab = this.tabsDialog.tabs.find(
+        tab => tab.id === this.tabsDialog.selectedTabId
+      )
+      const amount = this.normalizeApiAmount(
+        selectedTab?.currency || this.currency,
+        selectedTab?.balance
+      )
       return {
-        amount: null,
+        tab_id: this.tabsDialog.selectedTabId,
+        amount,
         description: this.invoiceDialog.internalMemo || 'TPoS settlement',
         reference: `tpos-${this.tposId}`,
         idempotency_key: this.generateTabsIdempotencyKey('tpos:settlement')
@@ -1190,35 +1203,28 @@ window.app = Vue.createApp({
       this.tabsDialog.settling = true
       try {
         const payload = this.buildTabSettlementParams()
-        const {data} = await LNbits.api.request(
-          'POST',
-          `/tpos/api/v1/tposs/${this.tposId}/tabs/${this.tabsDialog.selectedTabId}/settlements`,
-          null,
-          payload
-        )
-        const paymentRequest = data?.payment_request
-        const paymentHash = data?.settlement?.payment_hash
-        const settlementAmount = this.normalizeApiAmount(
-          this.currency,
-          data?.settlement?.amount
-        )
-        if (!paymentRequest || !paymentHash) {
+        if (!payload.amount) {
           Quasar.Notify.create({
             type: 'warning',
-            message: 'Settlement created, but no invoice was returned.'
+            message: 'This tab has no outstanding balance to settle.'
           })
           return
         }
         this.closeTabsDialog()
-        if (settlementAmount !== null) {
-          this.paymentAmount = settlementAmount
-          this.total = settlementAmount
+        this.pendingTabSettlement = payload
+        this.paymentAmount = payload.amount
+        this.sat = Math.ceil(payload.amount * this.exchangeRate)
+        if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
+          this.resetPaymentAttempt()
+          this.pendingTabSettlement = null
+          Quasar.Notify.create({
+            type: 'negative',
+            message:
+              'Exchange rate not available, or wrong value. Please try again later.'
+          })
+          return
         }
-        this.openInvoiceDialog(
-          paymentHash,
-          'lightning:' + String(paymentRequest).toUpperCase()
-        )
-        this.subscribeToPaymentWS(paymentHash)
+        await this.showInvoice()
       } catch (error) {
         LNbits.utils.notifyApiError(error)
       } finally {
@@ -1285,6 +1291,9 @@ window.app = Vue.createApp({
       if (this.lnaddress) {
         params.user_lnaddress = this.lnaddressDialog.lnaddress
       }
+      if (this.pendingTabSettlement) {
+        params.tab_settlement = this.pendingTabSettlement
+      }
       if (this.usingInventory && this.cart.size) {
         params.inventory = {
           inventory_id: this.inventoryId,
@@ -1307,7 +1316,8 @@ window.app = Vue.createApp({
         this.fiatProvider ||
         this.allowCashSettlement ||
         this.onchainEnabled ||
-        this.tabsEnabled
+        this.isSettlingTab ||
+        (this.tabsEnabled && !this.isSettlingTab)
       ) {
         const method = await this.showPaymentMethod()
         if (method === 'tab') {

@@ -16,6 +16,14 @@ class CreateWithdrawPay(BaseModel):
     pay_link: str
 
 
+class CreateTposInvoiceTabSettlement(BaseModel):
+    tab_id: str = Field(..., min_length=1)
+    amount: float = Field(..., gt=0)
+    reference: str | None = Field(None, max_length=120)
+    description: str | None = Field(None, max_length=512)
+    idempotency_key: str = Field(..., min_length=8, max_length=128)
+
+
 class CreateTposInvoice(BaseModel):
     amount: int = Query(..., ge=1)
     memo: str | None = Query(None)
@@ -31,6 +39,7 @@ class CreateTposInvoice(BaseModel):
     payment_method: str | None = Query(None)
     amount_fiat: float | None = Query(None, ge=0.0)
     tip_amount_fiat: float | None = Query(None, ge=0.0)
+    tab_settlement: CreateTposInvoiceTabSettlement | None = Query(None)
 
 
 class InventorySaleItem(BaseModel):
@@ -204,13 +213,6 @@ class CreateTposTabCharge(BaseModel):
     items: list[dict[str, Any]] = Field(default_factory=list, max_items=200)
     notes: dict[str, Any] | None = None
     internal_memo: str | None = Field(None, max_length=512)
-    idempotency_key: str = Field(..., min_length=8, max_length=128)
-
-
-class CreateTposTabSettlement(BaseModel):
-    amount: float | None = Field(None, gt=0)
-    reference: str | None = Field(None, max_length=120)
-    description: str | None = Field(None, max_length=512)
     idempotency_key: str = Field(..., min_length=8, max_length=128)
 
 
