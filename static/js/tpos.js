@@ -857,13 +857,16 @@ window.app = Vue.createApp({
           const url = `${window.location.origin}/tpos/api/v1/lnurl/${this.atmToken}/${this.sat}`
           const bytes = new TextEncoder().encode(url)
           const bech32 = NostrTools.nip19.encodeBytes('lnurl', bytes)
-          this.invoiceDialog.data = {
+          this.openInvoiceDialog({
+            payment_hash: `atm-withdraw-${this.atmToken}-${this.sat}`,
             payment_request: bech32.toUpperCase(),
+            lightning_payment_request: bech32.toUpperCase(),
             fallback:
-              window.location.hostname + '?lightning=' + bech32.toUpperCase()
-          }
-          this.invoiceDialog.show = true
-          this.readNfcTag()
+              window.location.hostname + '?lightning=' + bech32.toUpperCase(),
+            payment_method: 'lightning',
+            payment_options: ['lightning']
+          })
+          this.invoiceDialog.dismissMsg()
           this.invoiceDialog.dismissMsg = Quasar.Notify.create({
             timeout: 0,
             message: 'Withdraw...'
