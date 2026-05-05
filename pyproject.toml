@@ -7,8 +7,8 @@ authors = [{ name = "Alan Bits", email = "alan@lnbits.com" }]
 urls = { Homepage = "https://lnbits.com", Repository = "https://github.com/lnbits/tpos" }
 dependencies = [ "lnbits>1" ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "black",
     "pytest-asyncio",
     "pytest",
