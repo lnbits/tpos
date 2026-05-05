@@ -203,6 +203,13 @@
         >
           <q-card class="full-height" flat bordered v-ripple>
             <div @click="addToCart(item)">
+              <q-badge
+                v-if="itemCartQty(item.id) > 0"
+                class="z-top q-ma-sm"
+                color="primary"
+                :label="itemCartQty(item.id)"
+                floating
+              ></q-badge>
               <q-img :src="item.image || null" :ratio="4/3" fit="contain">
               </q-img>
 
@@ -226,6 +233,13 @@
         >
           <q-card class="full-height" flat bordered v-ripple>
             <div @click="addToCart(item)">
+              <q-badge
+                v-if="itemCartQty(item.id) > 0"
+                class="z-top q-ma-sm"
+                color="primary"
+                :label="itemCartQty(item.id)"
+                floating
+              ></q-badge>
               <q-img :src="item.image || null" :ratio="4/3" fit="contain">
               </q-img>
 
