@@ -479,6 +479,7 @@ async def api_tpos_update(
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
     user = await get_user(wallet.wallet.user)
     update_payload = data.dict(exclude_unset=True)
+    update_payload.pop("wallet", None)
     desired_onchain_enabled = update_payload.get(
         "onchain_enabled", tpos.onchain_enabled
     )
