@@ -46,6 +46,7 @@ const mapTpos = obj => {
     ? omitTagString.split(',').filter(Boolean)
     : []
   obj.only_show_sats_on_bitcoin = obj.only_show_sats_on_bitcoin ?? true
+  obj.allow_price_adjustment = obj.allow_price_adjustment ?? true
   obj.allow_cash_settlement = Boolean(obj.allow_cash_settlement)
   obj.onchain_enabled = Boolean(obj.onchain_enabled)
   obj.onchain_wallet_id = obj.onchain_wallet_id || null
@@ -148,6 +149,7 @@ window.app = Vue.createApp({
           enable_receipt_print: false,
           enable_remote: false,
           only_show_sats_on_bitcoin: true,
+          allow_price_adjustment: true,
           fiat: false,
           stripe_card_payments: false,
           stripe_reader_id: '',
@@ -303,6 +305,7 @@ window.app = Vue.createApp({
         enable_receipt_print: false,
         enable_remote: false,
         only_show_sats_on_bitcoin: true,
+        allow_price_adjustment: true,
         fiat: false,
         stripe_card_payments: false,
         stripe_reader_id: '',

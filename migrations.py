@@ -290,3 +290,12 @@ async def m022_add_onchain_settings_and_payments(db: Database):
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
     """)
+
+
+async def m023_add_allow_price_adjustment(db: Database):
+    """
+    Add item price adjustment toggle to tpos table.
+    """
+    await db.execute("""
+        ALTER TABLE tpos.pos ADD allow_price_adjustment BOOLEAN DEFAULT true;
+    """)

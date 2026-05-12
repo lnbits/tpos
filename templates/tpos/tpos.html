@@ -229,6 +229,7 @@
     ? tpos.inventory_omit_tags.split(',').filter(Boolean)
     : []
   tpos.use_inventory = Boolean(tpos.use_inventory)
+  tpos.allow_price_adjustment = tpos.allow_price_adjustment ?? true
   if (tpos.withdraw_maximum) {
     tpos.withdraw_premium = Number(tpos.withdraw_maximum / 100)
   }
