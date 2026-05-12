@@ -210,7 +210,14 @@
                 :label="itemCartQty(item.id)"
                 floating
               ></q-badge>
-              <q-img :src="item.image || null" :ratio="4/3" fit="contain">
+              <q-img
+                :src="item.image || null"
+                :ratio="4/3"
+                fit="contain"
+                loading="lazy"
+                loading-show-delay="500"
+                spinner-color="white"
+              >
               </q-img>
 
               <span class="item-grid-title" dense v-text="item.title"></span>
