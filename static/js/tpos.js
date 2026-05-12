@@ -455,9 +455,6 @@ window.app = Vue.createApp({
       }
     },
     setColor(category) {
-      if (!category || category.toLowerCase() === 'all') {
-        return 'primary'
-      }
       const key = category.toLowerCase()
       if (this.categoryColors[key]) {
         return this.categoryColors[key]
@@ -1413,17 +1410,10 @@ window.app = Vue.createApp({
         })
         .filter(Boolean)
 
-      if (categories.size) {
-        categories = ['All', ...categories]
-      }
       return Array.from(categories)
     },
     handleCategoryBtn(category) {
-      if (this.categoryFilter == category) {
-        this.categoryFilter = ''
-      } else {
-        this.categoryFilter = category == 'All' ? '' : category
-      }
+      this.categoryFilter = category === this.categoryFilter ? '' : category
     },
     matchesCategoryFilter(item) {
       if (!this.categoryFilter) return true
