@@ -43,6 +43,7 @@ window.app = Vue.createApp({
       tposId: null,
       currency: null,
       fiatProvider: null,
+      allowPriceAdjustment: true,
       allowCashSettlement: false,
       onchainEnabled: false,
       payInFiat: false,
@@ -536,6 +537,7 @@ window.app = Vue.createApp({
       this.cartTaxTotal()
     },
     promptItemPrice(item) {
+      if (!this.allowPriceAdjustment) return
       const cartItem = this.cart.get(item.id)
       if (!cartItem) return
       this.$q
@@ -585,6 +587,7 @@ window.app = Vue.createApp({
         })
     },
     updateCartItemPrice(cartItem, newPrice) {
+      if (!this.allowPriceAdjustment) return
       const roundedPrice =
         this.currency === 'sats'
           ? Math.ceil(newPrice)
@@ -1647,6 +1650,7 @@ window.app = Vue.createApp({
     this.wrapperMode =
       new URL(window.location.href).searchParams.get('wrapper') === 'true'
     this.fiatProvider = tpos.fiat_provider
+    this.allowPriceAdjustment = tpos.allow_price_adjustment ?? true
     this.allowCashSettlement = Boolean(tpos.allow_cash_settlement)
     this.onchainEnabled = Boolean(tpos.onchain_enabled)
 
