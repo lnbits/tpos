@@ -479,7 +479,11 @@ def _raise_tabs_bridge_error(exc: httpx.HTTPStatusError) -> HTTPException:
     elif status_code in (HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN):
         detail = "Tabs action not allowed for this TPoS."
     elif status_code == HTTPStatus.BAD_REQUEST:
-        detail = "Invalid tabs request."
+        try:
+            response_detail = exc.response.json().get("detail")
+        except Exception:
+            response_detail = None
+        detail = response_detail or "Invalid tabs request."
     else:
         detail = "Tabs service is temporarily unavailable."
     if status_code >= HTTPStatus.INTERNAL_SERVER_ERROR:

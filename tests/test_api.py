@@ -181,6 +181,42 @@ async def test_tabs_endpoints_use_real_tabs_api(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_tabs_bridge_returns_tabs_error_detail(client: AsyncClient):
+    _user, wallet = await _user_with_tabs("tabserroruser")
+    headers = {"X-API-KEY": wallet.adminkey}
+
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(tabs_enabled=True, tabs_allow_create=True),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    create_tab = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/tabs",
+        json={
+            "name": "Patio",
+            "limit_type": "hard",
+            "limit_amount": 100,
+        },
+    )
+    assert create_tab.status_code == 200
+    tab = create_tab.json()
+
+    charge = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/tabs/{tab['id']}/charges",
+        json={
+            "amount": 101,
+            "description": "Over limit",
+            "idempotency_key": "tpos-charge-over-limit",
+        },
+    )
+    assert charge.status_code == 400
+    assert charge.json()["detail"] == "Charge would exceed the configured tab limit."
+
+
+@pytest.mark.asyncio
 async def test_paid_tpos_invoice_settles_tab_via_real_tabs_api(client: AsyncClient):
     await _drain_internal_invoice_queue()
     _user, wallet = await _user_with_tabs("settlementuser")
