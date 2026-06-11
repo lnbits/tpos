@@ -23,6 +23,13 @@ tpos_static_files = [
     }
 ]
 
+tpos_redirect_paths = [
+    {
+        "from_path": "/.well-known/assetlinks.json",
+        "redirect_to_path": "/api/v1/well-known/assetlinks.json",
+    }
+]
+
 scheduled_tasks: list[asyncio.Task] = []
 
 
@@ -47,6 +54,7 @@ def tpos_start():
 __all__ = [
     "db",
     "tpos_ext",
+    "tpos_redirect_paths",
     "tpos_start",
     "tpos_static_files",
     "tpos_stop",

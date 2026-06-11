@@ -777,6 +777,22 @@ window.app = Vue.createApp({
         tpos.loadingWrapperToken = false
       }
     },
+    async warmWrapperAssetlinks(enabled) {
+      if (!enabled) {
+        return
+      }
+      try {
+        await LNbits.api.request(
+          'GET',
+          '/tpos/api/v1/well-known/assetlinks.json'
+        )
+      } catch (error) {
+        Quasar.Notify.create({
+          type: 'warning',
+          message: 'Unable to cache TPoS wrapper assetlinks.json.'
+        })
+      }
+    },
     openUrlDialog(id) {
       if (this.tposs.stripe_card_payments) {
         this.urlDialog.data = _.findWhere(this.tposs, {
