@@ -1,3 +1,6 @@
+import json
+from typing import Any
+
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
@@ -5,6 +8,54 @@ from .helpers import serialize_inventory_tags
 from .models import CreateTposData, LnurlCharge, Tpos, TposClean, TposPayment
 
 db = Database("ext_tpos")
+
+WRAPPER_ASSETLINKS_CACHE_KEY = "wrapper_assetlinks"
+
+
+async def get_wrapper_assetlinks_cache() -> tuple[dict | list, int] | None:
+    row: Any = await db.fetchone(
+        "SELECT value, updated_at FROM tpos.cache WHERE key = :key",
+        {"key": WRAPPER_ASSETLINKS_CACHE_KEY},
+    )
+    if not row or not row.get("value"):
+        return None
+    return json.loads(row["value"]), int(row["updated_at"] or 0)
+
+
+async def set_wrapper_assetlinks_cache(
+    assetlinks: dict | list, updated_at: int
+) -> None:
+    payload = json.dumps(assetlinks)
+    existing: Any = await db.fetchone(
+        "SELECT key FROM tpos.cache WHERE key = :key",
+        {"key": WRAPPER_ASSETLINKS_CACHE_KEY},
+    )
+    if existing:
+        await db.execute(
+            """
+            UPDATE tpos.cache
+            SET value = :value, updated_at = :updated_at
+            WHERE key = :key
+            """,
+            {
+                "key": WRAPPER_ASSETLINKS_CACHE_KEY,
+                "value": payload,
+                "updated_at": updated_at,
+            },
+        )
+        return
+
+    await db.execute(
+        """
+        INSERT INTO tpos.cache (key, value, updated_at)
+        VALUES (:key, :value, :updated_at)
+        """,
+        {
+            "key": WRAPPER_ASSETLINKS_CACHE_KEY,
+            "value": payload,
+            "updated_at": updated_at,
+        },
+    )
 
 
 async def create_tpos(data: CreateTposData) -> Tpos:

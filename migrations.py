@@ -299,3 +299,16 @@ async def m023_add_allow_price_adjustment(db: Database):
     await db.execute("""
         ALTER TABLE tpos.pos ADD allow_price_adjustment BOOLEAN DEFAULT true;
     """)
+
+
+async def m024_add_assetlinks_cache(db: Database):
+    """
+    Add cache table for TPoS wrapper Android asset links.
+    """
+    await db.execute("""
+        CREATE TABLE tpos.cache (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT 0
+        );
+    """)

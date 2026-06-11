@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from lnbits.core.crud import (
     get_account,
     get_standalone_payment,
@@ -75,6 +76,7 @@ from .services import (
     fetch_watchonly_config,
     fetch_watchonly_wallet,
     fetch_watchonly_wallets,
+    fetch_wrapper_assetlinks,
     get_default_inventory,
     get_inventory_items_for_tpos,
     inventory_available_for_user,
@@ -92,6 +94,18 @@ def _two_year_token_expiry_minutes() -> int:
         # Handle February 29 by falling back to February 28 two years later.
         expires_at = now.replace(year=now.year + 2, month=2, day=28)
     return max(1, int((expires_at - now).total_seconds() // 60))
+
+
+@tpos_api_router.get("/api/v1/well-known/assetlinks.json")
+async def api_tpos_assetlinks() -> JSONResponse:
+    try:
+        assetlinks = await fetch_wrapper_assetlinks()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=HTTPStatus.SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    return JSONResponse(content=assetlinks, media_type="application/json")
 
 
 def _build_receipt_data(

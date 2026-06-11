@@ -832,6 +832,7 @@
           <q-toggle
             v-model="urlDialog.data.useWrapper"
             label="Use with TPoS-Wrapper Android app"
+            @update:model-value="warmWrapperAssetlinks($event)"
           ></q-toggle>
         </div>
       </div>
