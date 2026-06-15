@@ -58,7 +58,6 @@ async def fetch_wrapper_assetlinks() -> dict | list:
     return assetlinks
 
 
-
 async def get_tpos_owner_user_id(tpos: Tpos) -> str:
     wallet = await get_wallet(tpos.wallet)
     if not wallet:

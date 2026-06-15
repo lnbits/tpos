@@ -314,7 +314,7 @@ async def m024_add_assetlinks_cache(db: Database):
     """)
 
 
-async def m023_add_tabs_integration_settings(db: Database):
+async def m025_add_tabs_integration_settings(db: Database):
     """
     Add tabs integration settings.
     """
