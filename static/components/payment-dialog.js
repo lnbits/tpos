@@ -104,15 +104,10 @@ window.app.component('tpos-payment-dialog', {
           v-text="tipSummary"
         ></span>
       </div>
-      <q-chip v-if="nfcTagReading && !isOnchain" square>
-        <q-avatar icon="nfc" color="positive" text-color="white"></q-avatar>
-        NFC supported
+      <q-chip square v-if="nfcTagReading && !isOnchain" label="NFC supported" icon="nfc" color="positive" text-color="white">
       </q-chip>
-      <div
-        v-else-if="!isOnchain"
-        class="text-caption text-grey"
-        v-text="'NFC not supported'"
-      ></div>
+      <q-chip square v-else-if="!isOnchain" label="NFC not supported" icon="nfc_off" text-color="grey">
+      </q-chip>
     </q-card-section>
 
     <q-card-actions align="between" class="q-pt-none">
