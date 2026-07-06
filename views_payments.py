@@ -6,9 +6,9 @@ from uuid import uuid4
 import httpx
 from fastapi import APIRouter, HTTPException, Query, Request
 from lnbits.core.crud import get_account, get_standalone_payment, get_wallet
-from lnbits.core.crud.payments import update_payment_checking_id
+from lnbits.core.crud.payments import update_payment, update_payment_checking_id
 from lnbits.core.crud.users import update_account
-from lnbits.core.models import CreateInvoice, Payment
+from lnbits.core.models import CreateInvoice, Payment, PaymentState
 from lnbits.core.models.users import UserLabel
 from lnbits.core.services import create_payment_request, websocket_updater
 from lnbits.tasks import internal_invoice_queue_put
@@ -482,6 +482,8 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
         )
     if payment.success:
         return {"success": True}
+    payment.status = PaymentState.SUCCESS
+    await update_payment(payment)
     await internal_invoice_queue_put(payment.checking_id)
     return {"success": True}
 

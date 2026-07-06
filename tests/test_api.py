@@ -621,6 +621,23 @@ async def test_cash_validate_and_print_invoice_endpoints(
     assert validated.status_code == 200
     assert validated.json() == {"success": True}
 
+    settled_payment = await get_standalone_payment(payment.payment_hash, incoming=True)
+    assert settled_payment is not None
+    assert settled_payment.success is True
+    await on_invoice_paid(settled_payment)
+
+    paid_response = await client.get(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}"
+    )
+    assert paid_response.status_code == 200
+    assert paid_response.json() == {"paid": True}
+
+    latest_response = await client.get(f"/tpos/api/v1/tposs/{tpos['id']}/invoices")
+    assert latest_response.status_code == 200
+    latest = latest_response.json()
+    assert latest[0]["pending"] is False
+    assert latest[0]["payment_method"] == "cash"
+
 
 @pytest.mark.asyncio
 async def test_atm_and_lnurl_withdraw_routes(client: AsyncClient, monkeypatch):
