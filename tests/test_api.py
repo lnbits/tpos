@@ -24,6 +24,7 @@ from tabs.crud import (  # type: ignore[import]
 
 import tpos.views_api as views_api  # type: ignore[import]
 import tpos.views_atm as views_atm  # type: ignore[import]
+import tpos.views_inventory as views_inventory  # type: ignore[import]
 import tpos.views_lnurl as views_lnurl  # type: ignore[import]
 from tpos.crud import (  # type: ignore[import]
     create_tpos_payment,
@@ -348,7 +349,9 @@ async def test_wrapper_inventory_onchain_status_endpoints(
         "delegate_permission/common.handle_all_urls"
     ]
 
-    monkeypatch.setattr(views_api, "inventory_available_for_user", lambda user: False)
+    monkeypatch.setattr(
+        views_inventory, "inventory_available_for_user", lambda user: False
+    )
     inventory_disabled = await client.get(
         "/tpos/api/v1/inventory/status", headers=headers
     )
@@ -364,8 +367,12 @@ async def test_wrapper_inventory_onchain_status_endpoints(
         assert user_id == user.id
         return {"id": "inv1", "tags": "coffee,tea", "omit_tags": "hidden"}
 
-    monkeypatch.setattr(views_api, "inventory_available_for_user", lambda user: True)
-    monkeypatch.setattr(views_api, "get_default_inventory", fake_default_inventory)
+    monkeypatch.setattr(
+        views_inventory, "inventory_available_for_user", lambda user: True
+    )
+    monkeypatch.setattr(
+        views_inventory, "get_default_inventory", fake_default_inventory
+    )
     inventory_enabled = await client.get(
         "/tpos/api/v1/inventory/status", headers=headers
     )
@@ -422,7 +429,9 @@ async def test_inventory_items_and_lnaddress_check(client: AsyncClient, monkeypa
             }
         ]
 
-    monkeypatch.setattr(views_api, "get_inventory_items_for_tpos", fake_inventory_items)
+    monkeypatch.setattr(
+        views_inventory, "get_inventory_items_for_tpos", fake_inventory_items
+    )
     items = await client.get(f"/tpos/api/v1/tposs/{tpos.id}/inventory-items")
     assert items.status_code == 200
     assert items.json()[0] == {

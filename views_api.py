@@ -50,7 +50,6 @@ from .crud import (
     update_tpos,
 )
 from .helpers import (
-    first_image,
     inventory_tags_to_list,
     inventory_tags_to_string,
 )
@@ -80,10 +79,10 @@ from .services import (
     fetch_watchonly_wallets,
     fetch_wrapper_assetlinks,
     get_default_inventory,
-    get_inventory_items_for_tpos,
     inventory_available_for_user,
     watchonly_available_for_user,
 )
+from .views_inventory import tpos_inventory_router
 from .views_tabs import (
     _ensure_tab_matches_tpos_currency,
     _tab_settlement_tolerance,
@@ -91,6 +90,7 @@ from .views_tabs import (
 )
 
 tpos_api_router = APIRouter()
+tpos_api_router.include_router(tpos_inventory_router)
 tpos_api_router.include_router(tpos_tabs_router)
 
 
@@ -298,24 +298,6 @@ async def api_tposs(
         user = await get_user(key_info.wallet.user)
         wallet_ids = user.wallet_ids if user else []
     return await get_tposs(wallet_ids)
-
-
-@tpos_api_router.get("/api/v1/inventory/status", status_code=HTTPStatus.OK)
-async def api_inventory_status(
-    wallet: WalletTypeInfo = Depends(require_admin_key),
-) -> dict:
-    user = await get_user(wallet.wallet.user)
-    if not inventory_available_for_user(user):
-        return {"enabled": False, "inventory_id": None, "tags": [], "omit_tags": []}
-    inventory = await get_default_inventory(wallet.wallet.user)
-    tags = inventory_tags_to_list(inventory.get("tags")) if inventory else []
-    omit_tags = inventory_tags_to_list(inventory.get("omit_tags")) if inventory else []
-    return {
-        "enabled": True,
-        "inventory_id": inventory.get("id") if inventory else None,
-        "tags": tags,
-        "omit_tags": omit_tags,
-    }
 
 
 @tpos_api_router.get("/api/v1/onchain/status", status_code=HTTPStatus.OK)
@@ -995,60 +977,3 @@ async def api_tpos_check_lnaddress(lnaddress: str):
         )
 
     return True
-
-
-@tpos_api_router.get(
-    "/api/v1/tposs/{tpos_id}/inventory-items", status_code=HTTPStatus.OK
-)
-async def api_tpos_inventory_items(tpos_id: str):
-    tpos = await get_tpos(tpos_id)
-    if not tpos or not tpos.use_inventory:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail="Inventory not enabled for this TPoS.",
-        )
-
-    wallet = await get_wallet(tpos.wallet)
-    if not wallet:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail="Wallet not found for this TPoS.",
-        )
-
-    inventory_id = tpos.inventory_id
-    inventory_data: dict[str, Any] | None = None
-    if not inventory_id:
-        inventory_data = await get_default_inventory(wallet.user)
-        inventory_id = inventory_data.get("id") if inventory_data else None
-    else:
-        inventory_data = await get_default_inventory(wallet.user)
-    if not inventory_id:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail="No inventory found for this TPoS.",
-        )
-
-    items = await get_inventory_items_for_tpos(
-        wallet.user,
-        inventory_id,
-        tpos.inventory_tags,
-        tpos.inventory_omit_tags,
-    )
-    return [
-        {
-            "id": item.get("id"),
-            "title": item.get("name"),
-            "description": item.get("description"),
-            "price": item.get("price"),
-            "tax": item.get("tax_rate"),
-            "image": first_image(item.get("images")),
-            "categories": inventory_tags_to_list(item.get("tags")),
-            "quantity_in_stock": item.get("quantity_in_stock"),
-            "disabled": (not item.get("is_active"))
-            or (
-                item.get("quantity_in_stock") is not None
-                and item.get("quantity_in_stock") <= 0
-            ),
-        }
-        for item in items
-    ]
