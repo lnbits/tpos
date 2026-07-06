@@ -1,5 +1,6 @@
 import json
 
+from lnbits.helpers import create_access_token
 from loguru import logger
 
 
@@ -64,3 +65,7 @@ def normalize_image(val: str | None) -> str | None:
     if val.startswith("http") or val.startswith("/api/") or val.startswith("data:"):
         return val
     return f"/api/v1/assets/{val}/thumbnail"
+
+
+def create_internal_user_access_token(user_id: str) -> str:
+    return create_access_token({"sub": "", "usr": user_id}, token_expire_minutes=1)

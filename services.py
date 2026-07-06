@@ -10,12 +10,11 @@ from lnbits.core.crud import (
     get_wallet,
 )
 from lnbits.core.models import User
-from lnbits.helpers import create_access_token
 from lnbits.settings import settings
 from loguru import logger
 
 from .crud import get_wrapper_assetlinks_cache, set_wrapper_assetlinks_cache
-from .helpers import from_csv, inventory_tags_to_list
+from .helpers import create_internal_user_access_token, from_csv, inventory_tags_to_list
 from .models import Tpos
 
 WRAPPER_ASSETLINKS_URL = (
@@ -90,9 +89,7 @@ async def deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> Non
     quantities = [item["quantity"] for item in items_to_update]
 
     # Needed to accomodate admin users, as using user ID is not possible
-    access = create_access_token(
-        {"sub": "", "usr": wallet.user}, token_expire_minutes=1
-    )
+    access = create_internal_user_access_token(wallet.user)
     async with httpx.AsyncClient() as client:
         await client.patch(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/quantities",
@@ -103,7 +100,7 @@ async def deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> Non
 
 
 async def get_default_inventory(user_id: str) -> dict[str, Any] | None:
-    access = _create_internal_user_access_token(user_id)
+    access = create_internal_user_access_token(user_id)
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1",
@@ -130,7 +127,7 @@ async def get_inventory_items_for_tpos(
     tag_list = inventory_tags_to_list(tags)
     omit_list = [tag.lower() for tag in inventory_tags_to_list(omit_tags)]
     allowed_tags = [tag.lower() for tag in tag_list]
-    access = _create_internal_user_access_token(user_id)
+    access = create_internal_user_access_token(user_id)
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/paginated",
@@ -300,7 +297,7 @@ async def fetch_tabs_for_tpos(
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Invalid tab status filter.",
         )
-    access = _create_internal_user_access_token(user_id)
+    access = create_internal_user_access_token(user_id)
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
@@ -336,7 +333,7 @@ async def fetch_tabs_for_tpos(
 
 
 async def create_tab_for_tpos(user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    access = _create_internal_user_access_token(user_id)
+    access = create_internal_user_access_token(user_id)
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -360,7 +357,7 @@ async def create_tab_charge_for_tpos(
     tab_id: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    access = _create_internal_user_access_token(user_id)
+    access = create_internal_user_access_token(user_id)
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -380,7 +377,7 @@ async def create_tab_charge_for_tpos(
 
 
 async def fetch_single_tab_for_tpos(user_id: str, tab_id: str) -> dict[str, Any]:
-    access = _create_internal_user_access_token(user_id)
+    access = create_internal_user_access_token(user_id)
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.get(
@@ -403,7 +400,7 @@ async def create_tab_settlement_for_tpos(
     tab_id: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    access = _create_internal_user_access_token(user_id)
+    access = create_internal_user_access_token(user_id)
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -451,7 +448,7 @@ async def push_order_to_orders(
         "shipped": True,
     }
 
-    access = _create_internal_user_access_token(user_id)
+    access = create_internal_user_access_token(user_id)
     params = {}
     if base_url:
         params["base_url"] = base_url
@@ -465,10 +462,6 @@ async def push_order_to_orders(
             )
         except Exception as exc:
             logger.warning(f"tpos: failed to push order to orders: {exc}")
-
-
-def _create_internal_user_access_token(user_id: str) -> str:
-    return create_access_token({"sub": "", "usr": user_id}, token_expire_minutes=1)
 
 
 def _raise_tabs_bridge_error(exc: httpx.HTTPStatusError) -> HTTPException:
