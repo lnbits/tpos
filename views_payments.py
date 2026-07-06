@@ -41,7 +41,6 @@ from .services import (
     fetch_onchain_address,
     fetch_single_tab_for_tpos,
 )
-from .tasks import on_invoice_paid
 from .views_onchain import _validate_watchonly_settings
 from .views_tabs import _ensure_tab_matches_tpos_currency, _tab_settlement_tolerance
 
@@ -482,10 +481,8 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
             detail="Payment is not an internal cash invoice.",
         )
     if payment.success:
-        await on_invoice_paid(payment)
         return {"success": True}
     await internal_invoice_queue_put(payment.checking_id)
-    await on_invoice_paid(payment)
     return {"success": True}
 
 
