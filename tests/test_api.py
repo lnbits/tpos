@@ -5,8 +5,14 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 from lnbits.core.crud import get_standalone_payment
+from lnbits.core.crud.payments import update_payment_checking_id
+from lnbits.core.models import CreateInvoice
 from lnbits.core.models.users import Account
-from lnbits.core.services import pay_invoice, update_wallet_balance
+from lnbits.core.services import (
+    create_payment_request,
+    pay_invoice,
+    update_wallet_balance,
+)
 from lnbits.core.services.users import create_user_account_no_ckeck
 from lnbits.settings import settings
 from lnbits.tasks import internal_invoice_queue
@@ -16,7 +22,16 @@ from tabs.crud import (  # type: ignore[import]
     get_tab_settlements,
 )
 
-from tpos.crud import get_tpos, get_tpos_payment_by_hash  # type: ignore[import]
+import tpos.views_api as views_api  # type: ignore[import]
+import tpos.views_atm as views_atm  # type: ignore[import]
+import tpos.views_lnurl as views_lnurl  # type: ignore[import]
+from tpos.crud import (  # type: ignore[import]
+    create_tpos_payment,
+    get_tpos,
+    get_tpos_payment_by_hash,
+    update_tpos,
+)
+from tpos.models import TposPayment  # type: ignore[import]
 from tpos.tasks import on_invoice_paid  # type: ignore[import]
 
 
@@ -314,3 +329,347 @@ async def test_tpos_rejects_invalid_tab_flows(client: AsyncClient):
         json={"name": "Denied"},
     )
     assert create_denied.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_wrapper_inventory_onchain_status_endpoints(
+    client: AsyncClient, monkeypatch
+):
+    user, wallet = await _user_with_tabs("statususer")
+    headers = {"X-API-KEY": wallet.adminkey}
+
+    async def fake_assetlinks():
+        return [{"relation": ["delegate_permission/common.handle_all_urls"]}]
+
+    monkeypatch.setattr(views_api, "fetch_wrapper_assetlinks", fake_assetlinks)
+    assetlinks = await client.get("/tpos/api/v1/well-known/assetlinks.json")
+    assert assetlinks.status_code == 200
+    assert assetlinks.json()[0]["relation"] == [
+        "delegate_permission/common.handle_all_urls"
+    ]
+
+    monkeypatch.setattr(views_api, "inventory_available_for_user", lambda user: False)
+    inventory_disabled = await client.get(
+        "/tpos/api/v1/inventory/status", headers=headers
+    )
+    assert inventory_disabled.status_code == 200
+    assert inventory_disabled.json() == {
+        "enabled": False,
+        "inventory_id": None,
+        "tags": [],
+        "omit_tags": [],
+    }
+
+    async def fake_default_inventory(user_id):
+        assert user_id == user.id
+        return {"id": "inv1", "tags": "coffee,tea", "omit_tags": "hidden"}
+
+    monkeypatch.setattr(views_api, "inventory_available_for_user", lambda user: True)
+    monkeypatch.setattr(views_api, "get_default_inventory", fake_default_inventory)
+    inventory_enabled = await client.get(
+        "/tpos/api/v1/inventory/status", headers=headers
+    )
+    assert inventory_enabled.status_code == 200
+    assert inventory_enabled.json() == {
+        "enabled": True,
+        "inventory_id": "inv1",
+        "tags": ["coffee", "tea"],
+        "omit_tags": ["hidden"],
+    }
+
+    async def fake_watchonly_status(wallet):
+        return False
+
+    monkeypatch.setattr(
+        views_api, "watchonly_available_for_user", fake_watchonly_status
+    )
+    onchain = await client.get("/tpos/api/v1/onchain/status", headers=headers)
+    assert onchain.status_code == 200
+    assert onchain.json()["available"] is False
+
+
+@pytest.mark.asyncio
+async def test_inventory_items_and_lnaddress_check(client: AsyncClient, monkeypatch):
+    _user, wallet = await _user_with_tabs("inventoryuser")
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs", json=_tpos_payload(), headers=headers
+    )
+    assert create.status_code == 201
+    tpos = await get_tpos(create.json()["id"])
+    assert tpos is not None
+    tpos.use_inventory = True
+    tpos.inventory_id = "inv1"
+    tpos.inventory_tags = "coffee"
+    tpos.inventory_omit_tags = "hidden"
+    await update_tpos(tpos)
+
+    async def fake_inventory_items(user_id, inventory_id, tags, omit_tags):
+        assert inventory_id == "inv1"
+        assert tags == "coffee"
+        assert omit_tags == "hidden"
+        return [
+            {
+                "id": "item1",
+                "name": "Coffee",
+                "description": "Hot",
+                "price": 250,
+                "tax_rate": 10,
+                "images": ["https://example.com/coffee.png"],
+                "tags": "coffee",
+                "quantity_in_stock": 3,
+                "is_active": True,
+            }
+        ]
+
+    monkeypatch.setattr(views_api, "get_inventory_items_for_tpos", fake_inventory_items)
+    items = await client.get(f"/tpos/api/v1/tposs/{tpos.id}/inventory-items")
+    assert items.status_code == 200
+    assert items.json()[0] == {
+        "id": "item1",
+        "title": "Coffee",
+        "description": "Hot",
+        "price": 250,
+        "tax": 10,
+        "image": "https://example.com/coffee.png",
+        "categories": ["coffee"],
+        "quantity_in_stock": 3,
+        "disabled": False,
+    }
+
+    async def bad_lnaddress(_lnaddress):
+        return object()
+
+    monkeypatch.setattr(views_api, "lnurl_handle", bad_lnaddress)
+    lnaddress = await client.get(
+        "/tpos/api/v1/tposs/lnaddresscheck?lnaddress=alice@example.com"
+    )
+    assert lnaddress.status_code == 400
+    assert "unexpected response type" in lnaddress.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_cash_validate_and_print_invoice_endpoints(
+    client: AsyncClient, monkeypatch
+):
+    await _drain_internal_invoice_queue()
+    user, wallet = await _user_with_tabs("cashuser")
+    settings.super_user = user.id
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(currency="EUR", allow_cash_settlement=True),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    payment = await create_payment_request(
+        wallet.id,
+        CreateInvoice(
+            unit="sat",
+            out=False,
+            amount=10,
+            memo="Cash sale",
+            internal=True,
+            extra={
+                "tag": "tpos",
+                "tpos_id": tpos["id"],
+                "amount": 10,
+                "fiat_method": "cash",
+                "details": {
+                    "currency": "EUR",
+                    "exchangeRate": 1,
+                    "taxValue": 0,
+                    "taxIncluded": True,
+                    "items": [],
+                },
+            },
+        ),
+    )
+    await update_payment_checking_id(
+        payment.checking_id, f"internal_cash_{payment.payment_hash}"
+    )
+    await create_tpos_payment(
+        TposPayment(
+            id=uuid4().hex,
+            tpos_id=tpos["id"],
+            payment_hash=payment.payment_hash,
+            amount=10,
+            payment_method="cash",
+        )
+    )
+    invoice = {"payment_hash": payment.payment_hash}
+
+    sent_messages = []
+
+    async def fake_websocket_updater(channel, message):
+        sent_messages.append((channel, message))
+
+    monkeypatch.setattr(views_api, "websocket_updater", fake_websocket_updater)
+    printed = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}/print",
+        json={"receipt_type": "receipt"},
+    )
+    assert printed.status_code == 200
+    assert printed.json() == {"success": True}
+    assert sent_messages
+
+    validated = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}/cash/validate"
+    )
+    assert validated.status_code == 200
+    assert validated.json() == {"success": True}
+
+
+@pytest.mark.asyncio
+async def test_atm_and_lnurl_withdraw_routes(client: AsyncClient, monkeypatch):
+    user, wallet = await _user_with_tabs("atmuser")
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(withdraw_limit=100),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    charge_response = await client.post(
+        f"/tpos/api/v1/atm/{tpos['id']}/create?usr={user.id}"
+    )
+    assert charge_response.status_code == 200
+    charge = charge_response.json()
+
+    await update_wallet_balance(wallet, 50_000)
+    withdraw = await client.get(f"/tpos/api/v1/atm/withdraw/{charge['id']}/25")
+    assert withdraw.status_code == 200
+    assert withdraw.json()["amount"] == 25
+
+    params = await client.get(
+        f"/tpos/api/v1/lnurl/{charge['id']}/25",
+        headers={"host": "localhost"},
+    )
+    assert params.status_code == 200
+    assert params.json()["k1"] == charge["id"]
+
+    async def fake_pay_invoice(**kwargs):
+        return None
+
+    async def fake_websocket_updater(channel, message):
+        return None
+
+    async def fake_pay_tribute(withdraw_amount, wallet_id, percent=0.5):
+        return None
+
+    monkeypatch.setattr(views_lnurl, "pay_invoice", fake_pay_invoice)
+    monkeypatch.setattr(views_lnurl, "websocket_updater", fake_websocket_updater)
+    monkeypatch.setattr(views_lnurl, "pay_tribute", fake_pay_tribute)
+    callback = await client.get(f"/tpos/api/v1/lnurl/cb?k1={charge['id']}&pr=lnbc1test")
+    assert callback.status_code == 200
+    assert callback.json()["status"] == "OK"
+
+    claimed_again = await client.get(
+        f"/tpos/api/v1/lnurl/cb?k1={charge['id']}&pr=lnbc1test"
+    )
+    assert claimed_again.status_code == 200
+    assert "already been claimed" in claimed_again.json()["reason"]
+
+
+@pytest.mark.asyncio
+async def test_atm_pay_endpoint(client: AsyncClient, monkeypatch):
+    user, wallet = await _user_with_tabs("atmpayuser")
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(withdraw_limit=100),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    charge_response = await client.post(
+        f"/tpos/api/v1/atm/{tpos['id']}/create?usr={user.id}"
+    )
+    assert charge_response.status_code == 200
+    charge = charge_response.json()
+
+    async def fake_lnurl_handle(pay_link, user_agent=None):
+        return views_atm.LnurlPayResponse(
+            callback="https://example.com/cb",
+            minSendable=1000,
+            maxSendable=1000,
+            metadata='[["text/plain","test"]]',
+        )
+
+    class FakePayResponse:
+        pr = "lnbc1test"
+
+    async def fake_execute_pay_request(response, msat, user_agent=None):
+        assert msat == 25_000
+        return FakePayResponse()
+
+    async def fake_execute_withdraw(response, pr, user_agent=None):
+        assert pr == "lnbc1test"
+        return None
+
+    monkeypatch.setattr(views_atm, "lnurl_handle", fake_lnurl_handle)
+    monkeypatch.setattr(views_atm, "execute_pay_request", fake_execute_pay_request)
+    monkeypatch.setattr(views_atm, "execute_withdraw", fake_execute_withdraw)
+    paid = await client.post(
+        f"/tpos/api/v1/atm/withdraw/{charge['id']}/25/pay",
+        json={"pay_link": "lnurl1test"},
+        headers={"host": "localhost"},
+    )
+    assert paid.status_code == 200
+    assert paid.json() == {
+        "success": True,
+        "message": "Withdraw processed successfully.",
+    }
+
+
+@pytest.mark.asyncio
+async def test_pay_invoice_lnurl_withdraw_endpoint(client: AsyncClient, monkeypatch):
+    _user, wallet = await _user_with_tabs("lnurlpayuser")
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs", json=_tpos_payload(), headers=headers
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    class FakeResponse:
+        is_error = False
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def get(self, url, **kwargs):
+            if "callback" in str(url):
+                return FakeResponse({"status": "OK"})
+            return FakeResponse(
+                {
+                    "tag": "withdrawRequest",
+                    "callback": "https://example.com/callback",
+                    "k1": "abc",
+                }
+            )
+
+    monkeypatch.setattr(
+        views_api.httpx, "AsyncClient", lambda *args, **kwargs: FakeClient()
+    )
+    paid = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/lnbc1test/pay",
+        json={"lnurl": "example.com/withdraw"},
+    )
+    assert paid.status_code == 200
+    assert paid.json()["success"] is True
