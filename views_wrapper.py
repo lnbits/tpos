@@ -21,7 +21,7 @@ from lnbits.decorators import require_admin_key
 from lnbits.helpers import create_access_token, get_api_routes
 
 from .crud import get_tpos
-from .services import fetch_wrapper_assetlinks
+from .services_wrapper import fetch_wrapper_assetlinks
 
 tpos_wrapper_router = APIRouter()
 
