@@ -27,6 +27,7 @@ import tpos.views_atm as views_atm  # type: ignore[import]
 import tpos.views_inventory as views_inventory  # type: ignore[import]
 import tpos.views_lnurl as views_lnurl  # type: ignore[import]
 import tpos.views_onchain as views_onchain  # type: ignore[import]
+import tpos.views_wrapper as views_wrapper  # type: ignore[import]
 from tpos.crud import (  # type: ignore[import]
     create_tpos_payment,
     get_tpos,
@@ -343,7 +344,7 @@ async def test_wrapper_inventory_onchain_status_endpoints(
     async def fake_assetlinks():
         return [{"relation": ["delegate_permission/common.handle_all_urls"]}]
 
-    monkeypatch.setattr(views_api, "fetch_wrapper_assetlinks", fake_assetlinks)
+    monkeypatch.setattr(views_wrapper, "fetch_wrapper_assetlinks", fake_assetlinks)
     assetlinks = await client.get("/tpos/api/v1/well-known/assetlinks.json")
     assert assetlinks.status_code == 200
     assert assetlinks.json()[0]["relation"] == [
