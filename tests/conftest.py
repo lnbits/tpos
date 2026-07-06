@@ -1,6 +1,7 @@
 import os
 from typing import Any, cast
 
+import httpx
 import pytest_asyncio
 import tabs.migrations as tabs_migrations  # type: ignore[import]
 from fastapi import FastAPI
@@ -15,7 +16,6 @@ from tabs import tabs_ext  # type: ignore[import]
 from tabs.crud import db as tabs_db  # type: ignore[import]
 
 import tpos.migrations as ext_migrations  # type: ignore[import]
-import tpos.services as tpos_services  # type: ignore[import]
 from tpos import tpos_ext  # type: ignore[import]
 from tpos.crud import db  # type: ignore[import]
 
@@ -60,6 +60,6 @@ async def client(monkeypatch):
         kwargs.setdefault("base_url", "http://testserver")
         return AsyncClient(*args, **kwargs)
 
-    monkeypatch.setattr(tpos_services.httpx, "AsyncClient", app_client)
+    monkeypatch.setattr(httpx, "AsyncClient", app_client)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
