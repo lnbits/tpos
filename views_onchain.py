@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from lnbits.core.models import WalletTypeInfo
 from lnbits.decorators import require_admin_key
 
-from .services import (
+from .services_onchain import (
     fetch_watchonly_config,
     fetch_watchonly_wallet,
     fetch_watchonly_wallets,

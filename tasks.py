@@ -22,10 +22,10 @@ from .crud import (
 from .services import (
     create_tab_settlement_for_tpos,
     ensure_tpos_tabs_access,
-    fetch_onchain_balance,
     push_order_to_orders,
 )
 from .services_inventory import deduct_inventory_stock
+from .services_onchain import fetch_onchain_balance
 
 
 async def wait_for_paid_invoices():

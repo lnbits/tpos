@@ -38,9 +38,9 @@ from .models import (
 )
 from .services import (
     ensure_tpos_tabs_access,
-    fetch_onchain_address,
     fetch_single_tab_for_tpos,
 )
+from .services_onchain import fetch_onchain_address
 from .views_onchain import _validate_watchonly_settings
 from .views_tabs import _ensure_tab_matches_tpos_currency, _tab_settlement_tolerance
 
