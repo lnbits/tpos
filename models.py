@@ -16,6 +16,14 @@ class CreateWithdrawPay(BaseModel):
     pay_link: str
 
 
+class CreateTposInvoiceTabSettlement(BaseModel):
+    tab_id: str = Field(..., min_length=1)
+    amount: float = Field(..., gt=0)
+    reference: str | None = Field(None, max_length=120)
+    description: str | None = Field(None, max_length=512)
+    idempotency_key: str = Field(..., min_length=8, max_length=128)
+
+
 class CreateTposInvoice(BaseModel):
     amount: int = Query(..., ge=1)
     memo: str | None = Query(None)
@@ -31,6 +39,7 @@ class CreateTposInvoice(BaseModel):
     payment_method: str | None = Query(None)
     amount_fiat: float | None = Query(None, ge=0.0)
     tip_amount_fiat: float | None = Query(None, ge=0.0)
+    tab_settlement: CreateTposInvoiceTabSettlement | None = Query(None)
 
 
 class InventorySaleItem(BaseModel):
@@ -77,6 +86,8 @@ class CreateTposData(BaseModel):
     onchain_enabled: bool = Field(False)
     onchain_wallet_id: str | None = None
     onchain_zero_conf: bool = Field(True)
+    tabs_enabled: bool = Field(False)
+    tabs_allow_create: bool = Field(False)
 
     @validator("tax_default", pre=True, always=True)
     def default_tax_when_none(cls, v):
@@ -117,6 +128,8 @@ class TposClean(BaseModel):
     onchain_enabled: bool = False
     onchain_wallet_id: str | None = None
     onchain_zero_conf: bool = True
+    tabs_enabled: bool = False
+    tabs_allow_create: bool = False
 
     @property
     def withdraw_maximum(self) -> int:
@@ -168,6 +181,39 @@ class TposInvoiceResponse(BaseModel):
     onchain_amount_sat: int | None = None
     payment_method: str | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
+
+
+class TposTab(BaseModel):
+    id: str
+    name: str
+    customer_name: str | None = None
+    reference: str | None = None
+    currency: str = "sats"
+    status: str = "open"
+    balance: float = 0
+    is_archived: bool = False
+
+
+class TposTabList(BaseModel):
+    data: list[TposTab] = Field(default_factory=list)
+
+
+class CreateTposTabData(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    customer_name: str | None = None
+    reference: str | None = None
+    currency: str | None = None
+    limit_type: str = "none"
+    limit_amount: float | None = None
+
+
+class CreateTposTabCharge(BaseModel):
+    amount: float = Field(..., gt=0)
+    description: str | None = Field(None, max_length=512)
+    items: list[dict[str, Any]] = Field(default_factory=list, max_items=200)
+    notes: dict[str, Any] | None = None
+    internal_memo: str | None = Field(None, max_length=512)
+    idempotency_key: str = Field(..., min_length=8, max_length=128)
 
 
 class LnurlCharge(BaseModel):

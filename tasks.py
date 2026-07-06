@@ -20,7 +20,9 @@ from .crud import (
     update_tpos_payment,
 )
 from .services import (
+    create_tab_settlement_for_tpos,
     deduct_inventory_stock,
+    ensure_tpos_tabs_access,
     fetch_onchain_balance,
     push_order_to_orders,
 )
@@ -169,6 +171,7 @@ async def process_paid_tpos_payment(
     await websocket_updater(tpos_id, json.dumps(stripped_payment))
     await websocket_updater(payment.payment_hash, json.dumps(stripped_payment))
 
+    await maybe_settle_tab(payment, tpos, payment_method)
     await maybe_push_order(payment, tpos)
 
     inventory_payload = payment.extra.get("inventory")
@@ -199,6 +202,45 @@ async def process_paid_tpos_payment(
         extra={**payment.extra, "tipSplitted": True},
     )
     logger.debug(f"tpos: tip invoice paid: {paid_payment.checking_id}")
+
+
+async def maybe_settle_tab(payment: Payment, tpos, payment_method: str) -> None:
+    settlement = (payment.extra or {}).get("tab_settlement")
+    if not settlement:
+        return
+
+    try:
+        user_id = await ensure_tpos_tabs_access(tpos)
+        await create_tab_settlement_for_tpos(
+            user_id=user_id,
+            tab_id=settlement["tab_id"],
+            payload={
+                "amount": settlement["amount"],
+                "method": _tabs_settlement_method(payment_method, payment),
+                "reference": settlement.get("reference"),
+                "description": settlement.get("description") or "TPoS settlement",
+                "metadata": json.dumps(
+                    {
+                        "source": "tpos",
+                        "source_id": tpos.id,
+                        "source_action": "settlement_paid",
+                        "payment_hash": payment.payment_hash,
+                        "payment_method": payment_method,
+                    }
+                ),
+                "idempotency_key": settlement["idempotency_key"],
+            },
+        )
+    except Exception as exc:
+        logger.warning(f"tpos: tab settlement failed: {exc}")
+
+
+def _tabs_settlement_method(payment_method: str, payment: Payment) -> str:
+    if payment_method == "cash":
+        return "cash"
+    if payment.extra.get("fiat_method") == "terminal":
+        return "card"
+    return "other"
 
 
 def _payment_method(payment: Payment) -> str:

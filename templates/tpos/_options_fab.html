@@ -50,6 +50,15 @@
   ></q-fab-action>
   <q-fab-action
     color="primary"
+    @click="openTabSettlementDialog"
+    v-if="tabsEnabled"
+    icon="assignment"
+    external-label
+    label-position="left"
+    label="Settle Tab"
+  ></q-fab-action>
+  <q-fab-action
+    color="primary"
     @click="clearLNaddress"
     v-if="tposLNaddress"
     icon="alternate_email"
