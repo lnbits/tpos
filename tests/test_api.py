@@ -27,6 +27,7 @@ import tpos.views_atm as views_atm  # type: ignore[import]
 import tpos.views_inventory as views_inventory  # type: ignore[import]
 import tpos.views_lnurl as views_lnurl  # type: ignore[import]
 import tpos.views_onchain as views_onchain  # type: ignore[import]
+import tpos.views_payments as views_payments  # type: ignore[import]
 import tpos.views_wrapper as views_wrapper  # type: ignore[import]
 from tpos.crud import (  # type: ignore[import]
     create_tpos_payment,
@@ -517,7 +518,7 @@ async def test_cash_validate_and_print_invoice_endpoints(
     async def fake_websocket_updater(channel, message):
         sent_messages.append((channel, message))
 
-    monkeypatch.setattr(views_api, "websocket_updater", fake_websocket_updater)
+    monkeypatch.setattr(views_payments, "websocket_updater", fake_websocket_updater)
     printed = await client.post(
         f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}/print",
         json={"receipt_type": "receipt"},
@@ -676,7 +677,7 @@ async def test_pay_invoice_lnurl_withdraw_endpoint(client: AsyncClient, monkeypa
             )
 
     monkeypatch.setattr(
-        views_api.httpx, "AsyncClient", lambda *args, **kwargs: FakeClient()
+        views_payments.httpx, "AsyncClient", lambda *args, **kwargs: FakeClient()
     )
     paid = await client.post(
         f"/tpos/api/v1/tposs/{tpos['id']}/invoices/lnbc1test/pay",
