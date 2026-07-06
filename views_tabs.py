@@ -7,10 +7,10 @@ from fastapi import APIRouter, HTTPException, Query
 
 from .crud import get_tpos
 from .models import CreateTposTabCharge, CreateTposTabData, Tpos, TposTab, TposTabList
-from .services import (
+from .services import ensure_tpos_tabs_access
+from .services_tabs import (
     create_tab_charge_for_tpos,
     create_tab_for_tpos,
-    ensure_tpos_tabs_access,
     fetch_single_tab_for_tpos,
     fetch_tabs_for_tpos,
 )

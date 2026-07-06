@@ -19,13 +19,10 @@ from .crud import (
     get_tpos_payment_by_hash,
     update_tpos_payment,
 )
-from .services import (
-    create_tab_settlement_for_tpos,
-    ensure_tpos_tabs_access,
-    push_order_to_orders,
-)
+from .services import ensure_tpos_tabs_access, push_order_to_orders
 from .services_inventory import deduct_inventory_stock
 from .services_onchain import fetch_onchain_balance
+from .services_tabs import create_tab_settlement_for_tpos
 
 
 async def wait_for_paid_invoices():
