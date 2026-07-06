@@ -22,6 +22,7 @@ from tabs.crud import (  # type: ignore[import]
     get_tab_settlements,
 )
 
+import tpos.tasks as tpos_tasks  # type: ignore[import]
 import tpos.views_api as views_api  # type: ignore[import]
 import tpos.views_atm as views_atm  # type: ignore[import]
 import tpos.views_inventory as views_inventory  # type: ignore[import]
@@ -236,7 +237,9 @@ async def test_tabs_bridge_returns_tabs_error_detail(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_paid_tpos_invoice_settles_tab_via_real_tabs_api(client: AsyncClient):
+async def test_paid_tpos_invoice_settles_tab_via_real_tabs_api(
+    client: AsyncClient, monkeypatch
+):
     await _drain_internal_invoice_queue()
     _user, wallet = await _user_with_tabs("settlementuser")
     headers = {"X-API-KEY": wallet.adminkey}
@@ -286,7 +289,22 @@ async def test_paid_tpos_invoice_settles_tab_via_real_tabs_api(client: AsyncClie
 
     payment = await get_standalone_payment(invoice["payment_hash"], incoming=True)
     assert payment is not None
+    paid_messages = []
+
+    async def fake_paid_websocket(channel, message):
+        paid_messages.append((channel, json.loads(message)))
+
+    monkeypatch.setattr(tpos_tasks, "websocket_updater", fake_paid_websocket)
     await on_invoice_paid(payment)
+
+    assert {channel for channel, _message in paid_messages} >= {
+        tpos["id"],
+        invoice["payment_hash"],
+    }
+    assert all(message["pending"] is False for _channel, message in paid_messages)
+    assert all(
+        message["payment_method"] == "lightning" for _channel, message in paid_messages
+    )
 
     tpos_payment = await get_tpos_payment_by_hash(invoice["payment_hash"])
     assert tpos_payment is not None
@@ -302,6 +320,58 @@ async def test_paid_tpos_invoice_settles_tab_via_real_tabs_api(client: AsyncClie
     assert settlements[0].status == "completed"
     assert settlements[0].method == "other"
     assert settlements[0].idempotency_key == "tpos-settlement-1"
+
+
+@pytest.mark.asyncio
+async def test_onchain_invoice_option_creates_internal_payment(
+    client: AsyncClient, monkeypatch
+):
+    user, wallet = await _user_with_tabs("onchainuser")
+    settings.super_user = user.id
+    headers = {"X-API-KEY": wallet.adminkey}
+
+    async def fake_watchonly_settings(**kwargs):
+        return {"mempool_endpoint": "https://mempool.example"}
+
+    async def fake_onchain_address(inkey, wallet_id):
+        assert wallet_id == "watch-wallet"
+        return {"address": "bc1qtposaddress"}
+
+    monkeypatch.setattr(
+        views_api, "_validate_watchonly_settings", fake_watchonly_settings
+    )
+    monkeypatch.setattr(
+        views_payments, "_validate_watchonly_settings", fake_watchonly_settings
+    )
+    monkeypatch.setattr(views_payments, "fetch_onchain_address", fake_onchain_address)
+
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(onchain_enabled=True, onchain_wallet_id="watch-wallet"),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    invoice_response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={"amount": 42, "memo": "Onchain", "payment_method": "btc_onchain"},
+    )
+    assert invoice_response.status_code == 201
+    invoice = invoice_response.json()
+    assert invoice["payment_request"] == "bc1qtposaddress"
+    assert invoice["payment_options"] == ["btc", "btc_onchain"]
+    assert invoice["payment_method"] == "onchain"
+
+    payment = await get_standalone_payment(invoice["payment_hash"], incoming=True)
+    assert payment is not None
+    assert payment.is_internal
+    assert payment.checking_id.startswith("internal_onchain_")
+
+    tpos_payment = await get_tpos_payment_by_hash(invoice["payment_hash"])
+    assert tpos_payment is not None
+    assert tpos_payment.onchain_address == "bc1qtposaddress"
+    assert tpos_payment.mempool_endpoint == "https://mempool.example"
 
 
 @pytest.mark.asyncio
@@ -525,7 +595,25 @@ async def test_cash_validate_and_print_invoice_endpoints(
     )
     assert printed.status_code == 200
     assert printed.json() == {"success": True}
+    order_printed = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}/print",
+        json={"receipt_type": "order_receipt"},
+    )
+    assert order_printed.status_code == 200
+    assert order_printed.json() == {"success": True}
     assert sent_messages
+    assert {
+        json.loads(message)["receipt_type"] for _channel, message in sent_messages
+    } == {
+        "receipt",
+        "order_receipt",
+    }
+
+    poll = await client.get(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}?extra=true"
+    )
+    assert poll.status_code == 200
+    assert poll.json()["extra"]["fiat_method"] == "cash"
 
     validated = await client.post(
         f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}/cash/validate"
