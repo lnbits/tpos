@@ -3,7 +3,7 @@ import json
 
 from lnbits.core.crud import get_user_active_extensions_ids, get_wallet
 from lnbits.core.crud.payments import get_standalone_payment, update_payment
-from lnbits.core.models import Payment
+from lnbits.core.models import Payment, PaymentState
 from lnbits.core.services import (
     create_invoice,
     get_pr_from_lnurl,
@@ -115,6 +115,7 @@ async def settle_onchain_tpos_payment(tpos_payment) -> None:
 
     payment.extra["payment_method"] = "onchain"
     payment.extra["settled_by_onchain"] = True
+    payment.status = PaymentState.SUCCESS
     await update_payment(payment)
     await internal_invoice_queue_put(payment.checking_id)
 
