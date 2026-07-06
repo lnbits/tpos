@@ -26,6 +26,7 @@ import tpos.views_api as views_api  # type: ignore[import]
 import tpos.views_atm as views_atm  # type: ignore[import]
 import tpos.views_inventory as views_inventory  # type: ignore[import]
 import tpos.views_lnurl as views_lnurl  # type: ignore[import]
+import tpos.views_onchain as views_onchain  # type: ignore[import]
 from tpos.crud import (  # type: ignore[import]
     create_tpos_payment,
     get_tpos,
@@ -388,7 +389,7 @@ async def test_wrapper_inventory_onchain_status_endpoints(
         return False
 
     monkeypatch.setattr(
-        views_api, "watchonly_available_for_user", fake_watchonly_status
+        views_onchain, "watchonly_available_for_user", fake_watchonly_status
     )
     onchain = await client.get("/tpos/api/v1/onchain/status", headers=headers)
     assert onchain.status_code == 200

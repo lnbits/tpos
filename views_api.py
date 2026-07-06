@@ -74,15 +74,12 @@ from .services import (
     ensure_tpos_tabs_access,
     fetch_onchain_address,
     fetch_single_tab_for_tpos,
-    fetch_watchonly_config,
-    fetch_watchonly_wallet,
-    fetch_watchonly_wallets,
     fetch_wrapper_assetlinks,
     get_default_inventory,
     inventory_available_for_user,
-    watchonly_available_for_user,
 )
 from .views_inventory import tpos_inventory_router
+from .views_onchain import _validate_watchonly_settings, tpos_onchain_router
 from .views_tabs import (
     _ensure_tab_matches_tpos_currency,
     _tab_settlement_tolerance,
@@ -91,6 +88,7 @@ from .views_tabs import (
 
 tpos_api_router = APIRouter()
 tpos_api_router.include_router(tpos_inventory_router)
+tpos_api_router.include_router(tpos_onchain_router)
 tpos_api_router.include_router(tpos_tabs_router)
 
 
@@ -165,84 +163,6 @@ def _build_receipt_data(
     )
 
 
-async def _get_watchonly_status(wallet) -> dict[str, Any]:
-    if not await watchonly_available_for_user(wallet.user):
-        return {
-            "available": False,
-            "message": "Watchonly extension must be enabled for this user.",
-            "network": None,
-            "wallets": [],
-        }
-
-    try:
-        config = await fetch_watchonly_config(wallet.inkey)
-        network_value = config.get("network")
-        if not isinstance(network_value, str) or not network_value:
-            raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail="Watchonly extension returned an invalid network configuration.",
-            )
-        network = network_value
-        wallets = await fetch_watchonly_wallets(wallet.inkey, network)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail=f"Watchonly extension is not reachable: {exc!s}",
-        ) from exc
-
-    return {
-        "available": True,
-        "message": None,
-        "network": network,
-        "wallets": wallets,
-        "mempool_endpoint": config.get("mempool_endpoint"),
-    }
-
-
-async def _validate_watchonly_settings(
-    *,
-    wallet,
-    onchain_enabled: bool,
-    onchain_wallet_id: str | None,
-) -> dict[str, Any] | None:
-    if not onchain_enabled:
-        return None
-    if not onchain_wallet_id:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Watchonly wallet is required when onchain payments are enabled.",
-        )
-
-    status = await _get_watchonly_status(wallet)
-    if not status["available"]:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail=status["message"] or "Watchonly extension is not available.",
-        )
-
-    try:
-        watch_wallet = await fetch_watchonly_wallet(wallet.inkey, onchain_wallet_id)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail=f"Cannot access watchonly wallet: {exc!s}",
-        ) from exc
-
-    if watch_wallet.get("network") != status["network"]:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Watchonly wallet network does not match the user watchonly config.",
-        )
-
-    return {
-        "watch_wallet": watch_wallet,
-        "network": status["network"],
-        "mempool_endpoint": status["mempool_endpoint"],
-    }
-
-
 def _payment_method_from_payment(payment: Payment) -> str:
     if payment.extra.get("payment_method"):
         return str(payment.extra["payment_method"])
@@ -298,13 +218,6 @@ async def api_tposs(
         user = await get_user(key_info.wallet.user)
         wallet_ids = user.wallet_ids if user else []
     return await get_tposs(wallet_ids)
-
-
-@tpos_api_router.get("/api/v1/onchain/status", status_code=HTTPStatus.OK)
-async def api_onchain_status(
-    key_info: WalletTypeInfo = Depends(require_admin_key),
-) -> dict[str, Any]:
-    return await _get_watchonly_status(key_info.wallet)
 
 
 @tpos_api_router.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
