@@ -29,7 +29,7 @@ from .models import (
     CreateUpdateItemData,
     Tpos,
 )
-from .services import (
+from .services_inventory import (
     get_default_inventory,
     inventory_available_for_user,
 )

@@ -8,7 +8,7 @@ from lnbits.decorators import require_admin_key
 
 from .crud import get_tpos
 from .helpers import first_image, inventory_tags_to_list
-from .services import (
+from .services_inventory import (
     get_default_inventory,
     get_inventory_items_for_tpos,
     inventory_available_for_user,
