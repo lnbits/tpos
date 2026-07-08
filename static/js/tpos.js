@@ -380,7 +380,7 @@ window.app = Vue.createApp({
       if (payload.type !== 'invoice_created') return
       if (!payload.payment_hash || !payload.payment_request) return
       this.amount = payload.amount_fiat || this.amount
-      this.tipAmount = payload.paid_in_fiat
+      this.tipAmount = payload.amount_fiat
         ? payload.tip_amount_fiat || this.tipAmount
         : payload.tip_amount || this.tipAmount
       this.exchangeRate = payload.exchange_rate || this.exchangeRate
