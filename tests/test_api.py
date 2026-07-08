@@ -37,7 +37,10 @@ from tpos.crud import (  # type: ignore[import]
     update_tpos,
 )
 from tpos.models import TposPayment  # type: ignore[import]
-from tpos.tasks import on_invoice_paid  # type: ignore[import]
+from tpos.tasks import (  # type: ignore[import]
+    on_invoice_paid,
+    settle_onchain_tpos_payment,
+)
 
 
 def _tpos_payload(**overrides):
@@ -373,6 +376,24 @@ async def test_onchain_invoice_option_creates_internal_payment(
     assert tpos_payment.onchain_address == "bc1qtposaddress"
     assert tpos_payment.mempool_endpoint == "https://mempool.example"
 
+    queued_checking_ids = []
+
+    async def fake_internal_invoice_queue_put(checking_id):
+        queued_checking_ids.append(checking_id)
+
+    monkeypatch.setattr(
+        tpos_tasks, "internal_invoice_queue_put", fake_internal_invoice_queue_put
+    )
+    await settle_onchain_tpos_payment(tpos_payment)
+    settled_payment = await get_standalone_payment(
+        invoice["payment_hash"], incoming=True
+    )
+    assert settled_payment is not None
+    assert settled_payment.success is True
+
+    await settle_onchain_tpos_payment(tpos_payment)
+    assert queued_checking_ids == [payment.checking_id, payment.checking_id]
+
 
 @pytest.mark.asyncio
 async def test_tpos_rejects_invalid_tab_flows(client: AsyncClient):
@@ -615,6 +636,14 @@ async def test_cash_validate_and_print_invoice_endpoints(
     assert poll.status_code == 200
     assert poll.json()["extra"]["fiat_method"] == "cash"
 
+    queued_checking_ids = []
+
+    async def fake_internal_invoice_queue_put(checking_id):
+        queued_checking_ids.append(checking_id)
+
+    monkeypatch.setattr(
+        views_payments, "internal_invoice_queue_put", fake_internal_invoice_queue_put
+    )
     validated = await client.post(
         f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}/cash/validate"
     )
@@ -624,6 +653,14 @@ async def test_cash_validate_and_print_invoice_endpoints(
     settled_payment = await get_standalone_payment(payment.payment_hash, incoming=True)
     assert settled_payment is not None
     assert settled_payment.success is True
+
+    retried = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}/cash/validate"
+    )
+    assert retried.status_code == 200
+    expected_checking_id = f"internal_cash_{payment.payment_hash}"
+    assert queued_checking_ids == [expected_checking_id, expected_checking_id]
+
     await on_invoice_paid(settled_payment)
 
     paid_response = await client.get(

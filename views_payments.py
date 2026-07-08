@@ -478,10 +478,9 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Payment is not an internal cash invoice.",
         )
-    if payment.success:
-        return {"success": True}
-    payment.status = PaymentState.SUCCESS
-    await update_payment(payment)
+    if not payment.success:
+        payment.status = PaymentState.SUCCESS
+        await update_payment(payment)
     await internal_invoice_queue_put(payment.checking_id)
     return {"success": True}
 

@@ -58,10 +58,10 @@ async def poll_onchain_payments():
                 )
                 tpos_payment.balance = settled_balance
                 tpos_payment.pending = unconfirmed_balance
-                if settled_balance >= tpos_payment.amount:
-                    tpos_payment.paid = True
+                settled = settled_balance >= tpos_payment.amount
+                if settled:
                     tpos_payment.payment_method = "onchain"
-                if changed or tpos_payment.paid:
+                if changed or settled:
                     await update_tpos_payment(tpos_payment)
                     await websocket_updater(
                         tpos_payment.payment_hash,
@@ -75,7 +75,7 @@ async def poll_onchain_payments():
                             }
                         ),
                     )
-                if tpos_payment.paid:
+                if settled:
                     await settle_onchain_tpos_payment(tpos_payment)
             except Exception as exc:
                 logger.warning(f"tpos: onchain polling failed: {exc}")
@@ -108,13 +108,11 @@ async def settle_onchain_tpos_payment(tpos_payment) -> None:
     if not payment or not payment.extra or payment.extra.get("tag") != "tpos":
         return
 
-    if payment.success:
-        return
-
     payment.extra["payment_method"] = "onchain"
     payment.extra["settled_by_onchain"] = True
-    payment.status = PaymentState.SUCCESS
-    await update_payment(payment)
+    if not payment.success:
+        payment.status = PaymentState.SUCCESS
+        await update_payment(payment)
     await internal_invoice_queue_put(payment.checking_id)
 
 
