@@ -1,26 +1,4 @@
-const getTposCurrencyFractionDigits = currency => {
-  const code = (currency || '').toUpperCase()
-  if (code === 'SAT' || code === 'SATS') {
-    return 0
-  }
-  try {
-    return new Intl.NumberFormat(window.i18n.global.locale, {
-      style: 'currency',
-      currency: code
-    }).resolvedOptions().maximumFractionDigits
-  } catch (e) {
-    return 2
-  }
-}
-
-const roundTposCurrencyAmount = (amount, currency) => {
-  const value = Number(amount) || 0
-  if ((currency || '').toLowerCase() === 'sats') {
-    return Math.ceil(value)
-  }
-  const scale = 10 ** getTposCurrencyFractionDigits(currency)
-  return Math.round(value * scale) / scale
-}
+const {roundTposCurrencyAmount} = window.tposUtils
 
 const mapTpos = obj => {
   obj.date = Quasar.date.formatDate(

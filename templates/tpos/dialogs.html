@@ -57,35 +57,13 @@
     </q-card>
   </q-dialog>
 
-  <q-dialog v-model="printDialog.show" persistent @hide="closePrintDialog">
-    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
-      <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">Print Receipt</div>
-      </q-card-section>
-      <q-card-actions align="between">
-        <div>
-          <q-btn
-            round
-            icon="receipt_long"
-            color="secondary"
-            class="q-mr-sm"
-            @click.stop="printOrderReceipt(printDialog.paymentHash)"
-          >
-            <q-tooltip>Print order receipt</q-tooltip>
-          </q-btn>
-          <q-btn
-            round
-            icon="print"
-            color="primary"
-            @click.stop="printReceipt(printDialog.paymentHash)"
-          >
-            <q-tooltip>Print receipt</q-tooltip>
-          </q-btn>
-        </div>
-        <q-btn outline color="grey" @click="closePrintDialog">CLOSE</q-btn>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <tpos-print-dialog
+    v-model:show="printDialog.show"
+    :payment-hash="printDialog.paymentHash"
+    @close="closePrintDialog"
+    @print-order-receipt="printOrderReceipt"
+    @print-receipt="printReceipt"
+  ></tpos-print-dialog>
 
   <q-dialog v-model="tipDialog.show" position="top">
     <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
@@ -290,37 +268,13 @@
     </q-card>
   </q-dialog>
 
-  <q-dialog v-model="heldCartsDialog.show" position="bottom">
-    <q-card class="lnbits__dialog-card">
-      <q-card-section class="row items-center q-pb-none">
-        <q-space />
-        <q-btn icon="close" flat round dense v-close-popup />
-      </q-card-section>
-      <q-list separator>
-        <q-item
-          v-for="[key, value] in Object.entries(heldCarts)"
-          :key="key"
-          clickable
-        >
-          <q-item-section @click="restoreCart(key)">
-            <q-item-label class="text-bold" v-text="formatDate(key)">
-            </q-item-label>
-            <q-item-label caption lines="2" v-text="value.note"></q-item-label>
-          </q-item-section>
-          <q-item-section side top>
-            <q-btn
-              icon="delete"
-              color="red"
-              @click.stop="deleteHeldCart(key)"
-              class="q-ml-sm"
-              size="sm"
-              round
-            ></q-btn>
-          </q-item-section>
-        </q-item>
-      </q-list>
-    </q-card>
-  </q-dialog>
+  <tpos-held-carts-dialog
+    v-model:show="heldCartsDialog.show"
+    :held-carts="heldCarts"
+    :format-date="formatDate"
+    @restore="restoreCart"
+    @delete="deleteHeldCart"
+  ></tpos-held-carts-dialog>
 
   <q-dialog v-model="atmBox" @hide="atmPin = null">
     <q-card>

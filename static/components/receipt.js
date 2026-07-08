@@ -67,9 +67,10 @@ window.app.component('receipt', {
       return amount / this.exchangeRate
     },
     formatCurrencyAmount(amount) {
-      return roundTposCurrencyAmount(amount, this.currency).toFixed(
-        getTposCurrencyFractionDigits(this.currency)
-      )
+      return window.tposUtils.roundTposCurrencyAmount(
+        amount,
+        this.currency
+      ).toFixed(window.tposUtils.getTposCurrencyFractionDigits(this.currency))
     }
   },
   created() {
