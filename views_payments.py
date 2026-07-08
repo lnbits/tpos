@@ -254,6 +254,7 @@ async def api_tpos_create_invoice(
                 "paid_in_fiat": data.pay_in_fiat,
                 "amount_fiat": data.amount_fiat,
                 "tip_amount": data.tip_amount,
+                "tip_amount_fiat": data.tip_amount_fiat,
                 "exchange_rate": data.exchange_rate if data.exchange_rate else None,
                 "tpos_payment_id": response_payload.tpos_payment_id,
                 "payment_options": response_payload.payment_options,

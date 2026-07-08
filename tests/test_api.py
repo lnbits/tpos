@@ -378,6 +378,43 @@ async def test_lnaddress_forwarding_uses_whole_sat_amount(
 
 
 @pytest.mark.asyncio
+async def test_remote_invoice_payload_keeps_fiat_tip_amount(
+    client: AsyncClient, monkeypatch
+):
+    _user, wallet = await _user_with_tabs("remotetipuser")
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(currency="USD", enable_remote=True),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+    sent_messages = []
+
+    async def fake_websocket_updater(channel, message):
+        sent_messages.append((channel, json.loads(message)))
+
+    monkeypatch.setattr(views_payments, "websocket_updater", fake_websocket_updater)
+    invoice_response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={
+            "amount": 3700,
+            "tip_amount": 3700,
+            "amount_fiat": 0.46,
+            "tip_amount_fiat": 0.02,
+            "exchange_rate": 80000,
+            "memo": "$0.46 with 5% tip",
+            "pay_in_fiat": False,
+        },
+    )
+
+    assert invoice_response.status_code == 201
+    assert sent_messages[0][1]["tip_amount"] == 3700
+    assert sent_messages[0][1]["tip_amount_fiat"] == 0.02
+
+
+@pytest.mark.asyncio
 async def test_onchain_invoice_option_creates_internal_payment(
     client: AsyncClient, monkeypatch
 ):
