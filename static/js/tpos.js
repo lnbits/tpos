@@ -295,14 +295,6 @@ window.app = Vue.createApp({
     currencyScale() {
       return getTposCurrencyScale(this.currency)
     },
-    lnaddressStorageKey() {
-      return `tpos.${this.tposId}.lnaddress`
-    },
-    lnaddressButtonLabel() {
-      return this.lnaddress
-        ? `LNaddress: ${this.lnaddressDialog.lnaddress}`
-        : 'Set LNaddress'
-    },
     filteredItems() {
       // filter out disabled items
       let items = this.items.filter(item => !item.disabled)
@@ -819,7 +811,7 @@ window.app = Vue.createApp({
         .then(response => {
           if (response.data) {
             this.$q.localStorage.set(
-              this.lnaddressStorageKey,
+              'tpos.lnaddress',
               this.lnaddressDialog.lnaddress
             )
             this.lnaddressDialog.show = false
@@ -1625,11 +1617,7 @@ window.app = Vue.createApp({
     handleColorScheme(val) {
       this.$q.localStorage.set('lnbits.tpos.color', val)
     },
-    openLNaddressDialog() {
-      this.lnaddressDialog.show = true
-    },
     clearLNaddress() {
-      this.$q.localStorage.remove(this.lnaddressStorageKey)
       this.$q.localStorage.remove('tpos.lnaddress')
       this.lnaddressDialog.lnaddress = ''
       const url = new URL(window.location.href)
@@ -1935,12 +1923,11 @@ window.app = Vue.createApp({
     }, 120000)
     if (this.tposLNaddress) {
       this.lnaddressDialog.lnaddress =
-        this.$q.localStorage.getItem(this.lnaddressStorageKey) ||
         this.$q.localStorage.getItem('tpos.lnaddress')
       if (lnaddressparam != '') {
         this.lnaddressDialog.lnaddress = lnaddressparam
         this.$q.localStorage.set(
-          this.lnaddressStorageKey,
+          'tpos.lnaddress',
           this.lnaddressDialog.lnaddress
         )
         this.lnaddress = true
