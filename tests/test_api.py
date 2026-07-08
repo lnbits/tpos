@@ -5,8 +5,8 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 from lnbits.core.crud import get_standalone_payment
-from lnbits.core.crud.payments import update_payment_checking_id
-from lnbits.core.models import CreateInvoice
+from lnbits.core.crud.payments import create_payment, update_payment_checking_id
+from lnbits.core.models import CreateInvoice, CreatePayment, PaymentState
 from lnbits.core.models.users import Account
 from lnbits.core.services import (
     create_payment_request,
@@ -323,6 +323,58 @@ async def test_paid_tpos_invoice_settles_tab_via_real_tabs_api(
     assert settlements[0].status == "completed"
     assert settlements[0].method == "other"
     assert settlements[0].idempotency_key == "tpos-settlement-1"
+
+
+@pytest.mark.asyncio
+async def test_lnaddress_forwarding_uses_whole_sat_amount(
+    client: AsyncClient, monkeypatch
+):
+    _user, wallet = await _user_with_tabs("lnaddressuser")
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(lnaddress=True, lnaddress_cut=0),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+    payment_hash = uuid4().hex
+    payment = await create_payment(
+        f"checking-{payment_hash}",
+        CreatePayment(
+            wallet_id=wallet.id,
+            payment_hash=payment_hash,
+            bolt11="bolt11",
+            amount_msat=395_920,
+            memo="lnaddress sale",
+            extra={
+                "tag": "tpos",
+                "tpos_id": tpos["id"],
+                "lnaddress": "user@example.com",
+            },
+        ),
+        status=PaymentState.SUCCESS,
+    )
+    requested_amounts = []
+
+    async def fake_get_pr_from_lnurl(address, amount):
+        assert address == "user@example.com"
+        requested_amounts.append(amount)
+        return "bolt11-forward"
+
+    async def fake_pay_invoice(**_kwargs):
+        return payment
+
+    async def fake_websocket_updater(*_args):
+        return None
+
+    monkeypatch.setattr(tpos_tasks, "get_pr_from_lnurl", fake_get_pr_from_lnurl)
+    monkeypatch.setattr(tpos_tasks, "pay_invoice", fake_pay_invoice)
+    monkeypatch.setattr(tpos_tasks, "websocket_updater", fake_websocket_updater)
+
+    await on_invoice_paid(payment)
+
+    assert requested_amounts == [395_000]
 
 
 @pytest.mark.asyncio

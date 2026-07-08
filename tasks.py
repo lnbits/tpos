@@ -151,7 +151,7 @@ async def process_paid_tpos_payment(
         address = payment.extra.get("lnaddress")
         if address:
             try:
-                pr = await get_pr_from_lnurl(address, int(calc_amount))
+                pr = await get_pr_from_lnurl(address, int(calc_amount // 1000) * 1000)
             except Exception as exc:
                 logger.error(f"tpos: Error getting payment request from lnurl: {exc}")
                 pr = None
