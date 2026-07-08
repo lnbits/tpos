@@ -1925,7 +1925,7 @@ window.app = Vue.createApp({
     this.disconnectRemoteInvoiceWS()
     Object.values(this.paymentWsByHash).forEach(ws => ws.close())
   },
-  onMounted() {
+  mounted() {
     if (!this.headerElement) {
       this.headerElement = document.querySelector('.q-header')
     }
