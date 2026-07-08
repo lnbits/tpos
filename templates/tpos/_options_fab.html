@@ -58,13 +58,13 @@
     label="Settle Tab"
   ></q-fab-action>
   <q-fab-action
-    color="primary"
-    @click="clearLNaddress"
+    :color="lnaddress ? 'positive' : 'warning'"
+    @click="openLNaddressDialog"
     v-if="tposLNaddress"
     icon="alternate_email"
     external-label
     label-position="left"
-    label="Clear LNaddress"
+    :label="lnaddressButtonLabel"
   ></q-fab-action>
   <q-fab-action
     color="primary"

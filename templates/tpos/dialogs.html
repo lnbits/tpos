@@ -315,6 +315,15 @@
           </q-input>
           <div>
             <q-btn label="Submit" type="submit" color="primary"></q-btn>
+            <q-btn
+              v-if="lnaddress"
+              flat
+              color="grey"
+              class="q-ml-sm"
+              label="Clear"
+              type="button"
+              @click="clearLNaddress"
+            ></q-btn>
           </div>
         </q-form>
       </q-card-section>
