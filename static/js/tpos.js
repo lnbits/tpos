@@ -1555,6 +1555,7 @@ window.app = Vue.createApp({
         })
         .catch(error => {
           console.error(error)
+          LNbits.utils.notifyApiError(error)
         })
     },
     async getRates() {
