@@ -38,9 +38,8 @@ from .models import (
 )
 from .services import ensure_tpos_tabs_access
 from .services_onchain import fetch_onchain_address
-from .services_tabs import fetch_single_tab_for_tpos
+from .services_tabs import get_tab_for_tpos, tab_settlement_tolerance
 from .views_onchain import _validate_watchonly_settings
-from .views_tabs import _ensure_tab_matches_tpos_currency, _tab_settlement_tolerance
 
 tpos_payments_router = APIRouter()
 
@@ -111,10 +110,7 @@ async def api_tpos_create_invoice(
     tab_settlement = data.tab_settlement
     if tab_settlement:
         user_id = await ensure_tpos_tabs_access(tpos)
-        tab = await fetch_single_tab_for_tpos(
-            user_id=user_id, tab_id=tab_settlement.tab_id
-        )
-        _ensure_tab_matches_tpos_currency(tab, tpos)
+        tab = await get_tab_for_tpos(user_id, tpos, tab_settlement.tab_id)
         if tab.get("status") == "closed":
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
@@ -127,7 +123,7 @@ async def api_tpos_create_invoice(
                 detail="This tab has no outstanding balance to settle.",
             )
         amount_over_balance = tab_settlement.amount - tab_balance
-        if amount_over_balance > _tab_settlement_tolerance(tab.get("currency")):
+        if amount_over_balance > tab_settlement_tolerance(tab.get("currency")):
             raise HTTPException(
                 status_code=HTTPStatus.BAD_REQUEST,
                 detail="Settlement amount cannot exceed the outstanding balance.",

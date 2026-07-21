@@ -11,8 +11,8 @@ from .services import ensure_tpos_tabs_access
 from .services_tabs import (
     create_tab_charge_for_tpos,
     create_tab_for_tpos,
-    fetch_single_tab_for_tpos,
     fetch_tabs_for_tpos,
+    get_tab_for_tpos,
 )
 
 tpos_tabs_router = APIRouter()
@@ -29,18 +29,6 @@ async def _get_tpos_or_404(tpos_id: str) -> Tpos:
 
 def _tpos_currency(tpos: Tpos) -> str:
     return (tpos.currency or "sats").lower()
-
-
-def _ensure_tab_matches_tpos_currency(tab: dict[str, Any], tpos: Tpos) -> None:
-    if (tab.get("currency") or "sats").lower() != _tpos_currency(tpos):
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Tab currency must match TPoS currency.",
-        )
-
-
-def _tab_settlement_tolerance(currency: str | None) -> float:
-    return 1 if (currency or "sats").lower() == "sats" else 0.01
 
 
 @tpos_tabs_router.get("/api/v1/tposs/{tpos_id}/tabs", response_model=TposTabList)
@@ -101,8 +89,7 @@ async def api_tpos_add_tab_charge(
     tpos = await _get_tpos_or_404(tpos_id)
     user_id = await ensure_tpos_tabs_access(tpos)
 
-    tab = await fetch_single_tab_for_tpos(user_id=user_id, tab_id=tab_id)
-    _ensure_tab_matches_tpos_currency(tab, tpos)
+    await get_tab_for_tpos(user_id, tpos, tab_id)
 
     metadata = {
         "source": "tpos",
@@ -130,5 +117,5 @@ async def api_tpos_add_tab_charge(
         tab_id=tab_id,
         payload=payload,
     )
-    updated_tab = await fetch_single_tab_for_tpos(user_id=user_id, tab_id=tab_id)
+    updated_tab = await get_tab_for_tpos(user_id, tpos, tab_id)
     return {"tab_id": tab_id, "entry": entry, "tab": TposTab(**updated_tab).dict()}

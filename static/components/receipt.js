@@ -67,16 +67,14 @@ window.app.component('receipt', {
       return amount / this.exchangeRate
     },
     formatCurrencyAmount(amount) {
-      return window.tposUtils.roundTposCurrencyAmount(
-        amount,
-        this.currency
-      ).toFixed(window.tposUtils.getTposCurrencyFractionDigits(this.currency))
+      return window.tposUtils
+        .roundTposCurrencyAmount(amount, this.currency)
+        .toFixed(window.tposUtils.getTposCurrencyFractionDigits(this.currency))
     }
   },
   created() {
     this.currency = this.data.extra.details.currency || g.settings.denomination
     this.exchangeRate = this.data.extra.details.exchangeRate || 1
-    console.log('Receipt component created', this.data)
   },
   template: `
     <div class="q-pa-md">

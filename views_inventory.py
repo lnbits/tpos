@@ -54,12 +54,9 @@ async def api_tpos_inventory_items(tpos_id: str) -> list[dict[str, Any]]:
         )
 
     inventory_id = tpos.inventory_id
-    inventory_data: dict[str, Any] | None = None
     if not inventory_id:
-        inventory_data = await get_default_inventory(wallet.user)
-        inventory_id = inventory_data.get("id") if inventory_data else None
-    else:
-        inventory_data = await get_default_inventory(wallet.user)
+        inventory = await get_default_inventory(wallet.user)
+        inventory_id = inventory.get("id") if inventory else None
     if not inventory_id:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND,

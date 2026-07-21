@@ -10,6 +10,7 @@ from lnbits.core.crud import (
 from lnbits.settings import settings
 
 from .helpers import create_internal_user_access_token
+from .models import Tpos
 
 _TAB_STATUSES = {"open", "suspended", "closed"}
 
@@ -33,22 +34,7 @@ async def fetch_tabs_for_tpos(
             status_code=HTTPStatus.BAD_REQUEST,
             detail="Invalid tab status filter.",
         )
-    access = create_internal_user_access_token(user_id)
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                url=f"http://{settings.host}:{settings.port}/tabs/api/v1/tabs",
-                headers={"Authorization": f"Bearer {access}"},
-            )
-        resp.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        raise _raise_tabs_bridge_error(exc) from exc
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_GATEWAY,
-            detail="Tabs service is temporarily unavailable.",
-        ) from exc
-    payload = resp.json()
+    payload = await _tabs_request(user_id, "GET", "/tabs")
     if not isinstance(payload, list):
         return []
     tabs = [tab for tab in payload if tab.get("wallet") == wallet_id]
@@ -69,23 +55,7 @@ async def fetch_tabs_for_tpos(
 
 
 async def create_tab_for_tpos(user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    access = create_internal_user_access_token(user_id)
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                url=f"http://{settings.host}:{settings.port}/tabs/api/v1/tabs",
-                headers={"Authorization": f"Bearer {access}"},
-                json=payload,
-            )
-        resp.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        raise _raise_tabs_bridge_error(exc) from exc
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_GATEWAY,
-            detail="Tabs service is temporarily unavailable.",
-        ) from exc
-    return resp.json()
+    return await _tabs_request(user_id, "POST", "/tabs", json=payload)
 
 
 async def create_tab_charge_for_tpos(
@@ -93,42 +63,27 @@ async def create_tab_charge_for_tpos(
     tab_id: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    access = create_internal_user_access_token(user_id)
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                url=f"http://{settings.host}:{settings.port}/tabs/api/v1/tabs/{tab_id}/entries",
-                headers={"Authorization": f"Bearer {access}"},
-                json=payload,
-            )
-        resp.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        raise _raise_tabs_bridge_error(exc) from exc
-    except httpx.RequestError as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_GATEWAY,
-            detail="Tabs service is temporarily unavailable.",
-        ) from exc
-    return resp.json()
+    return await _tabs_request(user_id, "POST", f"/tabs/{tab_id}/entries", json=payload)
 
 
 async def fetch_single_tab_for_tpos(user_id: str, tab_id: str) -> dict[str, Any]:
-    access = create_internal_user_access_token(user_id)
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                url=f"http://{settings.host}:{settings.port}/tabs/api/v1/tabs/{tab_id}",
-                headers={"Authorization": f"Bearer {access}"},
-            )
-        resp.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        raise _raise_tabs_bridge_error(exc) from exc
-    except httpx.RequestError as exc:
+    return await _tabs_request(user_id, "GET", f"/tabs/{tab_id}")
+
+
+async def get_tab_for_tpos(user_id: str, tpos: Tpos, tab_id: str) -> dict[str, Any]:
+    tab = await fetch_single_tab_for_tpos(user_id, tab_id)
+    if tab.get("wallet") != tpos.wallet:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Tab not found.")
+    if (tab.get("currency") or "sats").lower() != (tpos.currency or "sats").lower():
         raise HTTPException(
-            status_code=HTTPStatus.BAD_GATEWAY,
-            detail="Tabs service is temporarily unavailable.",
-        ) from exc
-    return resp.json()
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Tab currency must match TPoS currency.",
+        )
+    return tab
+
+
+def tab_settlement_tolerance(currency: str | None) -> float:
+    return 1 if (currency or "sats").lower() == "sats" else 0.01
 
 
 async def create_tab_settlement_for_tpos(
@@ -136,13 +91,26 @@ async def create_tab_settlement_for_tpos(
     tab_id: str,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
+    return await _tabs_request(
+        user_id, "POST", f"/tabs/{tab_id}/settlements", json=payload
+    )
+
+
+async def _tabs_request(
+    user_id: str,
+    method: str,
+    path: str,
+    *,
+    json: dict[str, Any] | None = None,
+) -> Any:
     access = create_internal_user_access_token(user_id)
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                url=f"http://{settings.host}:{settings.port}/tabs/api/v1/tabs/{tab_id}/settlements",
+            resp = await client.request(
+                method,
+                url=f"http://{settings.host}:{settings.port}/tabs/api/v1{path}",
                 headers={"Authorization": f"Bearer {access}"},
-                json=payload,
+                json=json,
             )
         resp.raise_for_status()
     except httpx.HTTPStatusError as exc:

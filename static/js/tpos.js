@@ -1771,7 +1771,6 @@ window.app = Vue.createApp({
         this.printText = data.print_text || ''
 
         this.orderReceipt = false
-        console.log('Printing receipt for payment hash:', paymentHash)
         await this.$nextTick()
         window.print()
       } catch (error) {
@@ -1796,7 +1795,6 @@ window.app = Vue.createApp({
         this.printText = data.order_print_text || ''
 
         this.orderReceipt = true
-        console.log('Printing order receipt for payment hash:', paymentHash)
         await this.$nextTick()
         window.print()
       } catch (error) {

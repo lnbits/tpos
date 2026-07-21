@@ -49,15 +49,6 @@ tpos_api_router.include_router(tpos_wrapper_router)
 tpos_api_router.include_router(tpos_payments_router)
 
 
-async def _get_tpos_or_404(tpos_id: str) -> Tpos:
-    tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-    return tpos
-
-
 @tpos_api_router.get("/api/v1/tposs", status_code=HTTPStatus.OK)
 async def api_tposs(
     all_wallets: bool = Query(False),

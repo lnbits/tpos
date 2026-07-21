@@ -6,6 +6,7 @@ import pytest
 from httpx import AsyncClient
 from lnbits.core.crud import get_standalone_payment
 from lnbits.core.crud.payments import create_payment, update_payment_checking_id
+from lnbits.core.crud.wallets import create_wallet
 from lnbits.core.models import CreateInvoice, CreatePayment, PaymentState
 from lnbits.core.models.users import Account
 from lnbits.core.services import (
@@ -201,6 +202,49 @@ async def test_tabs_endpoints_use_real_tabs_api(client: AsyncClient):
     entries = await get_tab_entries(tab["id"])
     assert len(entries) == 1
     assert entries[0].source == "tpos"
+
+
+@pytest.mark.asyncio
+async def test_tpos_tabs_reject_foreign_wallet_tab(client: AsyncClient):
+    user, wallet = await _user_with_tabs("tabswalletuser")
+    second_wallet = await create_wallet(user_id=user.id)
+
+    first_tpos = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(tabs_enabled=True, tabs_allow_create=True),
+        headers={"X-API-KEY": wallet.adminkey},
+    )
+    second_tpos = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(tabs_enabled=True, tabs_allow_create=True),
+        headers={"X-API-KEY": second_wallet.adminkey},
+    )
+    assert first_tpos.status_code == second_tpos.status_code == 201
+
+    foreign_tab = await client.post(
+        f"/tpos/api/v1/tposs/{second_tpos.json()['id']}/tabs",
+        json={"name": "Other wallet"},
+    )
+    assert foreign_tab.status_code == 200
+
+    charge = await client.post(
+        f"/tpos/api/v1/tposs/{first_tpos.json()['id']}/tabs/{foreign_tab.json()['id']}/charges",
+        json={"amount": 1, "idempotency_key": "foreign-tab-charge"},
+    )
+    assert charge.status_code == 404
+
+    settlement = await client.post(
+        f"/tpos/api/v1/tposs/{first_tpos.json()['id']}/invoices",
+        json={
+            "amount": 1,
+            "tab_settlement": {
+                "tab_id": foreign_tab.json()["id"],
+                "amount": 1,
+                "idempotency_key": "foreign-tab-settlement",
+            },
+        },
+    )
+    assert settlement.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -593,6 +637,15 @@ async def test_inventory_items_and_lnaddress_check(client: AsyncClient, monkeypa
     tpos.inventory_tags = "coffee"
     tpos.inventory_omit_tags = "hidden"
     await update_tpos(tpos)
+
+    async def unexpected_default_inventory(_user_id):
+        raise AssertionError(
+            "Configured inventory must not fetch the default inventory."
+        )
+
+    monkeypatch.setattr(
+        views_inventory, "get_default_inventory", unexpected_default_inventory
+    )
 
     async def fake_inventory_items(user_id, inventory_id, tags, omit_tags):
         assert inventory_id == "inv1"
