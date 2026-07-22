@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from time import time
 from typing import Any, Literal
@@ -46,6 +46,7 @@ from .crud import (
     get_latest_tpos_payments,
     get_tpos,
     get_tpos_payment_by_hash,
+    get_tpos_payments_between,
     get_tposs,
     update_tpos,
 )
@@ -68,8 +69,10 @@ from .models import (
     ReceiptPrint,
     TapToPay,
     Tpos,
+    TposDailySummary,
     TposInvoiceResponse,
     TposPayment,
+    render_summary_text,
 )
 from .services import (
     fetch_onchain_address,
@@ -145,6 +148,56 @@ def _build_receipt_data(
         business_address=tpos.business_address,
         business_vat_id=tpos.business_vat_id,
         only_show_sats_on_bitcoin=tpos.only_show_sats_on_bitcoin,
+    )
+
+
+MAX_SUMMARY_RANGE = timedelta(days=31)
+
+
+async def _build_daily_summary(
+    tpos: Tpos, tpos_id: str, start: datetime, end: datetime, lang: str = "en"
+) -> TposDailySummary:
+    if end <= start or end - start > MAX_SUMMARY_RANGE:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Invalid range: end must be after start and span at most 31 days.",
+        )
+    tpos_payments = await get_tpos_payments_between(tpos_id, start, end)
+
+    total_sats = 0
+    totals_by_currency: dict[str, float] = {}
+    for tpos_payment in tpos_payments:
+        total_sats += tpos_payment.amount
+        payment = await get_standalone_payment(tpos_payment.payment_hash, incoming=True)
+        if not payment:
+            continue
+        details = payment.extra.get("details") or {}
+        currency = details.get("currency")
+        exchange_rate = details.get("exchangeRate") or payment.extra.get("exchangeRate")
+        if currency and exchange_rate:
+            totals_by_currency[currency] = totals_by_currency.get(
+                currency, 0.0
+            ) + tpos_payment.amount / float(exchange_rate)
+
+    print_text = render_summary_text(
+        start=start,
+        end=end,
+        sales_count=len(tpos_payments),
+        total_sats=total_sats,
+        totals_by_currency=totals_by_currency,
+        business_name=tpos.business_name,
+        business_address=tpos.business_address,
+        business_vat_id=tpos.business_vat_id,
+        lang=lang,
+    )
+    return TposDailySummary(
+        tpos_id=tpos_id,
+        start=start,
+        end=end,
+        sales_count=len(tpos_payments),
+        total_sats=total_sats,
+        totals_by_currency=totals_by_currency,
+        print_text=print_text,
     )
 
 
@@ -864,6 +917,52 @@ async def api_tpos_print_invoice(
         receipt_type=receipt_type,
         print_text=receipt.render_text(receipt_type),
         receipt=receipt.to_api_dict(),
+    )
+    await websocket_updater(tpos_id, json.dumps(payload.dict()))
+    return {"success": True}
+
+
+@tpos_api_router.get(
+    "/api/v1/tposs/{tpos_id}/summary", status_code=HTTPStatus.OK
+)
+async def api_tpos_get_daily_summary(
+    tpos_id: str,
+    start: datetime = Query(...),
+    end: datetime = Query(...),
+    lang: str = Query("en"),
+) -> TposDailySummary:
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+    return await _build_daily_summary(tpos, tpos_id, start, end, lang)
+
+
+@tpos_api_router.post(
+    "/api/v1/tposs/{tpos_id}/summary/print", status_code=HTTPStatus.OK
+)
+async def api_tpos_print_daily_summary(
+    tpos_id: str,
+    start: datetime = Query(...),
+    end: datetime = Query(...),
+    lang: str = Query("en"),
+):
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+    summary = await _build_daily_summary(tpos, tpos_id, start, end, lang)
+    payload = ReceiptPrint(
+        tpos_id=tpos_id,
+        receipt_type="summary",
+        print_text=summary.print_text,
+        receipt={
+            **summary.dict(),
+            "start": summary.start.isoformat(),
+            "end": summary.end.isoformat(),
+        },
     )
     await websocket_updater(tpos_id, json.dumps(payload.dict()))
     return {"success": True}

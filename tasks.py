@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime, timezone
 
 from lnbits.core.crud import get_user_active_extensions_ids, get_wallet
 from lnbits.core.crud.payments import get_standalone_payment, update_payment
@@ -60,6 +61,7 @@ async def poll_onchain_payments():
                 tpos_payment.pending = unconfirmed_balance
                 if settled_balance >= tpos_payment.amount:
                     tpos_payment.paid = True
+                    tpos_payment.paid_at = datetime.now(timezone.utc)
                     tpos_payment.payment_method = "onchain"
                 if changed or tpos_payment.paid:
                     await update_tpos_payment(tpos_payment)
@@ -94,6 +96,7 @@ async def on_invoice_paid(payment: Payment) -> None:
     tpos_payment = await get_tpos_payment_by_hash(payment.payment_hash)
     if tpos_payment and not tpos_payment.paid:
         tpos_payment.paid = True
+        tpos_payment.paid_at = datetime.now(timezone.utc)
         tpos_payment.payment_method = payment_method
         await update_tpos_payment(tpos_payment)
 

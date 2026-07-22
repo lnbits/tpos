@@ -247,6 +247,22 @@ window.app = Vue.createApp({
     }
   },
   computed: {
+    printSummaryLabel() {
+      // Mirror the summary's backend languages (en + br) so the button label
+      // tracks the LNbits UI language, same source used for the receipt text.
+      const raw =
+        window.i18n?.global?.locale?.value ??
+        window.i18n?.global?.locale ??
+        window.g?.locale ??
+        'en'
+      const code = String(raw).toLowerCase().replace('_', '-')
+      const base = code.split('-', 1)[0]
+      const lang = code === 'br' || base === 'br' || base === 'pt' ? 'br' : 'en'
+      return {
+        br: 'Imprimir resumo diário',
+        en: 'Print daily summary'
+      }[lang]
+    },
     activePaymentAmount() {
       return this.paymentAmount !== null ? this.paymentAmount : this.amount
     },
@@ -1579,6 +1595,47 @@ window.app = Vue.createApp({
         Quasar.Notify.create({
           type: 'negative',
           message: 'Error fetching receipt data.'
+        })
+      }
+    },
+    async printDailySummary() {
+      const start = moment().startOf('day')
+      const end = moment(start).add(1, 'day')
+      // Match the receipt language to the LNbits UI language the operator has
+      // selected (same source tpos.js uses for number formatting above).
+      const lang =
+        window.i18n?.global?.locale?.value ??
+        window.i18n?.global?.locale ??
+        window.g?.locale ??
+        'en'
+      const query = `start=${encodeURIComponent(
+        start.toISOString()
+      )}&end=${encodeURIComponent(end.toISOString())}&lang=${lang}`
+      try {
+        if (this.wrapperMode) {
+          await LNbits.api.request(
+            'POST',
+            `/tpos/api/v1/tposs/${this.tposId}/summary/print?${query}`
+          )
+          Quasar.Notify.create({
+            type: 'positive',
+            message: 'Print request sent to wrapper.'
+          })
+          return
+        }
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/tpos/api/v1/tposs/${this.tposId}/summary?${query}`
+        )
+        this.printText = data.print_text || ''
+        this.orderReceipt = false
+        await this.$nextTick()
+        window.print()
+      } catch (error) {
+        console.error('Error fetching daily summary:', error)
+        Quasar.Notify.create({
+          type: 'negative',
+          message: 'Error fetching daily summary.'
         })
       }
     },

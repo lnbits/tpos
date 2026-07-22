@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import time
 from typing import Any, Literal
 
@@ -156,6 +156,7 @@ class TposPayment(BaseModel):
     pending: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    paid_at: datetime | None = None
 
 
 class TposInvoiceResponse(BaseModel):
@@ -348,9 +349,91 @@ class ReceiptPrint(BaseModel):
     type: str = "receipt_print"
     tpos_id: str | None = None
     payment_hash: str | None = None
-    receipt_type: Literal["receipt", "order_receipt"] = "receipt"
+    receipt_type: Literal["receipt", "order_receipt", "summary"] = "receipt"
     print_text: str = ""
     receipt: dict[str, Any] = Field(default_factory=dict)
+
+
+class TposDailySummary(BaseModel):
+    tpos_id: str
+    start: datetime
+    end: datetime
+    sales_count: int = 0
+    total_sats: int = 0
+    totals_by_currency: dict[str, float] = Field(default_factory=dict)
+    print_text: str = ""
+
+
+SUMMARY_TRANSLATIONS = {
+    "en": {
+        "title": "DAILY SUMMARY",
+        "sales": "Sales",
+        "total_sats": "Total (sats)",
+        "total": "Total",
+        "thanks": "Thank you!",
+        "vat": "VAT",
+    },
+    "br": {
+        "title": "RESUMO DIÁRIO",
+        "sales": "Vendas",
+        "total_sats": "Total (sats)",
+        "total": "Total",
+        "thanks": "Obrigado!",
+        "vat": "Doc. Fiscal",
+    },
+}
+
+
+def _normalize_summary_lang(lang: str | None) -> str:
+    """Map an LNbits UI locale onto a supported summary language.
+
+    The frontend now forwards the LNbits UI language verbatim (e.g. ``br``,
+    ``en``, ``pt-BR``, ``en-US``), so normalize region suffixes and treat any
+    Portuguese variant as ``br``; anything else without a translation falls
+    back to English.
+    """
+    code = (lang or "en").lower().replace("_", "-")
+    base = code.split("-", 1)[0]
+    if code == "br" or base in ("br", "pt"):
+        return "br"
+    return base if base in SUMMARY_TRANSLATIONS else "en"
+
+
+def render_summary_text(
+    start: datetime,
+    end: datetime,
+    sales_count: int,
+    total_sats: int,
+    totals_by_currency: dict[str, float],
+    business_name: str | None = None,
+    business_address: str | None = None,
+    business_vat_id: str | None = None,
+    lang: str = "en",
+) -> str:
+    t = SUMMARY_TRANSLATIONS[_normalize_summary_lang(lang)]
+    lines: list[str] = [t["title"]]
+    if start.date() == (end - timedelta(seconds=1)).date():
+        lines.append(start.strftime("%Y-%m-%d"))
+    else:
+        lines.append(f"{start.strftime('%Y-%m-%d %H:%M')} - {end.strftime('%Y-%m-%d %H:%M')}")
+    lines.append("")
+    lines.append(f"{t['sales']}: {sales_count}")
+    lines.append(f"{t['total_sats']}: {total_sats}")
+    for currency, amount in totals_by_currency.items():
+        lines.append(f"{t['total']} ({currency.upper()}): {amount:.2f}")
+    lines.append("")
+    lines.append(t["thanks"])
+
+    if business_name:
+        lines.append(business_name)
+    if business_address:
+        lines.extend(line for line in business_address.splitlines() if line.strip())
+    if business_vat_id:
+        lines.append(f"{t['vat']}: {business_vat_id}")
+
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return "\n".join(lines)
 
 
 CreateTposInvoice.update_forward_refs(InventorySale=InventorySale)
