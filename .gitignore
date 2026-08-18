@@ -4,3 +4,6 @@ node_modules
 .venv
 
 .codex
+
+# test artifacts
+data/

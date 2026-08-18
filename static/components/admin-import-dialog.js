@@ -7,7 +7,7 @@ window.app.component('tpos-admin-import-dialog', {
       <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
         <q-card-section>
           <h6 class="text-subtitle1 q-my-none">
-            <span v-text="\`Importing ${dialog?.count} items\`"></span>
+            <span v-text="'Importing ' + dialog.count + ' items'"></span>
           </h6>
         </q-card-section>
         <q-list bordered padding separator>

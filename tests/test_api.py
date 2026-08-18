@@ -459,6 +459,97 @@ async def test_remote_invoice_payload_keeps_fiat_tip_amount(
 
 
 @pytest.mark.asyncio
+async def test_terminal_invoice_keeps_reader_and_tap_to_pay_payload(
+    client: AsyncClient, monkeypatch
+):
+    _user, wallet = await _user_with_tabs("terminaluser")
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(
+            currency="USD",
+            fiat_provider="stripe",
+            stripe_card_payments=True,
+            stripe_reader_id="reader_test",
+        ),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    payment_hash = uuid4().hex
+    payment = await create_payment(
+        "pi_test",
+        CreatePayment(
+            wallet_id=wallet.id,
+            payment_hash=payment_hash,
+            bolt11="bolt11",
+            amount_msat=6_000,
+            memo="Terminal test",
+            extra={
+                "fiat_checking_id": "pi_test",
+                "fiat_payment_request": "pi_test_secret_test",
+            },
+        ),
+        status=PaymentState.PENDING,
+    )
+    captured_invoice_data = []
+
+    async def fake_create_payment_request(wallet_id, invoice_data):
+        assert wallet_id == wallet.id
+        captured_invoice_data.append(invoice_data)
+        return payment
+
+    sent_messages = []
+
+    async def fake_websocket_updater(channel, message):
+        sent_messages.append((channel, json.loads(message)))
+
+    monkeypatch.setattr(
+        views_payments, "create_payment_request", fake_create_payment_request
+    )
+    monkeypatch.setattr(views_payments, "websocket_updater", fake_websocket_updater)
+
+    invoice_response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={
+            "amount": 400,
+            "tip_amount": 80,
+            "amount_fiat": 5,
+            "tip_amount_fiat": 1,
+            "exchange_rate": 80,
+            "memo": "$5 with tip",
+            "pay_in_fiat": True,
+            "fiat_method": "terminal",
+        },
+    )
+
+    assert invoice_response.status_code == 201
+    assert invoice_response.json()["payment_request"] == "tap_to_pay"
+    invoice_data = captured_invoice_data[0]
+    assert invoice_data.unit == "USD"
+    assert invoice_data.amount == 6
+    assert invoice_data.fiat_provider == "stripe"
+    assert invoice_data.extra["terminal"] == {"reader_id": "reader_test"}
+
+    assert [message["type"] for _channel, message in sent_messages] == [
+        "invoice_created",
+        "tap_to_pay",
+    ]
+    tap_to_pay = sent_messages[1][1]
+    assert tap_to_pay == {
+        "type": "tap_to_pay",
+        "payment_intent_id": "pi_test",
+        "client_secret": "pi_test_secret_test",
+        "currency": "usd",
+        "amount": 600,
+        "tpos_id": tpos["id"],
+        "payment_hash": payment.payment_hash,
+        "paid": False,
+    }
+
+
+@pytest.mark.asyncio
 async def test_onchain_invoice_option_creates_internal_payment(
     client: AsyncClient, monkeypatch
 ):
@@ -523,9 +614,136 @@ async def test_onchain_invoice_option_creates_internal_payment(
     )
     assert settled_payment is not None
     assert settled_payment.success is True
+    unsettled_tpos_payment = await get_tpos_payment_by_hash(invoice["payment_hash"])
+    assert unsettled_tpos_payment is not None
+    assert unsettled_tpos_payment.paid is False
+
+    paid_response = await client.get(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}"
+    )
+    assert paid_response.status_code == 200
+    assert paid_response.json() == {"paid": True}
 
     await settle_onchain_tpos_payment(tpos_payment)
     assert queued_checking_ids == [payment.checking_id, payment.checking_id]
+
+
+@pytest.mark.asyncio
+async def test_poll_onchain_payments_balance_updates_and_settlement(
+    client: AsyncClient, monkeypatch
+):
+    user, wallet = await _user_with_tabs("polleruser")
+    settings.super_user = user.id
+    headers = {"X-API-KEY": wallet.adminkey}
+
+    async def fake_watchonly_settings(**kwargs):
+        return {"mempool_endpoint": "https://mempool.example"}
+
+    async def fake_onchain_address(inkey, wallet_id):
+        return {"address": "bc1qtposaddress"}
+
+    monkeypatch.setattr(
+        views_api, "_validate_watchonly_settings", fake_watchonly_settings
+    )
+    monkeypatch.setattr(
+        views_payments, "_validate_watchonly_settings", fake_watchonly_settings
+    )
+    monkeypatch.setattr(views_payments, "fetch_onchain_address", fake_onchain_address)
+
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(onchain_enabled=True, onchain_wallet_id="watch-wallet"),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    invoice_response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={"amount": 42, "memo": "Onchain", "payment_method": "btc_onchain"},
+    )
+    assert invoice_response.status_code == 201
+    payment_hash = invoice_response.json()["payment_hash"]
+
+    # single poll iteration: break the loop when it sleeps
+    class PollingStoppedError(Exception):
+        pass
+
+    async def fake_sleep(_seconds):
+        raise PollingStoppedError
+
+    monkeypatch.setattr(tpos_tasks.asyncio, "sleep", fake_sleep)
+
+    balance = {"confirmed": 0, "unconfirmed": 0}
+
+    async def fake_onchain_balance(endpoint, address):
+        assert endpoint == "https://mempool.example"
+        assert address == "bc1qtposaddress"
+        return dict(balance)
+
+    sent_messages = []
+
+    async def fake_websocket_updater(channel, message):
+        sent_messages.append((channel, json.loads(message)))
+
+    settle_calls = []
+
+    async def fake_settle(tpos_payment):
+        settle_calls.append(tpos_payment.payment_hash)
+
+    monkeypatch.setattr(tpos_tasks, "fetch_onchain_balance", fake_onchain_balance)
+    monkeypatch.setattr(tpos_tasks, "websocket_updater", fake_websocket_updater)
+    monkeypatch.setattr(tpos_tasks, "settle_onchain_tpos_payment", fake_settle)
+
+    async def poll_once():
+        with pytest.raises(PollingStoppedError):
+            await tpos_tasks.poll_onchain_payments()
+
+    def messages_for(hash_):
+        return [
+            message
+            for _channel, message in sent_messages
+            if message["payment_hash"] == hash_
+        ]
+
+    # iteration 1: nothing changed, no broadcast, no settlement
+    await poll_once()
+    assert messages_for(payment_hash) == []
+    assert payment_hash not in settle_calls
+
+    # iteration 2: unconfirmed balance only -> broadcast, no settlement
+    balance["unconfirmed"] = 20
+    await poll_once()
+    message = messages_for(payment_hash)[0]
+    assert message == {
+        "pending": True,
+        "payment_hash": payment_hash,
+        "onchain_balance": 20,
+        "onchain_pending": 20,
+        "payment_method": None,
+    }
+    assert payment_hash not in settle_calls
+
+    # iteration 3: confirmed amount reached -> broadcast, settlement triggered.
+    # TposPayment.paid stays False by design: the invoice listener marks it.
+    balance["confirmed"] = 42
+    balance["unconfirmed"] = 0
+    await poll_once()
+    message = messages_for(payment_hash)[1]
+    assert message == {
+        "pending": True,
+        "payment_hash": payment_hash,
+        "onchain_balance": 42,
+        "onchain_pending": 0,
+        "payment_method": "onchain",
+    }
+    assert settle_calls.count(payment_hash) == 1
+
+    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
+    assert tpos_payment is not None
+    assert tpos_payment.balance == 42
+    assert tpos_payment.pending == 0
+    assert tpos_payment.paid is False
 
 
 @pytest.mark.asyncio

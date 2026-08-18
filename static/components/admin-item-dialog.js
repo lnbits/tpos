@@ -28,7 +28,7 @@ window.app.component('tpos-admin-item-dialog', {
             filled
             dense
             v-model.number="dialog.data.price"
-            :label="\`Price (${dialog.data.currency})*\`"
+            :label="'Price (' + dialog.data.currency + ')*'"
           ></q-input>
           <q-select
             filled
@@ -49,7 +49,7 @@ window.app.component('tpos-admin-item-dialog', {
             dense
             v-model.number="dialog.data.tax"
             label="Tax %"
-            :hint="\`${dialog.taxInclusive ? 'Tax is included on unit price' : 'Tax is added on top of unit price'}. You can change behaviour on TPoS settings.\`"
+            :hint="(dialog.taxInclusive ? 'Tax is included on unit price' : 'Tax is added on top of unit price') + '. You can change behaviour on TPoS settings.'"
           ></q-input>
           <q-checkbox
             v-model="dialog.data.disabled"

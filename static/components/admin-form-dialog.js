@@ -311,7 +311,7 @@ window.app.component('tpos-admin-form-dialog', {
             dense
             v-model.number="dialog.data.withdraw_limit"
             type="number"
-            :label="\`Max amount to be sold daily (${g.settings.denomination}) *\`"
+            :label="'Max amount to be sold daily (' + g.settings.denomination + ') *'"
           ></q-input>
 
           <div class="row">
@@ -322,7 +322,7 @@ window.app.component('tpos-admin-form-dialog', {
                 v-model.number="dialog.data.withdraw_between"
                 type="number"
                 min="0"
-                :label="\`Time between withdraws (${g.settings.denomination})\`"
+                :label="'Time between withdraws (' + g.settings.denomination + ')'"
               ></q-input>
             </div>
             <div class="col-4">
