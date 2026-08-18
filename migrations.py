@@ -312,3 +312,17 @@ async def m024_add_assetlinks_cache(db: Database):
             updated_at INTEGER NOT NULL DEFAULT 0
         );
     """)
+
+
+async def m025_add_tpos_payment_paid_at(db: Database):
+    """
+    Add a settlement timestamp to tpos payments, distinct from created_at
+    (invoice creation time). Backfill existing paid rows from updated_at
+    as a best-effort approximation.
+    """
+    await db.execute("""
+        ALTER TABLE tpos.payments ADD paid_at TIMESTAMP NULL;
+    """)
+    await db.execute("""
+        UPDATE tpos.payments SET paid_at = updated_at WHERE paid = true;
+    """)

@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import Any
 
 from lnbits.db import Database
@@ -172,6 +173,21 @@ async def get_latest_tpos_payments(tpos_id: str, limit: int = 5) -> list[TposPay
         ORDER BY updated_at DESC LIMIT {int(limit)}
         """,
         {"tpos_id": tpos_id},
+        TposPayment,
+    )
+
+
+async def get_tpos_payments_between(
+    tpos_id: str, start: datetime, end: datetime
+) -> list[TposPayment]:
+    return await db.fetchall(
+        """
+        SELECT * FROM tpos.payments
+        WHERE tpos_id = :tpos_id AND paid = true
+        AND paid_at >= :start AND paid_at < :end
+        ORDER BY paid_at ASC
+        """,
+        {"tpos_id": tpos_id, "start": start, "end": end},
         TposPayment,
     )
 

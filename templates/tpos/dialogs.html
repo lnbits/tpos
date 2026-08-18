@@ -176,6 +176,14 @@
   <q-dialog v-model="lastPaymentsDialog.show" position="bottom">
     <q-card class="lnbits__dialog-card">
       <q-card-section class="row items-center q-pb-sm">
+        <q-btn
+          icon="receipt_long"
+          :label="printSummaryLabel"
+          color="primary"
+          unelevated
+          no-caps
+          @click="printDailySummary"
+        ></q-btn>
         <q-space></q-space>
         <q-btn icon="close" size="sm" flat round dense v-close-popup></q-btn>
       </q-card-section>
