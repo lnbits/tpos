@@ -30,10 +30,18 @@ checkblack:
 checkeditorconfig:
 	editorconfig-checker
 
-test:
+test: teststatic
 	PYTHONUNBUFFERED=1 \
 	DEBUG=true \
 	uv run pytest
+
+teststatic:
+	node tests/check_static_load.js
+
+test-e2e:
+	"$(abspath ../../../node_modules/.bin/playwright)" test --config "$(CURDIR)/tests/e2e/playwright.config.ts"
+
+e2e: test-e2e
 install-pre-commit-hook:
 	@echo "Installing pre-commit hook to git"
 	@echo "Uninstall the hook with uv run pre-commit uninstall"

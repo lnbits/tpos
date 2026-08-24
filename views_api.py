@@ -1,274 +1,52 @@
 import json
-from datetime import datetime, timezone
 from http import HTTPStatus
-from time import time
-from typing import Any, Literal
-from uuid import uuid4
 
-import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
 from lnbits.core.crud import (
-    get_account,
-    get_standalone_payment,
     get_user,
-    get_wallet,
 )
-from lnbits.core.crud.payments import update_payment_checking_id
-from lnbits.core.crud.users import (
-    get_user_access_control_lists,
-    update_account,
-    update_user_access_control_list,
-)
-from lnbits.core.models import CreateInvoice, Payment, WalletTypeInfo
-from lnbits.core.models.misc import SimpleItem
-from lnbits.core.models.users import (
-    AccessControlList,
-    AccessTokenPayload,
-    EndpointAccess,
-    UserLabel,
-)
-from lnbits.core.services import create_payment_request, websocket_updater
+from lnbits.core.models import WalletTypeInfo
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
-from lnbits.helpers import create_access_token, get_api_routes
-from lnbits.tasks import internal_invoice_queue_put
 from lnurl import LnurlPayResponse
-from lnurl import decode as decode_lnurl
 from lnurl import handle as lnurl_handle
 
 from .crud import (
     create_tpos,
-    create_tpos_payment,
     delete_tpos,
-    get_latest_tpos_payments,
     get_tpos,
-    get_tpos_payment_by_hash,
     get_tposs,
     update_tpos,
 )
 from .helpers import (
-    first_image,
     inventory_tags_to_list,
     inventory_tags_to_string,
 )
 from .models import (
     CreateTposData,
-    CreateTposInvoice,
     CreateUpdateItemData,
-    InventorySale,
-    PayLnurlWData,
-    PrintReceiptRequest,
-    ReceiptData,
-    ReceiptDetailsData,
-    ReceiptExtraData,
-    ReceiptItemData,
-    ReceiptPrint,
-    TapToPay,
     Tpos,
-    TposInvoiceResponse,
-    TposPayment,
 )
-from .services import (
-    fetch_onchain_address,
-    fetch_watchonly_config,
-    fetch_watchonly_wallet,
-    fetch_watchonly_wallets,
-    fetch_wrapper_assetlinks,
+from .services_inventory import (
     get_default_inventory,
-    get_inventory_items_for_tpos,
     inventory_available_for_user,
-    watchonly_available_for_user,
 )
+from .views_inventory import tpos_inventory_router
+from .views_onchain import _validate_watchonly_settings, tpos_onchain_router
+from .views_payments import tpos_payments_router
+from .views_tabs import (
+    tpos_tabs_router,
+)
+from .views_wrapper import tpos_wrapper_router
 
 tpos_api_router = APIRouter()
-
-
-def _two_year_token_expiry_minutes() -> int:
-    now = datetime.now(timezone.utc)
-    try:
-        expires_at = now.replace(year=now.year + 2)
-    except ValueError:
-        # Handle February 29 by falling back to February 28 two years later.
-        expires_at = now.replace(year=now.year + 2, month=2, day=28)
-    return max(1, int((expires_at - now).total_seconds() // 60))
-
-
-@tpos_api_router.get("/api/v1/well-known/assetlinks.json")
-async def api_tpos_assetlinks() -> JSONResponse:
-    try:
-        assetlinks = await fetch_wrapper_assetlinks()
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.SERVICE_UNAVAILABLE,
-            detail=str(exc),
-        ) from exc
-    return JSONResponse(content=assetlinks, media_type="application/json")
-
-
-def _build_receipt_data(
-    tpos: Tpos, payment: Payment, tpos_payment: TposPayment | None = None
-) -> ReceiptData:
-    extra = payment.extra or {}
-    details = extra.get("details") or {}
-    items = details.get("items") or []
-
-    receipt_items = [
-        ReceiptItemData(
-            title=str(item.get("title") or ""),
-            note=(str(item.get("note")) if item.get("note") is not None else None),
-            quantity=int(item.get("quantity") or 0),
-            price=float(item.get("price") or 0.0),
-        )
-        for item in items
-    ]
-
-    return ReceiptData(
-        paid=payment.success or bool(tpos_payment and tpos_payment.paid),
-        extra=ReceiptExtraData(
-            amount=int(extra.get("amount") or 0),
-            paid_in_fiat=bool(extra.get("paid_in_fiat")),
-            fiat_method=extra.get("fiat_method"),
-            fiat_payment_request=extra.get("fiat_payment_request"),
-            details=ReceiptDetailsData(
-                currency=str(details.get("currency") or "sats"),
-                exchange_rate=float(details.get("exchangeRate") or 1.0),
-                tax_value=float(details.get("taxValue") or 0.0),
-                tax_included=bool(details.get("taxIncluded")),
-                items=receipt_items,
-            ),
-        ),
-        created_at=payment.created_at,
-        business_name=tpos.business_name,
-        business_address=tpos.business_address,
-        business_vat_id=tpos.business_vat_id,
-        only_show_sats_on_bitcoin=tpos.only_show_sats_on_bitcoin,
-    )
-
-
-async def _get_watchonly_status(wallet) -> dict[str, Any]:
-    if not await watchonly_available_for_user(wallet.user):
-        return {
-            "available": False,
-            "message": "Watchonly extension must be enabled for this user.",
-            "network": None,
-            "wallets": [],
-        }
-
-    try:
-        config = await fetch_watchonly_config(wallet.inkey)
-        network_value = config.get("network")
-        if not isinstance(network_value, str) or not network_value:
-            raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail="Watchonly extension returned an invalid network configuration.",
-            )
-        network = network_value
-        wallets = await fetch_watchonly_wallets(wallet.inkey, network)
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail=f"Watchonly extension is not reachable: {exc!s}",
-        ) from exc
-
-    return {
-        "available": True,
-        "message": None,
-        "network": network,
-        "wallets": wallets,
-        "mempool_endpoint": config.get("mempool_endpoint"),
-    }
-
-
-async def _validate_watchonly_settings(
-    *,
-    wallet,
-    onchain_enabled: bool,
-    onchain_wallet_id: str | None,
-) -> dict[str, Any] | None:
-    if not onchain_enabled:
-        return None
-    if not onchain_wallet_id:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Watchonly wallet is required when onchain payments are enabled.",
-        )
-
-    status = await _get_watchonly_status(wallet)
-    if not status["available"]:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail=status["message"] or "Watchonly extension is not available.",
-        )
-
-    try:
-        watch_wallet = await fetch_watchonly_wallet(wallet.inkey, onchain_wallet_id)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail=f"Cannot access watchonly wallet: {exc!s}",
-        ) from exc
-
-    if watch_wallet.get("network") != status["network"]:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Watchonly wallet network does not match the user watchonly config.",
-        )
-
-    return {
-        "watch_wallet": watch_wallet,
-        "network": status["network"],
-        "mempool_endpoint": status["mempool_endpoint"],
-    }
-
-
-def _payment_method_from_payment(payment: Payment) -> str:
-    if payment.extra.get("payment_method"):
-        return str(payment.extra["payment_method"])
-    if payment.extra.get("fiat_method") == "cash":
-        return "cash"
-    if payment.extra.get("fiat_payment_request", "").startswith("pi_"):
-        return "fiat"
-    return "lightning"
-
-
-def _serialize_tpos_invoice_response(
-    payment: Payment, tpos_payment: TposPayment
-) -> TposInvoiceResponse:
-    payment_method = _payment_method_from_payment(payment)
-    payment_request = "lightning:" + payment.bolt11.upper()
-    if payment_method == "cash":
-        payment_request = "cash"
-    elif payment.extra.get("fiat_payment_request") and not payment.extra.get(
-        "fiat_payment_request", ""
-    ).startswith("pi_"):
-        payment_request = payment.extra["fiat_payment_request"]
-    elif payment_method == "fiat":
-        payment_request = "tap_to_pay"
-    elif payment_method == "onchain" and tpos_payment.onchain_address:
-        payment_request = tpos_payment.onchain_address
-
-    options = [payment_method]
-    if tpos_payment.onchain_address:
-        options = ["btc", "btc_onchain"]
-
-    return TposInvoiceResponse(
-        payment_hash=payment.payment_hash,
-        bolt11=payment.bolt11,
-        payment_request=payment_request,
-        tpos_payment_id=tpos_payment.id,
-        payment_options=options,
-        onchain_address=tpos_payment.onchain_address,
-        onchain_amount_sat=(
-            tpos_payment.amount if tpos_payment.onchain_address else None
-        ),
-        payment_method=payment_method,
-        extra=payment.extra or {},
-    )
+tpos_api_router.include_router(tpos_inventory_router)
+tpos_api_router.include_router(tpos_onchain_router)
+tpos_api_router.include_router(tpos_tabs_router)
+tpos_api_router.include_router(tpos_wrapper_router)
+tpos_api_router.include_router(tpos_payments_router)
 
 
 @tpos_api_router.get("/api/v1/tposs", status_code=HTTPStatus.OK)
@@ -283,31 +61,6 @@ async def api_tposs(
     return await get_tposs(wallet_ids)
 
 
-@tpos_api_router.get("/api/v1/inventory/status", status_code=HTTPStatus.OK)
-async def api_inventory_status(
-    wallet: WalletTypeInfo = Depends(require_admin_key),
-) -> dict:
-    user = await get_user(wallet.wallet.user)
-    if not inventory_available_for_user(user):
-        return {"enabled": False, "inventory_id": None, "tags": [], "omit_tags": []}
-    inventory = await get_default_inventory(wallet.wallet.user)
-    tags = inventory_tags_to_list(inventory.get("tags")) if inventory else []
-    omit_tags = inventory_tags_to_list(inventory.get("omit_tags")) if inventory else []
-    return {
-        "enabled": True,
-        "inventory_id": inventory.get("id") if inventory else None,
-        "tags": tags,
-        "omit_tags": omit_tags,
-    }
-
-
-@tpos_api_router.get("/api/v1/onchain/status", status_code=HTTPStatus.OK)
-async def api_onchain_status(
-    key_info: WalletTypeInfo = Depends(require_admin_key),
-) -> dict[str, Any]:
-    return await _get_watchonly_status(key_info.wallet)
-
-
 @tpos_api_router.post("/api/v1/tposs", status_code=HTTPStatus.CREATED)
 async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
@@ -318,6 +71,8 @@ async def api_tpos_create(
         onchain_enabled=data.onchain_enabled,
         onchain_wallet_id=data.onchain_wallet_id,
     )
+    if not data.tabs_enabled:
+        data.tabs_allow_create = False
     user = await get_user(wallet.wallet.user)
     if not (user and user.super_user):
         data.allow_cash_settlement = False
@@ -352,6 +107,7 @@ async def api_tpos_update(
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
     user = await get_user(wallet.wallet.user)
     update_payload = data.dict(exclude_unset=True)
+    update_payload.pop("wallet", None)
     desired_onchain_enabled = update_payload.get(
         "onchain_enabled", tpos.onchain_enabled
     )
@@ -363,6 +119,9 @@ async def api_tpos_update(
         onchain_enabled=desired_onchain_enabled,
         onchain_wallet_id=desired_onchain_wallet_id,
     )
+    desired_tabs_enabled = update_payload.get("tabs_enabled", tpos.tabs_enabled)
+    if not desired_tabs_enabled:
+        update_payload["tabs_allow_create"] = False
     desired_currency = update_payload.get("currency", tpos.currency)
     if desired_currency == "sats":
         update_payload["allow_cash_settlement"] = False
@@ -418,496 +177,6 @@ async def api_tpos_delete(
     return "", HTTPStatus.NO_CONTENT
 
 
-@tpos_api_router.post("/api/v1/tposs/{tpos_id}/wrapper-token")
-async def api_tpos_create_wrapper_token(
-    tpos_id: str,
-    request: Request,
-    wallet: WalletTypeInfo = Depends(require_admin_key),
-):
-    tpos = await get_tpos(tpos_id)
-
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-
-    if tpos.wallet != wallet.wallet.id:
-        raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
-
-    account = await get_account(wallet.wallet.user)
-    if not account or not account.username:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="A username is required to create a wrapper ACL token.",
-        )
-
-    user_acls = await get_user_access_control_lists(account.id)
-    acl_name = "TPoS Wrapper Fiat"
-    acl = next(
-        (
-            existing_acl
-            for existing_acl in user_acls.access_control_list
-            if existing_acl.name == acl_name
-        ),
-        None,
-    )
-
-    api_routes = get_api_routes(request.app.router.routes)
-    fiat_endpoints = []
-    for path, name in api_routes.items():
-        is_fiat_endpoint = path.startswith("/api/v1/fiat")
-        fiat_endpoints.append(
-            EndpointAccess(
-                path=path,
-                name=name,
-                read=is_fiat_endpoint,
-                write=is_fiat_endpoint,
-            )
-        )
-    fiat_endpoints.sort(key=lambda e: e.name.lower())
-
-    if acl:
-        acl.endpoints = fiat_endpoints
-    else:
-        acl = AccessControlList(
-            id=uuid4().hex,
-            name=acl_name,
-            endpoints=fiat_endpoints,
-            token_id_list=[],
-        )
-        user_acls.access_control_list.append(acl)
-        user_acls.access_control_list.sort(
-            key=lambda existing_acl: existing_acl.name.lower()
-        )
-
-    token_expire_minutes = _two_year_token_expiry_minutes()
-    api_token_id = uuid4().hex
-    payload = AccessTokenPayload(
-        sub=account.username, api_token_id=api_token_id, auth_time=int(time())
-    )
-    api_token = create_access_token(
-        data=payload.dict(), token_expire_minutes=token_expire_minutes
-    )
-
-    acl.token_id_list.append(
-        SimpleItem(id=api_token_id, name=f"TPoS Wrapper {tpos_id}")
-    )
-    await update_user_access_control_list(user_acls)
-
-    return {"auth": api_token, "expiration_time_minutes": token_expire_minutes}
-
-
-@tpos_api_router.post(
-    "/api/v1/tposs/{tpos_id}/invoices", status_code=HTTPStatus.CREATED
-)
-async def api_tpos_create_invoice(
-    tpos_id: str, data: CreateTposInvoice, request: Request
-) -> dict[str, Any]:
-    tpos = await get_tpos(tpos_id)
-
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-
-    inventory_payload: InventorySale | None = data.inventory
-    if inventory_payload:
-        if not tpos.use_inventory or not tpos.inventory_id:
-            raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail="Inventory is not enabled for this TPoS.",
-            )
-        inventory_payload.tags = inventory_tags_to_list(inventory_payload.tags)
-        if tpos.inventory_id and inventory_payload.inventory_id != tpos.inventory_id:
-            raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail="Mismatched inventory selection.",
-            )
-        allowed_tags = set(inventory_tags_to_list(tpos.inventory_tags))
-        if allowed_tags and any(
-            tag not in allowed_tags for tag in inventory_payload.tags
-        ):
-            raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail="Provided tags are not allowed for this TPoS.",
-            )
-
-    if not data.details:
-        tax_value = 0.0
-        if tpos.tax_default:
-            tax_value = (
-                (data.amount / data.exchange_rate) * (tpos.tax_default * 0.01)
-                if data.exchange_rate
-                else 0.0
-            )
-        data.details = {
-            "currency": tpos.currency,
-            "exchangeRate": data.exchange_rate,
-            "items": None,
-            "taxIncluded": True,
-            "taxValue": tax_value,
-        }
-
-    cash_method = data.pay_in_fiat and data.fiat_method == "cash"
-    onchain_method = data.payment_method == "btc_onchain"
-    if cash_method and not tpos.allow_cash_settlement:
-        raise HTTPException(
-            status_code=HTTPStatus.FORBIDDEN,
-            detail="Cash settlement is not enabled for this TPoS.",
-        )
-    if onchain_method and not tpos.onchain_enabled:
-        raise HTTPException(
-            status_code=HTTPStatus.FORBIDDEN,
-            detail="Onchain payments are not enabled for this TPoS.",
-        )
-    currency = tpos.currency if data.pay_in_fiat else "sat"
-    amount = data.amount + (data.tip_amount or 0.0)
-    if data.pay_in_fiat:
-        amount = (data.amount_fiat or 0.0) + (data.tip_amount_fiat or 0.0)
-
-    try:
-        extra = {
-            "tag": "tpos",
-            "tip_amount": data.tip_amount,
-            "tpos_id": tpos_id,
-            "amount": data.amount,
-            "exchangeRate": data.exchange_rate if data.exchange_rate else None,
-            "details": data.details if data.details else None,
-            "notes": data.notes if data.notes else None,
-            "lnaddress": data.user_lnaddress if data.user_lnaddress else None,
-            "internal_memo": data.internal_memo if data.internal_memo else None,
-            "paid_in_fiat": data.pay_in_fiat,
-            "base_url": str(request.base_url),
-        }
-        if cash_method or onchain_method:
-            wallet = await get_wallet(tpos.wallet)
-            if wallet:
-                account = await get_account(wallet.user)
-                if account:
-                    if not account.is_super_user:
-                        raise HTTPException(
-                            status_code=HTTPStatus.BAD_REQUEST,
-                            detail="This tpos cannot create cash or onchain invoices.",
-                        )
-                    existing = {label.name for label in account.extra.labels or []}
-                    label_name = "cash" if cash_method else "onchain"
-                    label_description = (
-                        "Cash payment" if cash_method else "Onchain payment"
-                    )
-                    label_color = "#FFC107" if cash_method else "#ED8403"
-                    if label_name not in existing:
-                        account.extra.labels.append(
-                            UserLabel(
-                                name=label_name,
-                                description=label_description,
-                                color=label_color,
-                            )
-                        )
-                        await update_account(account)
-        if inventory_payload:
-            extra["inventory"] = inventory_payload.dict()
-        if data.pay_in_fiat:
-            extra["fiat_method"] = data.fiat_method if data.fiat_method else "checkout"
-            if data.fiat_method == "terminal" and tpos.stripe_reader_id:
-                extra["terminal"] = {"reader_id": tpos.stripe_reader_id}
-        if onchain_method:
-            extra["payment_method"] = "onchain"
-        invoice_data = CreateInvoice(
-            unit=currency,
-            out=False,
-            amount=amount,
-            memo=f"{data.memo} to {tpos.name}" if data.memo else f"{tpos.name}",
-            extra=extra,
-            fiat_provider=(
-                tpos.fiat_provider if data.pay_in_fiat and not cash_method else None
-            ),
-            internal=bool(cash_method or onchain_method),
-            labels=["cash"] if cash_method else (["onchain"] if onchain_method else []),
-        )
-        payment = await create_payment_request(tpos.wallet, invoice_data)
-        if cash_method:
-            new_checking_id = f"internal_cash_{payment.payment_hash}"
-            await update_payment_checking_id(payment.checking_id, new_checking_id)
-            payment.checking_id = new_checking_id
-        elif onchain_method:
-            new_checking_id = f"internal_onchain_{payment.payment_hash}"
-            await update_payment_checking_id(payment.checking_id, new_checking_id)
-            payment.checking_id = new_checking_id
-
-        onchain_address = None
-        mempool_endpoint = None
-        if onchain_method:
-            wallet_record = await get_wallet(tpos.wallet)
-            if not wallet_record:
-                raise HTTPException(
-                    status_code=HTTPStatus.BAD_REQUEST,
-                    detail="Wallet not found for this TPoS.",
-                )
-            validation = await _validate_watchonly_settings(
-                wallet=wallet_record,
-                onchain_enabled=tpos.onchain_enabled,
-                onchain_wallet_id=tpos.onchain_wallet_id,
-            )
-            assert validation
-            address_data = await fetch_onchain_address(
-                wallet_record.inkey, tpos.onchain_wallet_id or ""
-            )
-            onchain_address = address_data.get("address")
-            mempool_endpoint = validation.get("mempool_endpoint")
-
-        tpos_payment = await create_tpos_payment(
-            TposPayment(
-                id=uuid4().hex,
-                tpos_id=tpos_id,
-                payment_hash=payment.payment_hash,
-                amount=int(data.amount + (data.tip_amount or 0)),
-                onchain_address=onchain_address,
-                onchain_wallet_id=tpos.onchain_wallet_id,
-                onchain_zero_conf=tpos.onchain_zero_conf,
-                mempool_endpoint=mempool_endpoint,
-            )
-        )
-        response_payload = _serialize_tpos_invoice_response(payment, tpos_payment)
-
-        if tpos.enable_remote:
-            payload = {
-                "type": "invoice_created",
-                "tpos_id": tpos_id,
-                "payment_hash": payment.payment_hash,
-                "payment_request": response_payload.payment_request,
-                "paid_in_fiat": data.pay_in_fiat,
-                "amount_fiat": data.amount_fiat,
-                "tip_amount": data.tip_amount,
-                "exchange_rate": data.exchange_rate if data.exchange_rate else None,
-                "tpos_payment_id": response_payload.tpos_payment_id,
-                "payment_options": response_payload.payment_options,
-                "onchain_address": response_payload.onchain_address,
-                "onchain_amount_sat": response_payload.onchain_amount_sat,
-                "payment_method": response_payload.payment_method,
-            }
-            await websocket_updater(tpos_id, json.dumps(payload))
-
-        if (invoice_data.extra or {}).get("fiat_method") == "terminal":
-            pi_id = payment.extra.get("fiat_checking_id")
-            client_secret = payment.extra.get("fiat_payment_request")
-            if pi_id and client_secret:
-                amount_minor = round(amount * 100)
-                tap_to_pay_payload = TapToPay(
-                    payment_intent_id=pi_id,
-                    client_secret=client_secret,
-                    currency=invoice_data.unit.lower(),
-                    amount=amount_minor,
-                    tpos_id=tpos_id,
-                    payment_hash=payment.payment_hash,
-                )
-                await websocket_updater(tpos_id, json.dumps(tap_to_pay_payload.dict()))
-        return response_payload.dict()
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=HTTPStatus.INTERNAL_SERVER_ERROR, detail=str(exc)
-        ) from exc
-
-
-@tpos_api_router.get("/api/v1/tposs/{tpos_id}/invoices")
-async def api_tpos_get_latest_invoices(tpos_id: str):
-    tpos_payments = await get_latest_tpos_payments(tpos_id)
-    result = []
-    for tpos_payment in tpos_payments:
-        payment = await get_standalone_payment(tpos_payment.payment_hash, incoming=True)
-        if not payment:
-            continue
-        details = payment.extra.get("details", {})
-        currency = details.get("currency", None)
-        exchange_rate = details.get("exchangeRate") or payment.extra.get("exchangeRate")
-        result.append(
-            {
-                "checking_id": payment.checking_id,
-                "amount": payment.amount,
-                "time": payment.time,
-                "pending": not tpos_payment.paid,
-                "currency": currency,
-                "exchange_rate": exchange_rate,
-                "payment_method": tpos_payment.payment_method,
-            }
-        )
-    return result
-
-
-@tpos_api_router.post(
-    "/api/v1/tposs/{tpos_id}/invoices/{payment_request}/pay", status_code=HTTPStatus.OK
-)
-async def api_tpos_pay_invoice(
-    lnurl_data: PayLnurlWData, payment_request: str, tpos_id: str
-):
-    tpos = await get_tpos(tpos_id)
-
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-
-    lnurl = (
-        lnurl_data.lnurl.replace("lnurlw://", "")
-        .replace("lightning://", "")
-        .replace("LIGHTNING://", "")
-        .replace("lightning:", "")
-        .replace("LIGHTNING:", "")
-    )
-
-    if lnurl.lower().startswith("lnurl"):
-        lnurl = decode_lnurl(lnurl)
-    else:
-        lnurl = "https://" + lnurl
-
-    async with httpx.AsyncClient() as client:
-        try:
-            headers = {"user-agent": "lnbits/tpos"}
-            r = await client.get(lnurl, follow_redirects=True, headers=headers)
-            if r.is_error:
-                lnurl_response = {"success": False, "detail": "Error loading"}
-            else:
-                resp = r.json()
-                if resp.get("status") == "ERROR":
-                    lnurl_response = {
-                        "success": False,
-                        "detail": resp.get("reason", ""),
-                    }
-                    return lnurl_response
-
-                if resp.get("tag") != "withdrawRequest":
-                    lnurl_response = {"success": False, "detail": "Wrong tag type"}
-                else:
-                    r2 = await client.get(
-                        resp.get("callback", ""),
-                        follow_redirects=True,
-                        headers=headers,
-                        params={
-                            "k1": resp.get("k1", ""),
-                            "pr": payment_request,
-                        },
-                    )
-                    resp2 = r2.json()
-                    if r2.is_error:
-                        lnurl_response = {
-                            "success": False,
-                            "detail": "Error loading callback",
-                        }
-                    elif resp2.get("status") == "ERROR":
-                        lnurl_response = {"success": False, "detail": resp2["reason"]}
-                    else:
-                        lnurl_response = {"success": True, "detail": resp2}
-        except (httpx.ConnectError, httpx.RequestError):
-            lnurl_response = {"success": False, "detail": "Unexpected error occurred"}
-
-    return lnurl_response
-
-
-@tpos_api_router.get(
-    "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}", status_code=HTTPStatus.OK
-)
-async def api_tpos_check_invoice(
-    tpos_id: str, payment_hash: str, extra: bool = Query(False)
-):
-    tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-    payment = await get_standalone_payment(payment_hash, incoming=True)
-    if not payment:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
-        )
-    if payment.extra.get("tag") != "tpos":
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
-        )
-    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
-
-    if extra:
-        return _build_receipt_data(tpos, payment, tpos_payment).to_api_dict()
-    return {"paid": payment.success or bool(tpos_payment and tpos_payment.paid)}
-
-
-@tpos_api_router.post(
-    "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}/print",
-    status_code=HTTPStatus.OK,
-)
-async def api_tpos_print_invoice(
-    data: PrintReceiptRequest, tpos_id: str, payment_hash: str
-):
-    tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-
-    payment = await get_standalone_payment(payment_hash, incoming=True)
-    if not payment:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
-        )
-    if payment.extra.get("tag") != "tpos" or payment.extra.get("tpos_id") != tpos_id:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
-        )
-
-    receipt_type: Literal["receipt", "order_receipt"] = (
-        "order_receipt" if data.receipt_type == "order_receipt" else "receipt"
-    )
-    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
-    receipt = _build_receipt_data(tpos, payment, tpos_payment)
-    payload = ReceiptPrint(
-        tpos_id=tpos_id,
-        payment_hash=payment_hash,
-        receipt_type=receipt_type,
-        print_text=receipt.render_text(receipt_type),
-        receipt=receipt.to_api_dict(),
-    )
-    await websocket_updater(tpos_id, json.dumps(payload.dict()))
-    return {"success": True}
-
-
-@tpos_api_router.post(
-    "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}/cash/validate",
-    status_code=HTTPStatus.OK,
-)
-async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
-    tpos = await get_tpos(tpos_id)
-    if not tpos:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
-        )
-    if not tpos.allow_cash_settlement:
-        raise HTTPException(
-            status_code=HTTPStatus.FORBIDDEN,
-            detail="Cash settlement is not enabled for this TPoS.",
-        )
-    payment = await get_standalone_payment(payment_hash, incoming=True)
-    if not payment:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
-        )
-    if payment.extra.get("tag") != "tpos" or payment.extra.get("tpos_id") != tpos_id:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
-        )
-    if payment.extra.get("fiat_method") != "cash":
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST, detail="Payment is not cash."
-        )
-    if not payment.is_internal:
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Payment is not an internal cash invoice.",
-        )
-    if payment.success:
-        return {"success": True}
-    await internal_invoice_queue_put(payment.checking_id)
-    return {"success": True}
-
-
 @tpos_api_router.put("/api/v1/tposs/{tpos_id}/items", status_code=HTTPStatus.CREATED)
 async def api_tpos_create_items(
     data: CreateUpdateItemData,
@@ -944,60 +213,3 @@ async def api_tpos_check_lnaddress(lnaddress: str):
         )
 
     return True
-
-
-@tpos_api_router.get(
-    "/api/v1/tposs/{tpos_id}/inventory-items", status_code=HTTPStatus.OK
-)
-async def api_tpos_inventory_items(tpos_id: str):
-    tpos = await get_tpos(tpos_id)
-    if not tpos or not tpos.use_inventory:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail="Inventory not enabled for this TPoS.",
-        )
-
-    wallet = await get_wallet(tpos.wallet)
-    if not wallet:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail="Wallet not found for this TPoS.",
-        )
-
-    inventory_id = tpos.inventory_id
-    inventory_data: dict[str, Any] | None = None
-    if not inventory_id:
-        inventory_data = await get_default_inventory(wallet.user)
-        inventory_id = inventory_data.get("id") if inventory_data else None
-    else:
-        inventory_data = await get_default_inventory(wallet.user)
-    if not inventory_id:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND,
-            detail="No inventory found for this TPoS.",
-        )
-
-    items = await get_inventory_items_for_tpos(
-        wallet.user,
-        inventory_id,
-        tpos.inventory_tags,
-        tpos.inventory_omit_tags,
-    )
-    return [
-        {
-            "id": item.get("id"),
-            "title": item.get("name"),
-            "description": item.get("description"),
-            "price": item.get("price"),
-            "tax": item.get("tax_rate"),
-            "image": first_image(item.get("images")),
-            "categories": inventory_tags_to_list(item.get("tags")),
-            "quantity_in_stock": item.get("quantity_in_stock"),
-            "disabled": (not item.get("is_active"))
-            or (
-                item.get("quantity_in_stock") is not None
-                and item.get("quantity_in_stock") <= 0
-            ),
-        }
-        for item in items
-    ]

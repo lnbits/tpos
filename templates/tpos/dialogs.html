@@ -57,35 +57,13 @@
     </q-card>
   </q-dialog>
 
-  <q-dialog v-model="printDialog.show" persistent @hide="closePrintDialog">
-    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
-      <q-card-section class="row items-center q-pb-none">
-        <div class="text-h6">Print Receipt</div>
-      </q-card-section>
-      <q-card-actions align="between">
-        <div>
-          <q-btn
-            round
-            icon="receipt_long"
-            color="secondary"
-            class="q-mr-sm"
-            @click.stop="printOrderReceipt(printDialog.paymentHash)"
-          >
-            <q-tooltip>Print order receipt</q-tooltip>
-          </q-btn>
-          <q-btn
-            round
-            icon="print"
-            color="primary"
-            @click.stop="printReceipt(printDialog.paymentHash)"
-          >
-            <q-tooltip>Print receipt</q-tooltip>
-          </q-btn>
-        </div>
-        <q-btn outline color="grey" @click="closePrintDialog">CLOSE</q-btn>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <tpos-print-dialog
+    v-model:show="printDialog.show"
+    :payment-hash="printDialog.paymentHash"
+    @close="closePrintDialog"
+    @print-order-receipt="printOrderReceipt"
+    @print-receipt="printReceipt"
+  ></tpos-print-dialog>
 
   <q-dialog v-model="tipDialog.show" position="top">
     <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
@@ -290,37 +268,13 @@
     </q-card>
   </q-dialog>
 
-  <q-dialog v-model="heldCartsDialog.show" position="bottom">
-    <q-card class="lnbits__dialog-card">
-      <q-card-section class="row items-center q-pb-none">
-        <q-space />
-        <q-btn icon="close" flat round dense v-close-popup />
-      </q-card-section>
-      <q-list separator>
-        <q-item
-          v-for="[key, value] in Object.entries(heldCarts)"
-          :key="key"
-          clickable
-        >
-          <q-item-section @click="restoreCart(key)">
-            <q-item-label class="text-bold" v-text="formatDate(key)">
-            </q-item-label>
-            <q-item-label caption lines="2" v-text="value.note"></q-item-label>
-          </q-item-section>
-          <q-item-section side top>
-            <q-btn
-              icon="delete"
-              color="red"
-              @click.stop="deleteHeldCart(key)"
-              class="q-ml-sm"
-              size="sm"
-              round
-            ></q-btn>
-          </q-item-section>
-        </q-item>
-      </q-list>
-    </q-card>
-  </q-dialog>
+  <tpos-held-carts-dialog
+    v-model:show="heldCartsDialog.show"
+    :held-carts="heldCarts"
+    :format-date="formatDate"
+    @restore="restoreCart"
+    @delete="deleteHeldCart"
+  ></tpos-held-carts-dialog>
 
   <q-dialog v-model="atmBox" @hide="atmPin = null">
     <q-card>
@@ -461,7 +415,140 @@
             </div>
           </q-btn>
         </div>
+        <div class="col-6" v-if="tabsEnabled && !isSettlingTab">
+          <q-btn
+            class="full-width q-px-lg q-py-sm"
+            size="xl"
+            color="secondary"
+            rounded
+            aria-label="Add to tab"
+            @click="selectPaymentMethod('tab')"
+          >
+            <div class="row items-center no-wrap q-gutter-x-xs">
+              <q-icon class="text-h4" name="playlist_add_check"></q-icon>
+              <span class="text-subtitle1 text-weight-medium">Tab</span>
+            </div>
+          </q-btn>
+        </div>
       </div>
+    </q-card>
+  </q-dialog>
+
+  <q-dialog v-model="tabsDialog.show" position="top" @hide="closeTabsDialog">
+    <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
+      <q-card-section class="row items-center q-pb-sm">
+        <div
+          class="text-h6"
+          v-text="tabsDialog.mode === 'settlement' ? 'Settle Tab' : 'Add to Tab'"
+        ></div>
+        <q-space></q-space>
+        <q-btn icon="close" size="sm" flat round dense v-close-popup></q-btn>
+      </q-card-section>
+
+      <q-card-section>
+        <q-input
+          filled
+          dense
+          v-model.trim="tabsDialog.query"
+          label="Search tabs"
+          @keyup.enter="loadTabsForCharge"
+        >
+          <template v-slot:append>
+            <q-btn dense flat icon="search" @click="loadTabsForCharge"></q-btn>
+          </template>
+        </q-input>
+      </q-card-section>
+
+      <q-card-section v-if="tabsDialog.loading" class="text-center">
+        <q-spinner-gears size="36px"></q-spinner-gears>
+      </q-card-section>
+
+      <q-card-section v-else>
+        <div v-if="tabsDialog.tabs.length">
+          <div class="text-caption text-grey-7 q-mb-sm">
+            Latest updated open tabs
+          </div>
+          <q-list bordered separator>
+            <q-item
+              v-for="tab in tabsDialog.tabs"
+              :key="tab.id"
+              clickable
+              :active="tabsDialog.selectedTabId === tab.id"
+              active-class="bg-primary text-white"
+              @click="tabsDialog.selectedTabId = tab.id"
+            >
+              <q-item-section>
+                <q-item-label
+                  v-text="tab.name + ' (' + formatAmount(tab.balance, tab.currency) + ')'"
+                ></q-item-label>
+                <q-item-label
+                  caption
+                  :class="tabsDialog.selectedTabId === tab.id ? 'text-white' : ''"
+                  v-text="tab.customer_name || tab.reference || tab.id"
+                ></q-item-label>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </div>
+        <div v-else class="text-caption text-grey-7">No open tabs found.</div>
+
+        <div class="q-mt-md" v-if="tabsAllowCreate">
+          <q-btn
+            flat
+            color="primary"
+            :label="tabsDialog.createMode ? 'Hide create form' : 'Create new tab'"
+            @click="tabsDialog.createMode = !tabsDialog.createMode"
+          ></q-btn>
+        </div>
+
+        <div v-if="tabsDialog.createMode" class="q-gutter-sm q-mt-sm">
+          <q-input
+            filled
+            dense
+            v-model.trim="tabsDialog.newTab.name"
+            label="Tab name"
+          ></q-input>
+          <q-input
+            filled
+            dense
+            v-model.trim="tabsDialog.newTab.customer_name"
+            label="Customer name"
+          ></q-input>
+          <q-input
+            filled
+            dense
+            v-model.trim="tabsDialog.newTab.reference"
+            label="Reference"
+          ></q-input>
+          <q-btn
+            color="primary"
+            :loading="tabsDialog.creating"
+            :disable="!tabsDialog.newTab.name"
+            @click="createTabFromDialog"
+            label="Create Tab"
+          ></q-btn>
+        </div>
+      </q-card-section>
+
+      <q-card-actions align="right">
+        <q-btn flat color="grey" v-close-popup label="Cancel"></q-btn>
+        <q-btn
+          v-if="tabsDialog.mode !== 'settlement'"
+          color="primary"
+          label="Add charge"
+          :disable="!tabsDialog.selectedTabId"
+          :loading="tabsDialog.posting"
+          @click="submitTabCharge"
+        ></q-btn>
+        <q-btn
+          v-else
+          color="secondary"
+          label="Settle tab"
+          :disable="!tabsDialog.selectedTabId"
+          :loading="tabsDialog.settling"
+          @click="submitTabSettlement"
+        ></q-btn>
+      </q-card-actions>
     </q-card>
   </q-dialog>
 </template>

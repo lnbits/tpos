@@ -3,7 +3,7 @@ import json
 
 from lnbits.core.crud import get_user_active_extensions_ids, get_wallet
 from lnbits.core.crud.payments import get_standalone_payment, update_payment
-from lnbits.core.models import Payment
+from lnbits.core.models import Payment, PaymentState
 from lnbits.core.services import (
     create_invoice,
     get_pr_from_lnurl,
@@ -19,11 +19,11 @@ from .crud import (
     get_tpos_payment_by_hash,
     update_tpos_payment,
 )
-from .services import (
-    deduct_inventory_stock,
-    fetch_onchain_balance,
-    push_order_to_orders,
-)
+from .services import ensure_tpos_tabs_access
+from .services_inventory import deduct_inventory_stock
+from .services_onchain import fetch_onchain_balance
+from .services_orders import push_order_to_orders
+from .services_tabs import create_tab_settlement_for_tpos
 
 
 async def wait_for_paid_invoices():
@@ -58,10 +58,10 @@ async def poll_onchain_payments():
                 )
                 tpos_payment.balance = settled_balance
                 tpos_payment.pending = unconfirmed_balance
-                if settled_balance >= tpos_payment.amount:
-                    tpos_payment.paid = True
+                settled = settled_balance >= tpos_payment.amount
+                if settled:
                     tpos_payment.payment_method = "onchain"
-                if changed or tpos_payment.paid:
+                if changed or settled:
                     await update_tpos_payment(tpos_payment)
                     await websocket_updater(
                         tpos_payment.payment_hash,
@@ -75,7 +75,7 @@ async def poll_onchain_payments():
                             }
                         ),
                     )
-                if tpos_payment.paid:
+                if settled:
                     await settle_onchain_tpos_payment(tpos_payment)
             except Exception as exc:
                 logger.warning(f"tpos: onchain polling failed: {exc}")
@@ -108,12 +108,11 @@ async def settle_onchain_tpos_payment(tpos_payment) -> None:
     if not payment or not payment.extra or payment.extra.get("tag") != "tpos":
         return
 
-    if payment.success:
-        return
-
     payment.extra["payment_method"] = "onchain"
     payment.extra["settled_by_onchain"] = True
-    await update_payment(payment)
+    if not payment.success:
+        payment.status = PaymentState.SUCCESS
+        await update_payment(payment)
     await internal_invoice_queue_put(payment.checking_id)
 
 
@@ -152,7 +151,7 @@ async def process_paid_tpos_payment(
         address = payment.extra.get("lnaddress")
         if address:
             try:
-                pr = await get_pr_from_lnurl(address, int(calc_amount))
+                pr = await get_pr_from_lnurl(address, int(calc_amount // 1000) * 1000)
             except Exception as exc:
                 logger.error(f"tpos: Error getting payment request from lnurl: {exc}")
                 pr = None
@@ -169,6 +168,7 @@ async def process_paid_tpos_payment(
     await websocket_updater(tpos_id, json.dumps(stripped_payment))
     await websocket_updater(payment.payment_hash, json.dumps(stripped_payment))
 
+    await maybe_settle_tab(payment, tpos, payment_method)
     await maybe_push_order(payment, tpos)
 
     inventory_payload = payment.extra.get("inventory")
@@ -199,6 +199,45 @@ async def process_paid_tpos_payment(
         extra={**payment.extra, "tipSplitted": True},
     )
     logger.debug(f"tpos: tip invoice paid: {paid_payment.checking_id}")
+
+
+async def maybe_settle_tab(payment: Payment, tpos, payment_method: str) -> None:
+    settlement = (payment.extra or {}).get("tab_settlement")
+    if not settlement:
+        return
+
+    try:
+        user_id = await ensure_tpos_tabs_access(tpos)
+        await create_tab_settlement_for_tpos(
+            user_id=user_id,
+            tab_id=settlement["tab_id"],
+            payload={
+                "amount": settlement["amount"],
+                "method": _tabs_settlement_method(payment_method, payment),
+                "reference": settlement.get("reference"),
+                "description": settlement.get("description") or "TPoS settlement",
+                "metadata": json.dumps(
+                    {
+                        "source": "tpos",
+                        "source_id": tpos.id,
+                        "source_action": "settlement_paid",
+                        "payment_hash": payment.payment_hash,
+                        "payment_method": payment_method,
+                    }
+                ),
+                "idempotency_key": settlement["idempotency_key"],
+            },
+        )
+    except Exception as exc:
+        logger.warning(f"tpos: tab settlement failed: {exc}")
+
+
+def _tabs_settlement_method(payment_method: str, payment: Payment) -> str:
+    if payment_method == "cash":
+        return "cash"
+    if payment.extra.get("fiat_method") == "terminal":
+        return "card"
+    return "other"
 
 
 def _payment_method(payment: Payment) -> str:
