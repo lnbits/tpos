@@ -451,7 +451,10 @@ window.app = Vue.createApp({
       }
     },
     setColor(category) {
-      const key = category.toLowerCase()
+      const categoryName = typeof category === 'string' ? category : ''
+      const key = categoryName.trim()
+        ? categoryName.toLowerCase()
+        : 'uncategorized'
       if (this.categoryColors[key]) {
         return this.categoryColors[key]
       }
