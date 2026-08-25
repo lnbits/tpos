@@ -7,19 +7,21 @@
     :width="drawerWidth"
     :breakpoint="1024"
   >
-    <div class="row full-width q-pa-md">
-      <div class="absolute-top-right q-pa-md">
-        <q-btn @click="cartDrawer = !cartDrawer" icon="close" flat round
-          ><q-tooltip>Hide Cart</q-tooltip></q-btn
-        >
+    <div class="column full-height">
+      <div class="q-pa-md col-auto">
+        <div class="absolute-top-right q-pa-md">
+          <q-btn @click="cartDrawer = !cartDrawer" icon="close" flat round
+            ><q-tooltip>Hide Cart</q-tooltip></q-btn
+          >
+        </div>
+        <div class="col-12 text-center">
+          <h3 class="q-mb-md" v-text="totalFormatted"></h3>
+          <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
+            <span v-text="totalfsat"></span><small> sat</small>
+          </h5>
+        </div>
       </div>
-      <div class="col-12 text-center">
-        <h3 class="q-mb-md" v-text="totalFormatted"></h3>
-        <h5 v-show="!denomIsSats" class="q-mt-none q-mb-sm">
-          <span v-text="totalfsat"></span><small> sat</small>
-        </h5>
-      </div>
-      <div class="col-12" :style="drawerItemsHeight">
+      <div class="q-pa-md q-pt-none col overflow-auto">
         <table class="table full-width" virtual-scroll>
           <colgroup>
             <col width="50%" />
@@ -95,10 +97,8 @@
           </tbody>
         </table>
       </div>
-    </div>
-    <div class="row q-col-gutter-md q-pa-md absolute-bottom q-mb-lg">
-      <div v-if="total > 0" class="col-12">
-        <q-list dense padding class="rounded-borders">
+      <div class="q-pa-md q-pt-none col-auto q-mb-lg">
+        <q-list v-if="total > 0" dense padding class="rounded-borders">
           <q-item>
             <q-item-section> Subtotal </q-item-section>
             <q-item-section side v-text="taxSubtotal"></q-item-section>
@@ -122,25 +122,42 @@
             <q-item-section side v-text="totalFormatted"></q-item-section>
           </q-item>
         </q-list>
-      </div>
-      <div class="col-12 col-sm-6">
-        <q-btn
-          class="full-width"
-          @click="submitForm"
-          color="positive"
-          label="Pay"
-          padding="md"
-          :disabled="cart.size == 0"
-        ></q-btn>
-      </div>
-      <div class="col-12 col-sm-6">
-        <q-btn
-          class="full-width"
-          @click="clearCart"
-          color="negative"
-          label="Clear cart"
-          padding="md"
-        ></q-btn>
+        <div class="row q-col-gutter-md">
+          <div v-if="$q.screen.gt.sm" class="col-12">
+            <tpos-payment-method-selector
+              :bitcoin-symbol="bitcoinSymbol"
+              :currency="currency"
+              :currency-symbol="currencySymbol"
+              :fiat-provider="!!fiatProvider"
+              :allow-cash-settlement="allowCashSettlement"
+              :onchain-enabled="onchainEnabled"
+              :tabs-enabled="tabsEnabled"
+              :is-settling-tab="isSettlingTab"
+              drawer
+              :disabled="cart.size == 0"
+              @select="submitForm"
+            ></tpos-payment-method-selector>
+          </div>
+          <div v-else class="col-12 col-sm-6">
+            <q-btn
+              class="full-width"
+              @click="submitForm()"
+              color="positive"
+              label="Pay"
+              padding="md"
+              :disabled="cart.size == 0"
+            ></q-btn>
+          </div>
+          <div :class="$q.screen.gt.sm ? 'col-12' : 'col-12 col-sm-6'">
+            <q-btn
+              class="full-width"
+              @click="clearCart"
+              color="negative"
+              label="Clear cart"
+              padding="md"
+            ></q-btn>
+          </div>
+        </div>
       </div>
     </div>
   </q-drawer>
