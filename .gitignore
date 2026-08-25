@@ -4,6 +4,9 @@ node_modules
 .venv
 
 .codex
+.claude
+AGENTS.md
+CLAUDE.md
 
 # test artifacts
 data/
