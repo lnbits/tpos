@@ -171,6 +171,18 @@
       :icon="isGridView ? 'view_list' : 'grid_view'"
       @click="isGridView = !isGridView"
     ></q-btn>
+    <q-slider
+      v-if="isGridView"
+      class="col-4 col-sm-3 col-md-2 gt-xs q-px-sm"
+      v-model.number="tileSize"
+      :min="80"
+      :max="240"
+      :step="10"
+      label
+      :label-value="tileSize + 'px'"
+      aria-label="Tile size"
+      @change="persistTileSize"
+    ></q-slider>
     <q-space></q-space>
     <!-- middle: grows -->
     <q-input
@@ -251,7 +263,7 @@
       <!-- sm+ : keep original fixed card size -->
       <div class="flex justify-center q-col-gutter-sm q-mt-md gt-xs">
         <div
-          style="height: 150px; width: 150px"
+          :style="{height: tileSize + 'px', width: tileSize + 'px'}"
           v-for="item in filteredItems"
           :key="item.id"
           v-show="matchesCategoryFilter(item)"
@@ -265,7 +277,11 @@
                 :label="itemCartQty(item.id)"
                 floating
               ></q-badge>
-              <q-img :src="item.image || null" :ratio="4/3" fit="contain">
+              <q-img
+                :src="item.image || null"
+                fit="contain"
+                :style="tileImageStyle"
+              >
               </q-img>
 
               <span class="item-grid-title" dense v-text="item.title"></span>

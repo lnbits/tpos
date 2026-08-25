@@ -4,6 +4,11 @@ const {
   roundTposCurrencyAmount
 } = window.tposUtils
 
+const TILE_SIZE_DEFAULT = 150
+const TILE_SIZE_MIN = 80
+const TILE_SIZE_MAX = 240
+const TILE_SIZE_STEP = 10
+
 window.app = Vue.createApp({
   el: '#vue',
   mixins: [window.windowMixin],
@@ -92,6 +97,7 @@ window.app = Vue.createApp({
       rounding: false,
       isFullScreen: false,
       isGridView: this.$q.screen.gt.sm,
+      tileSize: TILE_SIZE_DEFAULT,
       moreBtn: false,
       total: 0.0,
       cartTax: 0.0,
@@ -312,8 +318,14 @@ window.app = Vue.createApp({
     drawerWidth() {
       return this.$q.screen.lt.sm ? 360 : 450
     },
-    drawerItemsHeight() {
-      return `overflow-y: auto; height: ${this.$q.screen.gt.sm ? 'calc(100vh - 400px)' : 'calc(100vh - 465px)'}`
+    tileSizeStorageKey() {
+      return `lnbits.tpos.${this.tposId}.tileSize`
+    },
+    tileImageStyle() {
+      return {
+        height: `${Math.max(this.tileSize - 36, 32)}px`,
+        flex: '0 0 auto'
+      }
     },
     formattedCartTax() {
       return this.formatAmount(this.cartTax, this.currency)
@@ -1892,6 +1904,9 @@ window.app = Vue.createApp({
     this.amountFormatted = this.formatAmount(this.amount, this.currency)
     this.totalFormatted = this.formatAmount(this.total, this.currency)
     this.tposId = tpos.id
+    this.tileSize = this.normalizeTileSize(
+      this.$q.localStorage.getItem(this.tileSizeStorageKey)
+    )
     this.atmPremium = tpos.withdraw_premium / 100
     this.withdrawMaximum = withdraw_maximum
     this.pinDisabled = tpos.withdraw_pin_disabled
