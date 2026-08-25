@@ -631,7 +631,11 @@ window.app = Vue.createApp({
       for (let item of this.cart.values()) {
         let tax = item.tax || this.taxDefault
         if (tax > 0) {
-          total += item.price * item.quantity * (tax * 0.01)
+          const gross = item.price * item.quantity
+          const taxRate = tax * 0.01
+          total += this.taxInclusive
+            ? (gross * taxRate) / (1 + taxRate)
+            : gross * taxRate
         }
       }
       this.cartTax = roundTposCurrencyAmount(total, this.currency)
