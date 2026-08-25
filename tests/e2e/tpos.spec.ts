@@ -66,29 +66,107 @@ test('public item checkout completes through Lightning with FakeWallet', async (
         disabled: false
       }
     ]),
-    tip_options: '[]',
+    tip_options: '[10]',
     enable_remote: false,
-    tabs_enabled: false
+    tabs_enabled: true
   })
 
   await page.goto(`/tpos/${terminal.id}`)
   const pos = page.locator('body')
+  const tile = pos.locator('div.flex.justify-center.gt-xs > div').first()
+  await expect(tile).toBeVisible()
+  await expect
+    .poll(() =>
+      tile.evaluate(element => {
+        const style = getComputedStyle(element)
+        return {height: style.height, width: style.width}
+      })
+    )
+    .toEqual({height: '150px', width: '150px'})
+  await page.evaluate(
+    key => window.localStorage.setItem(key, JSON.stringify('invalid')),
+    `lnbits.tpos.${terminal.id}.tileSize`
+  )
+  await page.reload()
+  const fallbackTile = pos
+    .locator('div.flex.justify-center.gt-xs > div')
+    .first()
+  await expect
+    .poll(() =>
+      fallbackTile.evaluate(element => getComputedStyle(element).width)
+    )
+    .toBe('150px')
+  const tileSizeSlider = pos.locator('[aria-label="Tile size"]')
+  await expect(tileSizeSlider).toBeVisible()
+  await tileSizeSlider.focus()
+  await tileSizeSlider.press('ArrowRight', {delay: 50})
+  await tileSizeSlider.press('ArrowRight', {delay: 50})
+  await tileSizeSlider.press('ArrowRight', {delay: 50})
+  await tileSizeSlider.press('ArrowRight', {delay: 50})
+  await tileSizeSlider.press('ArrowRight', {delay: 50})
+  await expect
+    .poll(() =>
+      tile.evaluate(element => {
+        const style = getComputedStyle(element)
+        return {height: style.height, width: style.width}
+      })
+    )
+    .toEqual({height: '200px', width: '200px'})
+  await expect
+    .poll(() =>
+      page.evaluate(key => {
+        const value = window.localStorage.getItem(key)
+        return value === null ? null : JSON.parse(value)
+      }, `lnbits.tpos.${terminal.id}.tileSize`)
+    )
+    .toBe(200)
+  await page.reload()
+  const restoredTile = pos
+    .locator('div.flex.justify-center.gt-xs > div')
+    .first()
+  await expect
+    .poll(() =>
+      restoredTile.evaluate(element => getComputedStyle(element).width)
+    )
+    .toBe('200px')
+  await page.setViewportSize({width: 1280, height: 600})
+  await page.reload()
   const item = pos
     .locator('.item-grid-title:visible')
     .filter({hasText: itemName})
   await expect(item).toBeVisible()
   await item.click()
   await expect(pos.getByText('Total', {exact: true}).last()).toBeVisible()
+  const clearCart = pos.getByRole('button', {name: /clear cart/i})
+  await expect(clearCart).toBeVisible()
+  const clearCartBox = await clearCart.boundingBox()
+  expect(clearCartBox).not.toBeNull()
+  expect(clearCartBox!.y).toBeGreaterThanOrEqual(420)
+  expect(clearCartBox!.y + clearCartBox!.height).toBeLessThanOrEqual(592)
+  await expect(pos.getByRole('button', {name: /^pay$/i})).toHaveCount(0)
+  await pos.getByRole('button', {name: /lightning network/i}).click()
+  const tipDialog = pos
+    .locator('.q-dialog')
+    .filter({hasText: 'Would you like to leave a tip?'})
+    .last()
+  await expect(tipDialog).toBeVisible()
+  await expect(
+    pos.locator('.q-dialog').filter({hasText: 'Payment Method'})
+  ).toHaveCount(0)
   const invoiceResponse = page.waitForResponse(
     response =>
       response.request().method() === 'POST' &&
       response.url().includes(`/tpos/api/v1/tposs/${terminal.id}/invoices`)
   )
-  await pos.getByRole('button', {name: /^pay$/i}).click()
-  const invoice = (await (await invoiceResponse).json()) as {
+  await tipDialog.getByRole('button', {name: /no, thanks/i}).click()
+  const invoiceResponseResult = await invoiceResponse
+  const invoice = (await invoiceResponseResult.json()) as {
     bolt11?: string
   }
   expect(invoice.bolt11).toMatch(/^lnbc/i)
+  expect(invoiceResponseResult.request().postDataJSON()).toMatchObject({
+    payment_method: 'btc'
+  })
   await payInvoice(page, customerWallet, invoice.bolt11 as string)
   await expect(pos.getByText('Invoice Paid!', {exact: true})).toBeVisible({
     timeout: 60_000
@@ -96,6 +174,49 @@ test('public item checkout completes through Lightning with FakeWallet', async (
   await expect(
     pos.locator('table tbody tr').filter({hasText: itemName})
   ).toHaveCount(0)
+
+  await page.setViewportSize({width: 800, height: 900})
+  await page.reload()
+  await pos.getByText(itemName, {exact: true}).last().click()
+  await pos.getByRole('button', {name: /checkout/i}).click()
+  await expect(pos.getByRole('button', {name: /^pay$/i})).toBeVisible()
+  await expect(
+    pos.getByRole('button', {name: /lightning network/i})
+  ).toHaveCount(0)
+  await pos.getByRole('button', {name: /^pay$/i}).click()
+  const paymentMethodDialog = pos
+    .locator('.q-dialog')
+    .filter({hasText: 'Payment Method'})
+    .last()
+  const compactTipDialog = pos
+    .locator('.q-dialog')
+    .filter({hasText: 'Would you like to leave a tip?'})
+    .last()
+  await expect(compactTipDialog).toBeVisible()
+  await expect(paymentMethodDialog).toHaveCount(0)
+  await compactTipDialog.getByRole('button', {name: /no, thanks/i}).click()
+  await expect(paymentMethodDialog).toBeVisible()
+  const compactInvoiceResponse = page.waitForResponse(
+    response =>
+      response.request().method() === 'POST' &&
+      response.url().includes(`/tpos/api/v1/tposs/${terminal.id}/invoices`)
+  )
+  await paymentMethodDialog
+    .getByRole('button', {name: /lightning network/i})
+    .click()
+  const compactInvoiceResponseResult = await compactInvoiceResponse
+  const compactInvoice = (await compactInvoiceResponseResult.json()) as {
+    bolt11?: string
+  }
+  expect(compactInvoice.bolt11).toMatch(/^lnbc/i)
+  expect(compactInvoiceResponseResult.request().postDataJSON()).toMatchObject({
+    payment_method: 'btc'
+  })
+
+  await page.setViewportSize({width: 500, height: 900})
+  await page.reload()
+  await expect(pos.locator('[aria-label="Tile size"]')).toHaveCount(0)
+  await expect(pos.getByText(itemName, {exact: true}).last()).toBeVisible()
 })
 
 test('held carts survive restore and can then be deleted', async ({
