@@ -4,6 +4,11 @@ const {
   roundTposCurrencyAmount
 } = window.tposUtils
 
+const TILE_SIZE_DEFAULT = 150
+const TILE_SIZE_MIN = 80
+const TILE_SIZE_MAX = 240
+const TILE_SIZE_STEP = 10
+
 window.app = Vue.createApp({
   el: '#vue',
   mixins: [window.windowMixin],
@@ -80,7 +85,8 @@ window.app = Vue.createApp({
       pendingTabSettlement: null,
       cashValidating: false,
       tipDialog: {
-        show: false
+        show: false,
+        paymentMethod: null
       },
       urlDialog: {
         show: false
@@ -91,6 +97,7 @@ window.app = Vue.createApp({
       rounding: false,
       isFullScreen: false,
       isGridView: this.$q.screen.gt.sm,
+      tileSize: TILE_SIZE_DEFAULT,
       moreBtn: false,
       total: 0.0,
       cartTax: 0.0,
@@ -311,8 +318,14 @@ window.app = Vue.createApp({
     drawerWidth() {
       return this.$q.screen.lt.sm ? 360 : 450
     },
-    drawerItemsHeight() {
-      return `overflow-y: auto; height: ${this.$q.screen.gt.sm ? 'calc(100vh - 400px)' : 'calc(100vh - 465px)'}`
+    tileSizeStorageKey() {
+      return `lnbits.tpos.${this.tposId}.tileSize`
+    },
+    tileImageStyle() {
+      return {
+        height: `${Math.max(this.tileSize - 36, 32)}px`,
+        flex: '0 0 auto'
+      }
     },
     formattedCartTax() {
       return this.formatAmount(this.cartTax, this.currency)
@@ -921,17 +934,19 @@ window.app = Vue.createApp({
       }, 3000)
     },
     processTipSelection(selectedTipOption) {
+      const selectedPaymentMethod = this.tipDialog.paymentMethod
+      this.tipDialog.paymentMethod = null
       this.tipDialog.show = false
       if (!selectedTipOption) {
         this.tipAmount = 0.0
-        return this.showInvoice()
+        return this.showInvoice(selectedPaymentMethod)
       }
 
       this.tipAmount = roundTposCurrencyAmount(
         (selectedTipOption / 100) * this.activePaymentAmount,
         this.currency
       )
-      this.showInvoice()
+      this.showInvoice(selectedPaymentMethod)
     },
     resetPaymentAttempt() {
       this.paymentAmount = null
@@ -939,7 +954,7 @@ window.app = Vue.createApp({
       this.rounding = false
       this.tipRounding = null
     },
-    submitForm() {
+    submitForm(selectedPaymentMethod = null) {
       const paymentAmount =
         this.total > 0.0
           ? roundTposCurrencyAmount(this.total + this.amount, this.currency)
@@ -949,6 +964,7 @@ window.app = Vue.createApp({
       this.sat = Math.ceil(paymentAmount * this.exchangeRate)
 
       if (!this.exchangeRate || this.exchangeRate == 0 || this.sat == 0) {
+        this.tipDialog.paymentMethod = null
         Quasar.Notify.create({
           type: 'negative',
           message:
@@ -957,19 +973,24 @@ window.app = Vue.createApp({
         return
       }
 
+      this.tipDialog.paymentMethod = selectedPaymentMethod
       if (this.tip_options && this.tip_options.length) {
         this.rounding = false
         this.tipRounding = null
         this.showTipModal()
       } else {
-        this.showInvoice()
+        const method = this.tipDialog.paymentMethod
+        this.tipDialog.paymentMethod = null
+        this.showInvoice(method)
       }
     },
     showTipModal() {
       if (!this.atmMode) {
         this.tipDialog.show = true
       } else {
-        this.showInvoice()
+        const method = this.tipDialog.paymentMethod
+        this.tipDialog.paymentMethod = null
+        this.showInvoice(method)
       }
     },
     showPaymentMethod() {
@@ -981,29 +1002,46 @@ window.app = Vue.createApp({
     selectPaymentMethod(method) {
       this.currency_choice = false
       if (this._currencyResolver) {
-        switch (method) {
-          case 'fiat_tap':
-            this.fiatMethod = 'terminal'
-            method = 'fiat'
-            break
-          case 'fiat':
-            this.fiatMethod = 'checkout'
-            break
-          case 'cash':
-            this.fiatMethod = 'cash'
-            method = 'fiat'
-            break
-          case 'btc':
-          case 'btc_onchain':
-            this.fiatMethod = 'checkout'
-            break
-          case 'tab':
-            this.fiatMethod = 'checkout'
-            break
-        }
-        this._currencyResolver(method)
+        this._currencyResolver(this.normalizePaymentMethod(method))
         this._currencyResolver = null
       }
+    },
+    normalizePaymentMethod(method) {
+      switch (method) {
+        case 'fiat_tap':
+          this.fiatMethod = 'terminal'
+          return 'fiat'
+        case 'fiat':
+          this.fiatMethod = 'checkout'
+          return 'fiat'
+        case 'cash':
+          this.fiatMethod = 'cash'
+          return 'fiat'
+        case 'btc':
+        case 'btc_onchain':
+        case 'tab':
+          this.fiatMethod = 'checkout'
+          return method
+        default:
+          return method
+      }
+    },
+    normalizeTileSize(value) {
+      if (
+        value === null ||
+        value === undefined ||
+        (typeof value === 'string' && !value.trim())
+      ) {
+        return TILE_SIZE_DEFAULT
+      }
+      const parsed = Number(value)
+      if (!Number.isFinite(parsed)) return TILE_SIZE_DEFAULT
+      const bounded = Math.min(TILE_SIZE_MAX, Math.max(TILE_SIZE_MIN, parsed))
+      return Math.round(bounded / TILE_SIZE_STEP) * TILE_SIZE_STEP
+    },
+    persistTileSize(value) {
+      this.tileSize = this.normalizeTileSize(value)
+      this.$q.localStorage.set(this.tileSizeStorageKey, this.tileSize)
     },
     normalizeApiAmount(currency, value) {
       if (value === null || value === undefined || value === '') return null
@@ -1285,7 +1323,7 @@ window.app = Vue.createApp({
       }
       return params
     },
-    async showInvoice() {
+    async showInvoice(selectedPaymentMethod = null) {
       if (this.atmMode) {
         this.atmGetWithdraw()
         return
@@ -1298,7 +1336,9 @@ window.app = Vue.createApp({
         this.isSettlingTab ||
         (this.tabsEnabled && !this.isSettlingTab)
       ) {
-        const method = await this.showPaymentMethod()
+        const method = selectedPaymentMethod
+          ? this.normalizePaymentMethod(selectedPaymentMethod)
+          : await this.showPaymentMethod()
         if (method === 'tab') {
           await this.openTabChargeDialog()
           return
@@ -1868,6 +1908,9 @@ window.app = Vue.createApp({
     this.amountFormatted = this.formatAmount(this.amount, this.currency)
     this.totalFormatted = this.formatAmount(this.total, this.currency)
     this.tposId = tpos.id
+    this.tileSize = this.normalizeTileSize(
+      this.$q.localStorage.getItem(this.tileSizeStorageKey)
+    )
     this.atmPremium = tpos.withdraw_premium / 100
     this.withdrawMaximum = withdraw_maximum
     this.pinDisabled = tpos.withdraw_pin_disabled

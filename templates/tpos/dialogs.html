@@ -65,7 +65,11 @@
     @print-receipt="printReceipt"
   ></tpos-print-dialog>
 
-  <q-dialog v-model="tipDialog.show" position="top">
+  <q-dialog
+    v-model="tipDialog.show"
+    position="top"
+    @hide="tipDialog.paymentMethod = null"
+  >
     <q-card class="q-pa-lg q-pt-xl lnbits__dialog-card">
       <div class="text-center q-mb-xl">
         <b style="font-size: 24px">Would you like to leave a tip?</b>
@@ -324,113 +328,17 @@
   <q-dialog v-model="currency_choice">
     <q-card class="q-pa-md">
       <div class="text-h6 q-mb-md">Payment Method</div>
-      <div class="row q-col-gutter-sm q-pt-xs">
-        <div class="col-6">
-          <q-btn
-            class="full-width q-px-lg q-py-sm"
-            size="xl"
-            color="primary"
-            rounded
-            aria-label="Lightning Network"
-            @click="selectPaymentMethod('btc')"
-          >
-            <div class="row items-center no-wrap q-gutter-x-sm">
-              <span
-                class="text-h4 text-weight-bold"
-                v-text="bitcoinSymbol"
-              ></span>
-              <span class="text-subtitle1 text-weight-medium">Lightning</span>
-            </div>
-          </q-btn>
-        </div>
-        <div class="col-6" v-if="onchainEnabled">
-          <q-btn
-            class="full-width q-px-lg q-py-sm"
-            size="xl"
-            color="primary"
-            rounded
-            aria-label="Bitcoin Onchain"
-            @click="selectPaymentMethod('btc_onchain')"
-          >
-            <div class="row items-center no-wrap q-gutter-x-sm">
-              <span
-                class="text-h4 text-weight-bold"
-                v-text="bitcoinSymbol"
-              ></span>
-              <span class="text-subtitle1 text-weight-medium">Onchain</span>
-            </div>
-          </q-btn>
-        </div>
-        <div class="col-6" v-if="fiatProvider">
-          <q-btn
-            class="full-width q-px-lg q-py-sm"
-            size="xl"
-            color="secondary"
-            rounded
-            :aria-label="currency + ' QR'"
-            @click="selectPaymentMethod('fiat')"
-          >
-            <div class="row items-center no-wrap q-gutter-x-xs">
-              <span
-                class="text-h5 text-weight-bold"
-                v-text="currencySymbol"
-              ></span>
-              <q-icon name="qr_code" size="30px"></q-icon>
-            </div>
-          </q-btn>
-        </div>
-        <div class="col-6" v-if="allowCashSettlement && currency != 'sats'">
-          <q-btn
-            class="full-width q-px-lg q-py-sm"
-            size="xl"
-            color="secondary"
-            rounded
-            :aria-label="currency + ' TAP'"
-            @click="selectPaymentMethod('cash')"
-          >
-            <div class="row items-center no-wrap q-gutter-x-xs">
-              <span
-                class="text-h5 text-weight-bold"
-                v-text="currencySymbol"
-              ></span>
-              <q-icon name="toll" size="30px"></q-icon>
-            </div>
-          </q-btn>
-        </div>
-        <div class="col-6" v-if="fiatProvider">
-          <q-btn
-            class="full-width q-px-lg q-py-sm"
-            size="xl"
-            color="secondary"
-            rounded
-            :aria-label="`CASH ${currency}`"
-            @click="selectPaymentMethod('fiat_tap')"
-          >
-            <div class="row items-center no-wrap q-gutter-x-xs">
-              <span
-                class="text-h5 text-weight-bold"
-                v-text="currencySymbol"
-              ></span>
-              <q-icon name="credit_card" size="30px"></q-icon>
-            </div>
-          </q-btn>
-        </div>
-        <div class="col-6" v-if="tabsEnabled && !isSettlingTab">
-          <q-btn
-            class="full-width q-px-lg q-py-sm"
-            size="xl"
-            color="secondary"
-            rounded
-            aria-label="Add to tab"
-            @click="selectPaymentMethod('tab')"
-          >
-            <div class="row items-center no-wrap q-gutter-x-xs">
-              <q-icon class="text-h4" name="playlist_add_check"></q-icon>
-              <span class="text-subtitle1 text-weight-medium">Tab</span>
-            </div>
-          </q-btn>
-        </div>
-      </div>
+      <tpos-payment-method-selector
+        :bitcoin-symbol="bitcoinSymbol"
+        :currency="currency"
+        :currency-symbol="currencySymbol"
+        :fiat-provider="!!fiatProvider"
+        :allow-cash-settlement="allowCashSettlement"
+        :onchain-enabled="onchainEnabled"
+        :tabs-enabled="tabsEnabled"
+        :is-settling-tab="isSettlingTab"
+        @select="selectPaymentMethod"
+      ></tpos-payment-method-selector>
     </q-card>
   </q-dialog>
 

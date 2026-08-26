@@ -37,6 +37,7 @@ const pages = [
       'static/js/tpos.js',
       'static/components/item-list.js',
       'static/components/keypad.js',
+      'static/components/payment-method-selector.js',
       'static/components/payment-dialog.js',
       'static/components/held-carts-dialog.js',
       'static/components/print-dialog.js',
