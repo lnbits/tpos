@@ -81,12 +81,10 @@ async def api_tpos_create_invoice(
 
     if not data.details:
         tax_value = 0.0
-        if tpos.tax_default:
-            tax_value = (
-                (data.amount / data.exchange_rate) * (tpos.tax_default * 0.01)
-                if data.exchange_rate
-                else 0.0
-            )
+        if tpos.tax_default and data.exchange_rate:
+            gross_amount = data.amount / data.exchange_rate
+            tax_rate = tpos.tax_default * 0.01
+            tax_value = (gross_amount * tax_rate) / (1 + tax_rate)
         data.details = {
             "currency": tpos.currency,
             "exchangeRate": data.exchange_rate,

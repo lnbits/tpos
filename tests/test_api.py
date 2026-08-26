@@ -155,6 +155,35 @@ async def test_tpos_crud_settings_and_wrapper_token(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_manual_invoice_tax_value_extracts_inclusive_tax(
+    client: AsyncClient,
+):
+    _user, wallet = await _user_with_tabs("manualtaxtest")
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(currency="EUR", tax_default=21),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={"amount": 350, "exchange_rate": 100},
+    )
+    assert response.status_code == 201
+
+    payment = await get_standalone_payment(
+        response.json()["payment_hash"], incoming=True
+    )
+    assert payment is not None
+    details = payment.extra["details"]
+    assert details["taxIncluded"] is True
+    assert details["taxValue"] == pytest.approx(3.5 * 0.21 / 1.21)
+
+
+@pytest.mark.asyncio
 async def test_tabs_endpoints_use_real_tabs_api(client: AsyncClient):
     _user, wallet = await _user_with_tabs("tabsuser")
     headers = {"X-API-KEY": wallet.adminkey}
