@@ -71,7 +71,7 @@ window.app.component('tpos-payment-method-selector', {
           color="secondary"
           rounded
           :disable="disabled"
-          :aria-label="currency + ' TAP'"
+          :aria-label="'Cash ' + currency"
           @click="$emit('select', 'cash')"
         >
           <div class="row items-center no-wrap q-gutter-x-xs">
@@ -87,7 +87,7 @@ window.app.component('tpos-payment-method-selector', {
           color="secondary"
           rounded
           :disable="disabled"
-          :aria-label="'CASH ' + currency"
+          :aria-label="'Tap to Pay ' + currency"
           @click="$emit('select', 'fiat_tap')"
         >
           <div class="row items-center no-wrap q-gutter-x-xs">
