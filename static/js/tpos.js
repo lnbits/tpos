@@ -245,6 +245,15 @@ window.app = Vue.createApp({
     }
   },
   computed: {
+    // 'cash' or 'custom' while an internally settled fiat invoice is open
+    internalFiatMethod() {
+      const request =
+        this.invoiceDialog.data && this.invoiceDialog.data.payment_request
+      return request === 'cash' || request === 'custom' ? request : null
+    },
+    internalFiatMethodLabel() {
+      return (this.internalFiatMethod || 'cash').toUpperCase()
+    },
     activePaymentAmount() {
       return this.paymentAmount !== null ? this.paymentAmount : this.amount
     },
@@ -410,6 +419,7 @@ window.app = Vue.createApp({
           lightning_payment_request:
             paymentRequest &&
             paymentRequest !== 'cash' &&
+            paymentRequest !== 'custom' &&
             paymentRequest !== 'tap_to_pay'
               ? paymentRequest
               : null,
@@ -425,6 +435,7 @@ window.app = Vue.createApp({
           ? null
           : paymentData.payment_request &&
               paymentData.payment_request !== 'cash' &&
+              paymentData.payment_request !== 'custom' &&
               paymentData.payment_request !== 'tap_to_pay'
             ? paymentData.payment_request
             : paymentData.bolt11
@@ -1018,6 +1029,9 @@ window.app = Vue.createApp({
         case 'cash':
           this.fiatMethod = 'cash'
           return 'fiat'
+        case 'custom':
+          this.fiatMethod = 'custom'
+          return 'fiat'
         case 'btc':
         case 'btc_onchain':
         case 'tab':
@@ -1368,11 +1382,12 @@ window.app = Vue.createApp({
     async validateCashInvoice() {
       const paymentHash = this.invoiceDialog.data.payment_hash
       if (!paymentHash || this.cashValidating) return
+      const method = this.internalFiatMethod || 'cash'
       this.cashValidating = true
       try {
         await LNbits.api.request(
           'POST',
-          `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}/cash/validate`
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}/${method}/validate`
         )
       } catch (error) {
         LNbits.utils.notifyApiError(error)

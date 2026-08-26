@@ -1066,6 +1066,99 @@ async def test_cash_validate_and_print_invoice_endpoints(
 
 
 @pytest.mark.asyncio
+async def test_custom_validate_invoice_endpoint(client: AsyncClient, monkeypatch):
+    await _drain_internal_invoice_queue()
+    user, wallet = await _user_with_tabs("customuser")
+    settings.super_user = user.id
+    headers = {"X-API-KEY": wallet.adminkey}
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(currency="EUR", allow_cash_settlement=True),
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    payment = await create_payment_request(
+        wallet.id,
+        CreateInvoice(
+            unit="sat",
+            out=False,
+            amount=10,
+            memo="Custom sale",
+            internal=True,
+            extra={
+                "tag": "tpos",
+                "tpos_id": tpos["id"],
+                "amount": 10,
+                "fiat_method": "custom",
+                "details": {
+                    "currency": "EUR",
+                    "exchangeRate": 1,
+                    "taxValue": 0,
+                    "taxIncluded": True,
+                    "items": [],
+                },
+            },
+        ),
+    )
+    await update_payment_checking_id(
+        payment.checking_id, f"internal_custom_{payment.payment_hash}"
+    )
+    await create_tpos_payment(
+        TposPayment(
+            id=uuid4().hex,
+            tpos_id=tpos["id"],
+            payment_hash=payment.payment_hash,
+            amount=10,
+            payment_method="custom",
+        )
+    )
+
+    queued_checking_ids = []
+
+    async def fake_internal_invoice_queue_put(checking_id):
+        queued_checking_ids.append(checking_id)
+
+    monkeypatch.setattr(
+        views_payments, "internal_invoice_queue_put", fake_internal_invoice_queue_put
+    )
+
+    # the cash route must not accept a custom invoice
+    wrong_route = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{payment.payment_hash}/cash/validate"
+    )
+    assert wrong_route.status_code == 400
+    assert queued_checking_ids == []
+
+    validated = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}"
+        f"/invoices/{payment.payment_hash}/custom/validate"
+    )
+    assert validated.status_code == 200
+    assert validated.json() == {"success": True}
+    assert queued_checking_ids == [f"internal_custom_{payment.payment_hash}"]
+
+    settled_payment = await get_standalone_payment(payment.payment_hash, incoming=True)
+    assert settled_payment is not None
+    assert settled_payment.success is True
+
+    poll = await client.get(
+        f"/tpos/api/v1/tposs/{tpos['id']}"
+        f"/invoices/{payment.payment_hash}?extra=true"
+    )
+    assert poll.status_code == 200
+    assert poll.json()["extra"]["fiat_method"] == "custom"
+
+    await on_invoice_paid(settled_payment)
+
+    latest_response = await client.get(f"/tpos/api/v1/tposs/{tpos['id']}/invoices")
+    assert latest_response.status_code == 200
+    latest = latest_response.json()
+    assert latest[0]["payment_method"] == "custom"
+
+
+@pytest.mark.asyncio
 async def test_atm_and_lnurl_withdraw_routes(client: AsyncClient, monkeypatch):
     user, wallet = await _user_with_tabs("atmuser")
     headers = {"X-API-KEY": wallet.adminkey}
