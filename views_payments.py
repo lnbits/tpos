@@ -20,7 +20,11 @@ from .crud import (
     get_tpos,
     get_tpos_payment_by_hash,
 )
-from .helpers import inventory_tags_to_list
+from .helpers import (
+    INTERNAL_FIAT_LABEL_COLORS,
+    INTERNAL_FIAT_METHODS,
+    inventory_tags_to_list,
+)
 from .models import (
     CreateTposInvoice,
     InventorySale,
@@ -93,7 +97,12 @@ async def api_tpos_create_invoice(
             "taxValue": tax_value,
         }
 
-    cash_method = data.pay_in_fiat and data.fiat_method == "cash"
+    internal_fiat_method = (
+        data.fiat_method
+        if data.pay_in_fiat and data.fiat_method in INTERNAL_FIAT_METHODS
+        else None
+    )
+    cash_method = internal_fiat_method is not None
     onchain_method = data.payment_method == "btc_onchain"
     if cash_method and not tpos.allow_cash_settlement:
         raise HTTPException(
@@ -160,11 +169,17 @@ async def api_tpos_create_invoice(
                             detail="This tpos cannot create cash or onchain invoices.",
                         )
                     existing = {label.name for label in account.extra.labels or []}
-                    label_name = "cash" if cash_method else "onchain"
+                    label_name = internal_fiat_method if cash_method else "onchain"
                     label_description = (
-                        "Cash payment" if cash_method else "Onchain payment"
+                        f"{label_name.capitalize()} payment"
+                        if cash_method
+                        else "Onchain payment"
                     )
-                    label_color = "#FFC107" if cash_method else "#ED8403"
+                    label_color = (
+                        INTERNAL_FIAT_LABEL_COLORS.get(label_name, "#FFC107")
+                        if cash_method
+                        else "#ED8403"
+                    )
                     if label_name not in existing:
                         account.extra.labels.append(
                             UserLabel(
@@ -192,11 +207,15 @@ async def api_tpos_create_invoice(
                 tpos.fiat_provider if data.pay_in_fiat and not cash_method else None
             ),
             internal=bool(cash_method or onchain_method),
-            labels=["cash"] if cash_method else (["onchain"] if onchain_method else []),
+            labels=(
+                [internal_fiat_method]
+                if internal_fiat_method
+                else (["onchain"] if onchain_method else [])
+            ),
         )
         payment = await create_payment_request(tpos.wallet, invoice_data)
         if cash_method:
-            new_checking_id = f"internal_cash_{payment.payment_hash}"
+            new_checking_id = f"internal_{internal_fiat_method}_{payment.payment_hash}"
             await update_payment_checking_id(payment.checking_id, new_checking_id)
             payment.checking_id = new_checking_id
         elif onchain_method:
@@ -440,11 +459,14 @@ async def api_tpos_print_invoice(
     return {"success": True}
 
 
-@tpos_payments_router.post(
-    "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}/cash/validate",
-    status_code=HTTPStatus.OK,
-)
-async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
+async def _validate_internal_fiat_invoice(
+    tpos_id: str, payment_hash: str, fiat_method: str
+):
+    """Mark an internally settled fiat invoice as received.
+
+    Shared by the cash and custom validation routes. The cashier confirms
+    manually that the amount was received through that channel.
+    """
     tpos = await get_tpos(tpos_id)
     if not tpos:
         raise HTTPException(
@@ -464,14 +486,15 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
         )
-    if payment.extra.get("fiat_method") != "cash":
+    if payment.extra.get("fiat_method") != fiat_method:
         raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST, detail="Payment is not cash."
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail=f"Payment is not {fiat_method}.",
         )
     if not payment.is_internal:
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
-            detail="Payment is not an internal cash invoice.",
+            detail=f"Payment is not an internal {fiat_method} invoice.",
         )
     if not payment.success:
         payment.status = PaymentState.SUCCESS
@@ -480,11 +503,27 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
     return {"success": True}
 
 
+@tpos_payments_router.post(
+    "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}/cash/validate",
+    status_code=HTTPStatus.OK,
+)
+async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
+    return await _validate_internal_fiat_invoice(tpos_id, payment_hash, "cash")
+
+
+@tpos_payments_router.post(
+    "/api/v1/tposs/{tpos_id}/invoices/{payment_hash}/custom/validate",
+    status_code=HTTPStatus.OK,
+)
+async def api_tpos_validate_custom_invoice(tpos_id: str, payment_hash: str):
+    return await _validate_internal_fiat_invoice(tpos_id, payment_hash, "custom")
+
+
 def _payment_method_from_payment(payment: Payment) -> str:
     if payment.extra.get("payment_method"):
         return str(payment.extra["payment_method"])
-    if payment.extra.get("fiat_method") == "cash":
-        return "cash"
+    if payment.extra.get("fiat_method") in INTERNAL_FIAT_METHODS:
+        return str(payment.extra["fiat_method"])
     if payment.extra.get("fiat_payment_request", "").startswith("pi_"):
         return "fiat"
     return "lightning"
@@ -495,8 +534,8 @@ def _serialize_tpos_invoice_response(
 ) -> TposInvoiceResponse:
     payment_method = _payment_method_from_payment(payment)
     payment_request = "lightning:" + payment.bolt11.upper()
-    if payment_method == "cash":
-        payment_request = "cash"
+    if payment_method in INTERNAL_FIAT_METHODS:
+        payment_request = payment_method
     elif payment.extra.get("fiat_payment_request") and not payment.extra.get(
         "fiat_payment_request", ""
     ).startswith("pi_"):

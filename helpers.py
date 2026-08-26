@@ -3,6 +3,14 @@ import json
 from lnbits.helpers import create_access_token
 from loguru import logger
 
+# Fiat methods that are settled inside LNbits instead of by a fiat provider.
+# The invoice is created as an internal payment and a cashier confirms it
+# manually. The chosen value is stored in payment.extra["fiat_method"].
+INTERNAL_FIAT_METHODS = ("cash", "custom")
+
+# Colour of the account label LNbits attaches to these payments.
+INTERNAL_FIAT_LABEL_COLORS = {"cash": "#FFC107", "custom": "#7E57C2"}
+
 
 def from_csv(value: str | None, separator: str = ",") -> list[str]:
     if not value:

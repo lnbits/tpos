@@ -21,10 +21,10 @@
         <q-btn v-close-popup flat color="grey" class="q-ml-auto">Close</q-btn>
       </div>
       <div
-        v-else-if="invoiceDialog.data.payment_request == 'cash'"
+        v-else-if="invoiceDialog.data.payment_request == 'cash' || invoiceDialog.data.payment_request == 'custom'"
         class="text-center q-mb-xl"
       >
-        <h3>CASH ${ currency }</h3>
+        <h3>${ internalFiatMethodLabel } ${ currency }</h3>
         <h3 class="q-my-md">${ activePaymentAmountWithTipFormatted }</h3>
         <h5 class="q-mt-none q-mb-sm">
           ${ activePaymentAmountFormatted }

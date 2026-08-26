@@ -96,6 +96,22 @@ window.app.component('tpos-payment-method-selector', {
           </div>
         </q-btn>
       </div>
+      <div class="col-6" v-if="allowCashSettlement && currency != 'sats'">
+        <q-btn
+          class="full-width q-px-lg q-py-sm"
+          :size="drawer ? 'lg' : 'xl'"
+          color="secondary"
+          rounded
+          :disable="disabled"
+          :aria-label="'Custom ' + currency"
+          @click="$emit('select', 'custom')"
+        >
+          <div class="row items-center no-wrap q-gutter-x-xs">
+            <span class="text-h5 text-weight-bold" v-text="currencySymbol"></span>
+            <q-icon name="more_horiz" size="30px"></q-icon>
+          </div>
+        </q-btn>
+      </div>
       <div class="col-6" v-if="tabsEnabled && !isSettlingTab">
         <q-btn
           class="full-width q-px-lg q-py-sm"
