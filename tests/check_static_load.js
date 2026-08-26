@@ -184,6 +184,20 @@ for (const page of pages) {
   }
 
   const html = page.templates.map(t => templateWithIncludes(t)).join('\n')
+  if (page.name === 'public tpos page (tpos.html)') {
+    const tapToPayBindings = html.match(
+      /:tap-to-pay-enabled="tapToPayEnabled"/g
+    )
+    const selector = registered['tpos-payment-method-selector']
+    if (
+      tapToPayBindings?.length !== 2 ||
+      !selector?.props?.tapToPayEnabled ||
+      !selector.template.includes('v-if="tapToPayEnabled"')
+    ) {
+      failures += 1
+      console.log('FAIL  Tap to Pay visibility is not wrapper-gated')
+    }
+  }
   for (const tag of usedComponentTags(html)) {
     if (registered[tag]) {
       console.log(`ok    <${tag}> is registered`)

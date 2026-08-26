@@ -172,6 +172,7 @@ window.app = Vue.createApp({
       enablePrint: false,
       enableRemote: false,
       wrapperMode: false,
+      tapToPayEnabled: false,
       receiptData: null,
       printText: '',
       orderReceipt: false,
@@ -1922,6 +1923,8 @@ window.app = Vue.createApp({
     this.enableRemote = Boolean(tpos.enable_remote)
     this.wrapperMode =
       new URL(window.location.href).searchParams.get('wrapper') === 'true'
+    this.tapToPayEnabled =
+      this.wrapperMode && Boolean(tpos.stripe_card_payments)
     this.fiatProvider = tpos.fiat_provider
     this.allowPriceAdjustment = tpos.allow_price_adjustment ?? true
     this.allowCashSettlement = Boolean(tpos.allow_cash_settlement)
