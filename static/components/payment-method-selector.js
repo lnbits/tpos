@@ -5,6 +5,7 @@ window.app.component('tpos-payment-method-selector', {
     currency: {type: String, required: true},
     currencySymbol: {type: String, required: true},
     fiatProvider: {type: Boolean, default: false},
+    tapToPayEnabled: {type: Boolean, default: false},
     allowCashSettlement: {type: Boolean, default: false},
     onchainEnabled: {type: Boolean, default: false},
     tabsEnabled: {type: Boolean, default: false},
@@ -79,7 +80,7 @@ window.app.component('tpos-payment-method-selector', {
           </div>
         </q-btn>
       </div>
-      <div class="col-6" v-if="fiatProvider">
+      <div class="col-6" v-if="tapToPayEnabled">
         <q-btn
           class="full-width q-px-lg q-py-sm"
           :size="drawer ? 'lg' : 'xl'"
