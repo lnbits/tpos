@@ -74,7 +74,7 @@ async def api_tpos_atm_authorize(tpos_id: str, data: AuthorizeAtm) -> LnurlCharg
     wallet = await get_wallet(tpos.wallet)
     account = await get_account(wallet.user) if wallet else None
     key = f"{ATM_AUTH_CACHE_PREFIX}{tpos_id}"
-    failures = cache.get(key, 0)
+    failures = cache.get(key, 0) or 0
     if failures >= ATM_AUTH_MAX_FAILURES:
         raise HTTPException(
             HTTPStatus.TOO_MANY_REQUESTS,
