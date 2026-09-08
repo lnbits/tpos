@@ -2,11 +2,13 @@ from http import HTTPStatus
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from lnbits.core.crud import (
+    get_account,
     get_wallet,
 )
 from lnbits.core.models import User
 from lnbits.core.models.misc import SimpleStatus
 from lnbits.decorators import check_user_exists
+from lnbits.utils.cache import cache
 from lnurl import (
     CallbackUrl,
     LnurlErrorResponse,
@@ -27,11 +29,17 @@ from .crud import (
     update_lnurlcharge,
 )
 from .models import (
+    AuthorizeAtm,
     CreateWithdrawPay,
     LnurlCharge,
 )
 
 tpos_atm_router = APIRouter(prefix="/api/v1/atm", tags=["TPoS ATM"])
+
+ATM_AUTH_CACHE_PREFIX = "tpos:atm:auth:"
+ATM_AUTH_WINDOW = 15 * 60
+ATM_AUTH_COOLDOWN = 60
+ATM_AUTH_MAX_FAILURES = 5
 
 
 @tpos_atm_router.post("/{tpos_id}/create")
@@ -51,12 +59,47 @@ async def api_tpos_atm_pin_check(
 
     if not tpos.can_withdraw:
         raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Withdrawals are not allowed at this time. Try again later.",
+            HTTPStatus.BAD_REQUEST,
+            "Withdrawals are not allowed at this time. Try again later.",
         )
+    return await create_lnurlcharge(tpos.id)
 
-    charge = await create_lnurlcharge(tpos.id)
-    return charge
+
+@tpos_atm_router.post("/{tpos_id}/authorize")
+async def api_tpos_atm_authorize(tpos_id: str, data: AuthorizeAtm) -> LnurlCharge:
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(HTTPStatus.NOT_FOUND, "TPoS does not exist.")
+
+    wallet = await get_wallet(tpos.wallet)
+    account = await get_account(wallet.user) if wallet else None
+    key = f"{ATM_AUTH_CACHE_PREFIX}{tpos_id}"
+    failures = cache.get(key, 0)
+    if failures >= ATM_AUTH_MAX_FAILURES:
+        raise HTTPException(
+            HTTPStatus.TOO_MANY_REQUESTS,
+            "Too many failed attempts. Try again later.",
+        )
+    if not account or not account.verify_password(data.password):
+        failures += 1
+        cache.set(
+            key,
+            failures,
+            expiry=(
+                ATM_AUTH_COOLDOWN
+                if failures >= ATM_AUTH_MAX_FAILURES
+                else ATM_AUTH_WINDOW
+            ),
+        )
+        raise HTTPException(HTTPStatus.UNAUTHORIZED, "Invalid credentials.")
+
+    cache.pop(key)
+    if not tpos.can_withdraw:
+        raise HTTPException(
+            HTTPStatus.BAD_REQUEST,
+            "Withdrawals are not allowed at this time. Try again later.",
+        )
+    return await create_lnurlcharge(tpos.id)
 
 
 @tpos_atm_router.get("/withdraw/{charge_id}/{amount}")

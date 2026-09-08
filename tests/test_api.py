@@ -1119,6 +1119,60 @@ async def test_atm_and_lnurl_withdraw_routes(client: AsyncClient, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_atm_create_requires_authenticated_tpos_owner(client: AsyncClient):
+    owner_account = Account(id=uuid4().hex, username=f"atmowner_{uuid4().hex[:8]}")
+    owner_account.hash_password("secret1234")
+    owner = await create_user_account_no_ckeck(account=owner_account)
+    other_account = Account(id=uuid4().hex, username=f"atmother_{uuid4().hex[:8]}")
+    other = await create_user_account_no_ckeck(account=other_account)
+
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(withdraw_limit=100),
+        headers={"X-API-KEY": owner.wallets[0].adminkey},
+    )
+    assert create.status_code == 201
+    tpos = create.json()
+
+    owner_create = await client.post(
+        f"/tpos/api/v1/atm/{tpos['id']}/create?usr={owner.id}"
+    )
+    assert owner_create.status_code == 200
+
+    authorize = await client.post(
+        f"/tpos/api/v1/atm/{tpos['id']}/authorize",
+        json={"password": "secret1234"},
+    )
+    assert authorize.status_code == 200
+
+    invalid = await client.post(
+        f"/tpos/api/v1/atm/{tpos['id']}/authorize",
+        json={"password": "wrong"},
+    )
+    assert invalid.status_code == 401
+    assert invalid.json()["detail"] == "Invalid credentials."
+    for _ in range(4):
+        invalid = await client.post(
+            f"/tpos/api/v1/atm/{tpos['id']}/authorize",
+            json={"password": "wrong"},
+        )
+        assert invalid.status_code == 401
+    locked = await client.post(
+        f"/tpos/api/v1/atm/{tpos['id']}/authorize",
+        json={"password": "secret1234"},
+    )
+    assert locked.status_code == 429
+
+    other_create = await client.post(
+        f"/tpos/api/v1/atm/{tpos['id']}/create?usr={other.id}"
+    )
+    assert other_create.status_code == 403
+    assert other_create.json()["detail"] == (
+        "You do not have access to this TPoS wallet."
+    )
+
+
+@pytest.mark.asyncio
 async def test_atm_pay_endpoint(client: AsyncClient, monkeypatch):
     user, wallet = await _user_with_tabs("atmpayuser")
     headers = {"X-API-KEY": wallet.adminkey}

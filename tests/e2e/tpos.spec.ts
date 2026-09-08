@@ -41,6 +41,80 @@ test('admin can create a terminal and add an item through the extracted dialogs'
   await expect(page.getByText(itemName, {exact: true})).toBeVisible()
 })
 
+test('ATM uses an owner session or password fallback and exits locally', async ({
+  page,
+  lnbitsServer
+}) => {
+  await login(page, lnbitsServer)
+  const merchantWallet = await superuserWallet(page)
+  const terminal = await createTpos(page, merchantWallet, {
+    name: `ATM terminal ${randomHex()}`,
+    currency: 'sats',
+    wallet: merchantWallet.id,
+    withdraw_limit: 100,
+    enable_remote: false
+  })
+
+  await page.goto(`/tpos/${terminal.id}`)
+  const directCreateRequest = page.waitForRequest(
+    request =>
+      request.method() === 'POST' &&
+      request.url().includes(`/tpos/api/v1/atm/${terminal.id}/create`)
+  )
+  await page
+    .locator('.q-fab:visible')
+    .first()
+    .getByRole('button')
+    .first()
+    .click()
+  await page.getByRole('button', {name: /^ATM$/}).click()
+  await directCreateRequest
+  await expect(
+    page.locator('.q-dialog').filter({hasText: 'Unlock ATM'})
+  ).toHaveCount(0)
+  await expect(page.locator('.atm-mode-border')).toBeVisible()
+  await page.getByRole('button', {name: /EXIT ATM/i}).click()
+  await expect(page.locator('.atm-mode-border')).toHaveCount(0)
+
+  await page.context().clearCookies()
+  await page.reload()
+  const unauthenticatedResponse = page.waitForResponse(
+    response =>
+      response.request().method() === 'POST' &&
+      response.url().endsWith(`/tpos/api/v1/atm/${terminal.id}/create`) &&
+      response.status() === 401
+  )
+  await page
+    .locator('.q-fab:visible')
+    .first()
+    .getByRole('button')
+    .first()
+    .click()
+  await page.getByRole('button', {name: /^ATM$/}).click()
+  await unauthenticatedResponse
+  const dialog = page
+    .locator('.q-dialog')
+    .filter({hasText: 'Unlock ATM'})
+    .last()
+  await expect(dialog).toBeVisible()
+  await expect(dialog.getByLabel('Password')).toBeVisible()
+  await expect(dialog.getByLabel('Username')).toHaveCount(0)
+
+  const authorizeRequest = page.waitForRequest(
+    request =>
+      request.method() === 'POST' &&
+      request.url().includes(`/tpos/api/v1/atm/${terminal.id}/authorize`)
+  )
+  await dialog.getByLabel('Password').fill(lnbitsServer.password)
+  await dialog.getByRole('button', {name: 'Enter ATM'}).click()
+  const authorize = await authorizeRequest
+  expect(authorize.postDataJSON()).toEqual({password: lnbitsServer.password})
+  await expect(page.locator('.atm-mode-border')).toBeVisible()
+
+  await page.getByRole('button', {name: /EXIT ATM/i}).click()
+  await expect(page.locator('.atm-mode-border')).toHaveCount(0)
+})
+
 test('public item checkout completes through Lightning with FakeWallet', async ({
   page,
   lnbitsServer
@@ -96,7 +170,9 @@ test('public item checkout completes through Lightning with FakeWallet', async (
       fallbackTile.evaluate(element => getComputedStyle(element).width)
     )
     .toBe('150px')
-  const tileSizeSlider = pos.locator('[aria-label="Tile size"]')
+  const tileSizeSlider = pos
+    .getByRole('slider', {name: 'Tile size'})
+    .locator('.q-slider__track-container')
   await expect(tileSizeSlider).toBeVisible()
   await tileSizeSlider.focus()
   await tileSizeSlider.press('ArrowRight', {delay: 50})
@@ -112,14 +188,6 @@ test('public item checkout completes through Lightning with FakeWallet', async (
       })
     )
     .toEqual({height: '200px', width: '200px'})
-  await expect
-    .poll(() =>
-      page.evaluate(key => {
-        const value = window.localStorage.getItem(key)
-        return value === null ? null : JSON.parse(value)
-      }, `lnbits.tpos.${terminal.id}.tileSize`)
-    )
-    .toBe(200)
   await page.reload()
   const restoredTile = pos
     .locator('div.flex.justify-center.gt-xs > div')
@@ -215,7 +283,7 @@ test('public item checkout completes through Lightning with FakeWallet', async (
 
   await page.setViewportSize({width: 500, height: 900})
   await page.reload()
-  await expect(pos.locator('[aria-label="Tile size"]')).toHaveCount(0)
+  await expect(pos.getByRole('slider', {name: 'Tile size'})).toHaveCount(0)
   await expect(pos.getByText(itemName, {exact: true}).last()).toBeVisible()
 })
 
