@@ -34,8 +34,11 @@ window.app = Vue.createApp({
       tipAmount: 0.0,
       tipRounding: null,
       hasNFC: false,
-      atmBox: false,
-      hidePin: true,
+      atmDialog: {
+        show: false,
+        loading: false,
+        password: ''
+      },
       atmMode: false,
       atmToken: '',
       nfcTagReading: false,
@@ -801,10 +804,32 @@ window.app = Vue.createApp({
     },
     exitAtmMode() {
       this.atmMode = false
+      this.atmToken = ''
+      if (this.connectionWithdraw) {
+        this.connectionWithdraw.close()
+        this.connectionWithdraw = null
+      }
       this.getRates()
       this.cancelAddAmount()
     },
-    startAtmMode() {
+    async startAtmMode() {
+      try {
+        const {data} = await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/atm/${this.tposId}/create`
+        )
+        this.enterAtmMode(data)
+      } catch (error) {
+        if ([401, 403].includes(error.response?.status)) {
+          this.atmDialog.show = true
+        } else {
+          LNbits.utils.notifyApiError(error)
+        }
+      }
+    },
+    enterAtmMode(data) {
+      if (data.claimed != false) return
+      this.atmToken = data.id
       if (!this.showPoS) {
         this.showPoS = true
       }
@@ -813,16 +838,26 @@ window.app = Vue.createApp({
       if (this.atmPremium > 0) {
         this.exchangeRate = this.exchangeRate / (1 + this.atmPremium)
       }
-      LNbits.api
-        .request('POST', `/tpos/api/v1/atm/${this.tposId}/create`)
-        .then(res => {
-          this.atmToken = res.data.id
-          if (res.data.claimed == false) {
-            this.atmBox = false
-            this.atmMode = true
-          }
-        })
-        .catch(LNbits.utils.notifyApiError)
+      this.atmMode = true
+      this.atmDialog.show = false
+      this.atmDialog.password = ''
+    },
+    async atmLogin() {
+      this.atmDialog.loading = true
+      try {
+        const {data} = await LNbits.api.request(
+          'POST',
+          `/tpos/api/v1/atm/${this.tposId}/authorize`,
+          null,
+          {password: this.atmDialog.password}
+        )
+        this.enterAtmMode(data)
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+        this.atmDialog.password = ''
+      } finally {
+        this.atmDialog.loading = false
+      }
     },
     lnaddressSubmit() {
       LNbits.api
@@ -894,10 +929,8 @@ window.app = Vue.createApp({
           this.connectionWithdraw.onmessage = e => {
             if (e.data == 'paid') {
               this.invoiceDialog.show = false
-              this.atmToken = ''
+              this.exitAtmMode()
               this.showComplete()
-              this.atmMode = false
-              this.connectionWithdraw.close()
             }
           }
           this.getRates()
@@ -1997,8 +2030,8 @@ window.app = Vue.createApp({
       // do nothing if the event was already processed
       if (event.defaultPrevented) return
 
-      // active only in the the PoS mode, not in the Cart mode or ATM pin
-      if (!this.showPoS || this.atmBox) return
+      // active only in the PoS mode, not in the Cart mode or ATM login
+      if (!this.showPoS || this.atmDialog.show) return
 
       // prevent weird behaviour when setting round tip
       if (this.tipDialog.show) return
