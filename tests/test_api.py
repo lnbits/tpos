@@ -1,5 +1,7 @@
 import asyncio
 import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -33,6 +35,7 @@ import tpos.views_payments as views_payments  # type: ignore[import]
 import tpos.views_wrapper as views_wrapper  # type: ignore[import]
 from tpos.crud import (  # type: ignore[import]
     create_tpos_payment,
+    get_pending_tpos_payments,
     get_tpos,
     get_tpos_payment_by_hash,
     update_tpos,
@@ -750,6 +753,7 @@ async def test_poll_onchain_payments_balance_updates_and_settlement(
         "onchain_balance": 20,
         "onchain_pending": 20,
         "payment_method": None,
+        "status": "pending",
     }
     assert payment_hash not in settle_calls
 
@@ -765,6 +769,7 @@ async def test_poll_onchain_payments_balance_updates_and_settlement(
         "onchain_balance": 42,
         "onchain_pending": 0,
         "payment_method": "onchain",
+        "status": "pending",
     }
     assert settle_calls.count(payment_hash) == 1
 
@@ -773,6 +778,83 @@ async def test_poll_onchain_payments_balance_updates_and_settlement(
     assert tpos_payment.balance == 42
     assert tpos_payment.pending == 0
     assert tpos_payment.paid is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("payment", "balance", "zero_conf", "expected_status"),
+    [
+        (
+            SimpleNamespace(
+                status=PaymentState.PENDING, is_expired=True, success=False
+            ),
+            {"confirmed": 0, "unconfirmed": 0},
+            True,
+            "expired",
+        ),
+        (
+            SimpleNamespace(status=PaymentState.FAILED, is_expired=True, success=False),
+            {"confirmed": 20, "unconfirmed": 0},
+            True,
+            "underpaid",
+        ),
+        (
+            SimpleNamespace(status=PaymentState.FAILED, is_expired=True, success=False),
+            {"confirmed": 0, "unconfirmed": 42},
+            False,
+            "pending",
+        ),
+        (None, {"confirmed": 0, "unconfirmed": 0}, True, "abandoned"),
+        (None, {"confirmed": 20, "unconfirmed": 0}, True, "underpaid"),
+        (
+            SimpleNamespace(
+                status=PaymentState.PENDING, is_expired=True, success=False
+            ),
+            RuntimeError("provider down"),
+            True,
+            "pending",
+        ),
+    ],
+)
+async def test_expired_onchain_payment_states(
+    monkeypatch, payment, balance, zero_conf, expected_status
+):
+    tpos_payment = TposPayment(
+        id=uuid4().hex,
+        tpos_id=uuid4().hex,
+        payment_hash=uuid4().hex,
+        amount=42,
+        onchain_address="bc1qexpired",
+        mempool_endpoint="https://mempool.example",
+        onchain_zero_conf=zero_conf,
+    )
+    await create_tpos_payment(tpos_payment)
+
+    async def stop_polling(_seconds):
+        raise RuntimeError("stop")
+
+    get_payment = AsyncMock(return_value=payment)
+    fetch_balance = AsyncMock(return_value=balance)
+    websocket = AsyncMock()
+    if isinstance(balance, Exception):
+        fetch_balance.side_effect = balance
+    monkeypatch.setattr(tpos_tasks, "get_standalone_payment", get_payment)
+    monkeypatch.setattr(tpos_tasks, "fetch_onchain_balance", fetch_balance)
+    monkeypatch.setattr(tpos_tasks, "websocket_updater", websocket)
+    monkeypatch.setattr(tpos_tasks.asyncio, "sleep", stop_polling)
+
+    with pytest.raises(RuntimeError, match="stop"):
+        await tpos_tasks.poll_onchain_payments()
+
+    saved = await get_tpos_payment_by_hash(tpos_payment.payment_hash)
+    assert saved is not None
+    assert saved.status.value == expected_status
+    pending_hashes = {
+        payment.payment_hash for payment in await get_pending_tpos_payments()
+    }
+    assert (tpos_payment.payment_hash in pending_hashes) is (
+        expected_status == "pending"
+    )
 
 
 @pytest.mark.asyncio
