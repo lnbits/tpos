@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from time import time
 from typing import Any, Literal
 
@@ -154,12 +155,30 @@ class Tpos(TposClean, BaseModel):
     tip_wallet: str | None = None
 
 
+class TposPaymentStatus(str, Enum):
+    PENDING = "pending"
+    PAID = "paid"
+    EXPIRED = "expired"
+    UNDERPAID = "underpaid"
+    ABANDONED = "abandoned"
+
+
+TERMINAL_PAYMENT_STATUSES = frozenset(
+    {
+        TposPaymentStatus.EXPIRED,
+        TposPaymentStatus.UNDERPAID,
+        TposPaymentStatus.ABANDONED,
+    }
+)
+
+
 class TposPayment(BaseModel):
     id: str
     tpos_id: str
     payment_hash: str
     amount: int = 0
     paid: bool = False
+    status: TposPaymentStatus = TposPaymentStatus.PENDING
     payment_method: str | None = None
     onchain_address: str | None = None
     onchain_wallet_id: str | None = None
