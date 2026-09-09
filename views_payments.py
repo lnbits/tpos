@@ -22,6 +22,7 @@ from .crud import (
 )
 from .helpers import inventory_tags_to_list
 from .models import (
+    TERMINAL_PAYMENT_STATUSES,
     CreateTposInvoice,
     InventorySale,
     PayLnurlWData,
@@ -385,8 +386,15 @@ async def api_tpos_check_invoice(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
+    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
     payment = await get_standalone_payment(payment_hash, incoming=True)
     if not payment:
+        if (
+            tpos_payment
+            and tpos_payment.tpos_id == tpos_id
+            and tpos_payment.status in TERMINAL_PAYMENT_STATUSES
+        ):
+            return {"paid": False, "status": tpos_payment.status.value}
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
         )
@@ -394,11 +402,18 @@ async def api_tpos_check_invoice(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
         )
-    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
-
     if extra:
         return _build_receipt_data(tpos, payment, tpos_payment).to_api_dict()
-    return {"paid": payment.success or bool(tpos_payment and tpos_payment.paid)}
+    response: dict[str, bool | str] = {
+        "paid": payment.success or bool(tpos_payment and tpos_payment.paid),
+    }
+    if (
+        tpos_payment
+        and tpos_payment.onchain_address
+        and tpos_payment.status in TERMINAL_PAYMENT_STATUSES
+    ):
+        response["status"] = tpos_payment.status.value
+    return response
 
 
 @tpos_payments_router.post(
