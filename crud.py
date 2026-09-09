@@ -157,7 +157,7 @@ async def get_pending_tpos_payments() -> list[TposPayment]:
     return await db.fetchall(
         """
         SELECT * FROM tpos.payments
-        WHERE paid = false AND onchain_address IS NOT NULL
+        WHERE paid = false AND status = 'pending' AND onchain_address IS NOT NULL
         ORDER BY created_at ASC
         """,
         model=TposPayment,

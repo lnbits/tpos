@@ -1393,6 +1393,24 @@ window.app = Vue.createApp({
         this.promptPrintType(paymentHash)
       }
     },
+    stopTerminalPayment(paymentHash, status) {
+      const ws = this.paymentWsByHash[paymentHash]
+      if (ws) ws.close()
+      delete this.paymentWsByHash[paymentHash]
+      if (this.invoiceDialog.data?.payment_hash !== paymentHash) return
+      if (this.invoiceDialog.paymentChecker) {
+        clearInterval(this.invoiceDialog.paymentChecker)
+        this.invoiceDialog.paymentChecker = null
+      }
+      this.invoiceDialog.show = false
+      Quasar.Notify.create({
+        type: 'warning',
+        message:
+          status === 'underpaid'
+            ? 'Onchain payment expired with insufficient funds. Reconcile the received amount manually in Watchonly.'
+            : 'Onchain payment expired. Check received funds manually in Watchonly.'
+      })
+    },
     startPaymentChecker(paymentHash) {
       if (this.invoiceDialog.paymentChecker) {
         clearInterval(this.invoiceDialog.paymentChecker)
@@ -1407,6 +1425,10 @@ window.app = Vue.createApp({
             clearInterval(this.invoiceDialog.paymentChecker)
             this.invoiceDialog.paymentChecker = null
             this.finalizeSuccessfulPayment(paymentHash)
+          } else if (
+            ['expired', 'underpaid', 'abandoned'].includes(data.status)
+          ) {
+            this.stopTerminalPayment(paymentHash, data.status)
           }
         } catch (error) {
           console.warn('TPoS payment status check failed:', error)
@@ -1432,6 +1454,10 @@ window.app = Vue.createApp({
             }
             this.finalizeSuccessfulPayment(paymentHash)
             ws.close()
+          } else if (
+            ['expired', 'underpaid', 'abandoned'].includes(payment.status)
+          ) {
+            this.stopTerminalPayment(paymentHash, payment.status)
           }
         }
         ws.onerror = err => {
