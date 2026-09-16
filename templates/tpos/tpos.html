@@ -102,6 +102,9 @@
     {% include "tpos/dialogs.html" %}
   </q-page>
 </q-page-container>
+<Teleport to="body">
+  <div v-if="atmMode" class="atm-mode-border" aria-hidden="true"></div>
+</Teleport>
 <template v-if="enablePrint">
   <Teleport to="body">
     <div
@@ -169,6 +172,16 @@
     padding: 8px;
     text-align: left;
   }
+
+  .atm-mode-border {
+    position: fixed;
+    inset: 0;
+    border: 5px solid #d32f2f;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 10000;
+  }
+
   @media screen {
     .receipt,
     .receipt-text {

@@ -16,6 +16,13 @@ class CreateWithdrawPay(BaseModel):
     pay_link: str
 
 
+class AuthorizeAtm(BaseModel):
+    password: str = Field(..., min_length=1, max_length=256)
+
+    class Config:
+        extra = "forbid"
+
+
 class CreateTposInvoiceTabSettlement(BaseModel):
     tab_id: str = Field(..., min_length=1)
     amount: float = Field(..., gt=0)
