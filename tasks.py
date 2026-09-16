@@ -19,6 +19,7 @@ from .crud import (
     get_tpos_payment_by_hash,
     update_tpos_payment,
 )
+from .models import TposPaymentStatus
 from .services import ensure_tpos_tabs_access
 from .services_inventory import deduct_inventory_stock
 from .services_onchain import fetch_onchain_balance
@@ -42,6 +43,17 @@ async def poll_onchain_payments():
             if not tpos_payment.onchain_address or not tpos_payment.mempool_endpoint:
                 continue
             try:
+                payment = await get_standalone_payment(
+                    tpos_payment.payment_hash, incoming=True
+                )
+                if payment and payment.success:
+                    await on_invoice_paid(payment)
+                    continue
+                expired = (
+                    not payment
+                    or payment.status == PaymentState.FAILED.value
+                    or payment.is_expired
+                )
                 balance = await fetch_onchain_balance(
                     tpos_payment.mempool_endpoint, tpos_payment.onchain_address
                 )
@@ -56,12 +68,31 @@ async def poll_onchain_payments():
                     tpos_payment.balance != settled_balance
                     or tpos_payment.pending != unconfirmed_balance
                 )
+                previous_status = tpos_payment.status
                 tpos_payment.balance = settled_balance
                 tpos_payment.pending = unconfirmed_balance
+                received = confirmed_balance + unconfirmed_balance
                 settled = settled_balance >= tpos_payment.amount
                 if settled:
                     tpos_payment.payment_method = "onchain"
-                if changed or settled:
+                    if not payment:
+                        # Funds arrived but the standalone invoice is gone:
+                        # record a terminal state for manual reconciliation.
+                        tpos_payment.status = TposPaymentStatus.ABANDONED
+                elif expired:
+                    if received == 0:
+                        tpos_payment.status = (
+                            TposPaymentStatus.EXPIRED
+                            if payment
+                            else TposPaymentStatus.ABANDONED
+                        )
+                    elif received < tpos_payment.amount:
+                        tpos_payment.status = TposPaymentStatus.UNDERPAID
+                    elif not payment:
+                        # Full amount received (unconfirmed) but the standalone
+                        # invoice is gone: cannot settle, reconcile manually.
+                        tpos_payment.status = TposPaymentStatus.ABANDONED
+                if changed or settled or tpos_payment.status != previous_status:
                     await update_tpos_payment(tpos_payment)
                     await websocket_updater(
                         tpos_payment.payment_hash,
@@ -72,13 +103,21 @@ async def poll_onchain_payments():
                                 "onchain_balance": tpos_payment.balance,
                                 "onchain_pending": tpos_payment.pending,
                                 "payment_method": tpos_payment.payment_method,
+                                "status": tpos_payment.status,
                             }
                         ),
                     )
-                if settled:
+                if settled and payment:
                     await settle_onchain_tpos_payment(tpos_payment)
             except Exception as exc:
-                logger.warning(f"tpos: onchain polling failed: {exc}")
+                logger.warning(
+                    "tpos: onchain polling failed for payment_hash={} address={} "
+                    "({}): {}",
+                    tpos_payment.payment_hash,
+                    tpos_payment.onchain_address,
+                    type(exc).__name__,
+                    exc,
+                )
         await asyncio.sleep(10)
 
 
@@ -94,6 +133,7 @@ async def on_invoice_paid(payment: Payment) -> None:
     tpos_payment = await get_tpos_payment_by_hash(payment.payment_hash)
     if tpos_payment and not tpos_payment.paid:
         tpos_payment.paid = True
+        tpos_payment.status = TposPaymentStatus.PAID
         tpos_payment.payment_method = payment_method
         await update_tpos_payment(tpos_payment)
 
