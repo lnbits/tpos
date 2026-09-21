@@ -1,3 +1,5 @@
+from typing import Any
+
 from lnbits.db import Database
 
 
@@ -332,4 +334,83 @@ async def m026_add_onchain_payment_status(db: Database):
     """)
     await db.execute("""
         UPDATE tpos.payments SET status = 'paid' WHERE paid = true;
+    """)
+
+
+async def m027_add_fiat_wallet(db: Database):
+    """
+    Add the fiat wallet used by cash settlement and fiat provider payments.
+    """
+    await db.execute("""
+        ALTER TABLE tpos.pos ADD fiat_wallet_id TEXT NULL;
+    """)
+
+
+async def m028_backfill_fiat_wallets(db: Database):
+    """
+    Assign a fiat wallet to every TPoS that settles cash or fiat provider payments.
+    """
+    # local imports: core modules are not importable while migrations load
+    from lnbits.core.db import db as core_db
+    from lnbits.utils.exchange_rates import allowed_currencies
+    from loguru import logger
+
+    from .services_fiat import create_user_fiat_wallet
+
+    allowed = allowed_currencies()
+    rows: list[Any] = await db.fetchall("""
+        SELECT id, wallet, currency
+        FROM tpos.pos
+        WHERE fiat_wallet_id IS NULL
+          AND currency IS NOT NULL
+          AND UPPER(currency) <> 'SATS'
+          AND (allow_cash_settlement = true OR fiat_provider IS NOT NULL)
+        """)
+    async with core_db.connect() as core_conn:
+        for row in rows:
+            disable_cash = False
+            try:
+                currency = (row["currency"] or "").upper()
+                if currency not in allowed:
+                    logger.warning(
+                        f"tpos: {currency} is not a supported fiat currency, "
+                        f"disabling cash settlement for TPoS {row['id']}"
+                    )
+                    disable_cash = True
+                else:
+                    owner = await core_conn.fetchone(
+                        'SELECT "user", deleted FROM wallets WHERE id = :id',
+                        {"id": row["wallet"]},
+                    )
+                    if not owner or owner["deleted"]:
+                        logger.warning(
+                            f"tpos: TPoS {row['id']} has no owner wallet, "
+                            "disabling cash settlement"
+                        )
+                        disable_cash = True
+                    else:
+                        wallet = await create_user_fiat_wallet(
+                            owner["user"], currency, conn=core_conn
+                        )
+                        await db.execute(
+                            """
+                            UPDATE tpos.pos SET fiat_wallet_id = :fiat_wallet_id
+                            WHERE id = :id
+                            """,
+                            {"fiat_wallet_id": wallet.id, "id": row["id"]},
+                        )
+            except Exception as exc:
+                logger.warning(
+                    f"tpos: could not assign a fiat wallet to TPoS {row['id']}: {exc}"
+                )
+                disable_cash = True
+            if disable_cash:
+                await db.execute(
+                    "UPDATE tpos.pos SET allow_cash_settlement = false WHERE id = :id",
+                    {"id": row["id"]},
+                )
+
+    await db.execute("""
+        UPDATE tpos.pos SET allow_cash_settlement = false
+        WHERE currency IS NULL OR UPPER(currency) = 'SATS';
     """)
