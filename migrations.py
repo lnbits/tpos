@@ -324,3 +324,12 @@ async def m025_add_tabs_integration_settings(db: Database):
     await db.execute("""
         ALTER TABLE tpos.pos ADD tabs_allow_create BOOLEAN DEFAULT false;
     """)
+
+
+async def m026_add_onchain_payment_status(db: Database):
+    await db.execute("""
+        ALTER TABLE tpos.payments ADD status TEXT NOT NULL DEFAULT 'pending';
+    """)
+    await db.execute("""
+        UPDATE tpos.payments SET status = 'paid' WHERE paid = true;
+    """)
