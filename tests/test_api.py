@@ -18,7 +18,7 @@ from lnbits.core.services import (
 )
 from lnbits.core.services.users import create_user_account_no_ckeck
 from lnbits.settings import settings
-from lnbits.tasks import internal_invoice_queue
+from lnbits.task_manager import task_manager
 from tabs.crud import (  # type: ignore[import]
     get_tab_by_id,
     get_tab_entries,
@@ -76,7 +76,7 @@ async def _user_with_tabs(username: str = "tposuser"):
 async def _drain_internal_invoice_queue() -> None:
     while True:
         try:
-            internal_invoice_queue.get_nowait()
+            task_manager.internal_invoice_queue.get_nowait()
         except asyncio.QueueEmpty:
             return
 
@@ -492,9 +492,10 @@ async def test_remote_invoice_payload_keeps_fiat_tip_amount(
 
 @pytest.mark.asyncio
 async def test_terminal_invoice_keeps_reader_and_tap_to_pay_payload(
-    client: AsyncClient, monkeypatch
+    client: AsyncClient, monkeypatch, enable_stripe
 ):
     _user, wallet = await _user_with_tabs("terminaluser")
+    enable_stripe(_user.id)
     headers = {"X-API-KEY": wallet.adminkey}
     create = await client.post(
         "/tpos/api/v1/tposs",

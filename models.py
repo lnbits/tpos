@@ -164,6 +164,26 @@ class Tpos(TposClean, BaseModel):
     fiat_wallet_id: str | None = None
 
 
+class TposWalletOption(BaseModel):
+    """Wallet data for the admin UI — never carries keys."""
+
+    id: str
+    name: str
+    currency: str | None = None
+    balance_msat: int = 0
+
+
+class TposWallets(BaseModel):
+    can_create_fiat_wallet: bool
+    lightning_wallets: list[TposWalletOption] = Field(default_factory=list)
+    fiat_wallets: list[TposWalletOption] = Field(default_factory=list)
+
+
+class CreateFiatWalletData(BaseModel):
+    currency: str = Field(..., min_length=3, max_length=3)
+    name: str | None = Field(None, max_length=64)
+
+
 class TposPaymentStatus(str, Enum):
     PENDING = "pending"
     PAID = "paid"

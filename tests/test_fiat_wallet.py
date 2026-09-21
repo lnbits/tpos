@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from httpx import AsyncClient
 from lnbits.core.crud.wallets import create_wallet, delete_wallet, update_wallet
 from lnbits.core.models.users import Account
 from lnbits.core.models.wallets import WalletType
@@ -23,6 +24,26 @@ async def _user(username: str):
     account = Account(id=uuid4().hex, username=username)
     user = await create_user_account_no_ckeck(account=account)
     return user, user.wallets[0]
+
+
+def _tpos_payload(**overrides) -> dict:
+    payload = {
+        "wallet": None,
+        "name": "Fiat TPoS",
+        "currency": "EUR",
+        "business_name": "Fiat Shop",
+        "business_address": "1 Market Street",
+        "business_vat_id": "VAT123",
+        "tip_options": "[]",
+        "tip_wallet": "",
+        "withdraw_between": 1,
+        "withdraw_limit": 100,
+        "withdraw_time_option": "secs",
+        "enable_receipt_print": True,
+        "enable_remote": True,
+    }
+    payload.update(overrides)
+    return payload
 
 
 async def _add_tpos(
@@ -193,3 +214,229 @@ async def test_create_user_fiat_wallet_rejects_unsupported_currency():
 
     assert exc.value.status_code == 400
     assert await get_user_fiat_wallets(user.id) == []
+
+
+@pytest.mark.asyncio
+async def test_cash_settlement_needs_no_superuser(client: AsyncClient):
+    user, wallet = await _user("fiat_cash_api")
+    assert not user.super_user
+
+    response = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(allow_cash_settlement=True),
+        headers={"X-API-KEY": wallet.adminkey},
+    )
+
+    assert response.status_code == 201, response.text
+    tpos = response.json()
+    assert tpos["fiat_wallet_id"]
+    fiat_wallet = await find_fiat_wallet(user.id, "EUR")
+    assert fiat_wallet and fiat_wallet.id == tpos["fiat_wallet_id"]
+    assert fiat_wallet.currency == "EUR"
+    assert fiat_wallet.user == user.id
+
+
+@pytest.mark.asyncio
+async def test_tpos_requires_a_lightning_wallet(client: AsyncClient):
+    user, _ = await _user("fiat_key_rejected")
+    fiat_wallet = await create_user_fiat_wallet(user.id, "EUR")
+
+    response = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(),
+        headers={"X-API-KEY": fiat_wallet.adminkey},
+    )
+
+    assert response.status_code == 400
+    assert "Lightning wallet" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_card_payments_require_admin_enablement(
+    client: AsyncClient, enable_stripe
+):
+    user, wallet = await _user("fiat_card_api")
+    headers = {"X-API-KEY": wallet.adminkey}
+    payload = _tpos_payload(fiat_provider="stripe")
+
+    refused = await client.post("/tpos/api/v1/tposs", json=payload, headers=headers)
+    assert refused.status_code == 400
+    assert "Card payments are not enabled" in refused.json()["detail"]
+
+    enable_stripe(user.id)
+    allowed = await client.post("/tpos/api/v1/tposs", json=payload, headers=headers)
+
+    assert allowed.status_code == 201, allowed.text
+    fiat_wallet = await find_fiat_wallet(user.id, "EUR")
+    assert allowed.json()["fiat_wallet_id"] == (fiat_wallet and fiat_wallet.id)
+
+
+@pytest.mark.asyncio
+async def test_explicit_fiat_wallet_is_validated(client: AsyncClient):
+    user, wallet = await _user("fiat_explicit")
+    other_user, _ = await _user("fiat_explicit_other")
+    own = await create_user_fiat_wallet(user.id, "EUR")
+    other = await create_user_fiat_wallet(other_user.id, "EUR")
+    usd = await create_user_fiat_wallet(user.id, "USD")
+    headers = {"X-API-KEY": wallet.adminkey}
+
+    accepted = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(
+            name="Explicit", allow_cash_settlement=True, fiat_wallet_id=own.id
+        ),
+        headers=headers,
+    )
+    assert accepted.status_code == 201, accepted.text
+    assert accepted.json()["fiat_wallet_id"] == own.id
+
+    cases = {
+        other.id: 403,
+        wallet.id: 400,
+        usd.id: 400,
+        "does-not-exist": 400,
+    }
+    for wallet_id, status in cases.items():
+        response = await client.post(
+            "/tpos/api/v1/tposs",
+            json=_tpos_payload(
+                name=f"Bad {wallet_id}",
+                allow_cash_settlement=True,
+                fiat_wallet_id=wallet_id,
+            ),
+            headers=headers,
+        )
+        assert response.status_code == status, response.text
+
+
+@pytest.mark.asyncio
+async def test_update_reresolves_the_fiat_wallet(client: AsyncClient):
+    user, wallet = await _user("fiat_update")
+    headers = {"X-API-KEY": wallet.adminkey}
+    created = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(allow_cash_settlement=True),
+        headers=headers,
+    )
+    tpos_id = created.json()["id"]
+    eur_wallet_id = created.json()["fiat_wallet_id"]
+
+    usd = await client.put(
+        f"/tpos/api/v1/tposs/{tpos_id}",
+        json=_tpos_payload(currency="USD", allow_cash_settlement=True),
+        headers=headers,
+    )
+    assert usd.status_code == 200, usd.text
+    usd_wallet_id = usd.json()["fiat_wallet_id"]
+    assert usd_wallet_id and usd_wallet_id != eur_wallet_id
+
+    sats = await client.put(
+        f"/tpos/api/v1/tposs/{tpos_id}",
+        json=_tpos_payload(currency="sats", allow_cash_settlement=True),
+        headers=headers,
+    )
+    assert sats.status_code == 200, sats.text
+    assert sats.json()["fiat_wallet_id"] is None
+    assert sats.json()["allow_cash_settlement"] is False
+
+    back_to_eur = await client.put(
+        f"/tpos/api/v1/tposs/{tpos_id}",
+        json=_tpos_payload(currency="EUR", allow_cash_settlement=True),
+        headers=headers,
+    )
+    assert back_to_eur.json()["fiat_wallet_id"] == eur_wallet_id
+
+    released = await client.put(
+        f"/tpos/api/v1/tposs/{tpos_id}",
+        json=_tpos_payload(currency="EUR", allow_cash_settlement=False),
+        headers=headers,
+    )
+    assert released.json()["fiat_wallet_id"] is None
+    assert len(await get_user_fiat_wallets(user.id)) == 2
+
+
+@pytest.mark.asyncio
+async def test_wallet_endpoints_share_and_never_leak_keys(client: AsyncClient):
+    user, wallet = await _user("fiat_wallets_api")
+    headers = {"X-API-KEY": wallet.adminkey}
+    for name in ("First", "Second"):
+        created = await client.post(
+            "/tpos/api/v1/tposs",
+            json=_tpos_payload(name=name, allow_cash_settlement=True),
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+
+    tposs = await client.get("/tpos/api/v1/tposs", headers=headers)
+    wallet_ids = {tpos["fiat_wallet_id"] for tpos in tposs.json()}
+    assert len(wallet_ids) == 1 and None not in wallet_ids
+
+    existing = await client.post(
+        "/tpos/api/v1/fiat/wallets", json={"currency": "eur"}, headers=headers
+    )
+    assert existing.status_code == 200, existing.text
+    assert existing.json()["id"] in wallet_ids
+    assert len(await get_user_fiat_wallets(user.id)) == 1
+
+    new_wallet = await client.post(
+        "/tpos/api/v1/fiat/wallets", json={"currency": "USD"}, headers=headers
+    )
+    assert new_wallet.status_code == 201, new_wallet.text
+    assert new_wallet.json()["currency"] == "USD"
+
+    bad_currency = await client.post(
+        "/tpos/api/v1/fiat/wallets", json={"currency": "XYZ"}, headers=headers
+    )
+    assert bad_currency.status_code == 400
+
+    status = await client.get(
+        "/tpos/api/v1/wallets", headers={"X-API-KEY": wallet.inkey}
+    )
+    assert status.status_code == 200, status.text
+    status_json = status.json()
+    assert status_json["can_create_fiat_wallet"] is False
+    assert [item["id"] for item in status_json["lightning_wallets"]] == [wallet.id]
+    assert {item["currency"] for item in status_json["fiat_wallets"]} == {"EUR", "USD"}
+    assert "adminkey" not in status.text and "inkey" not in status.text
+
+
+@pytest.mark.asyncio
+async def test_legacy_provider_tpos_is_tolerated_until_it_changes(
+    client: AsyncClient, enable_stripe
+):
+    user, wallet = await _user("fiat_legacy_provider")
+    enable_stripe(user.id)
+    headers = {"X-API-KEY": wallet.adminkey}
+    created = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(name="Legacy", fiat_provider="stripe"),
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    tpos_id = created.json()["id"]
+    # un-backfillable legacy state: provider kept, no fiat wallet assigned
+    async with db.connect() as conn:
+        await conn.execute(
+            """
+            UPDATE tpos.pos
+            SET currency = 'XYZ', fiat_wallet_id = NULL
+            WHERE id = :id
+            """,
+            {"id": tpos_id},
+        )
+
+    tolerated = await client.put(
+        f"/tpos/api/v1/tposs/{tpos_id}",
+        json=_tpos_payload(name="Renamed", currency="XYZ", fiat_provider="stripe"),
+        headers=headers,
+    )
+    assert tolerated.status_code == 200, tolerated.text
+    assert tolerated.json()["fiat_wallet_id"] is None
+
+    refused = await client.put(
+        f"/tpos/api/v1/tposs/{tpos_id}",
+        json=_tpos_payload(name="Renamed", currency="XYZ", fiat_provider="paypal"),
+        headers=headers,
+    )
+    assert refused.status_code == 400
+    assert "Card payments are not enabled" in refused.json()["detail"]

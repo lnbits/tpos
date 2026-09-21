@@ -1,15 +1,18 @@
 import json
 from http import HTTPStatus
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from lnbits.core.crud import (
     get_user,
 )
+from lnbits.core.crud.wallets import get_wallets
 from lnbits.core.models import WalletTypeInfo
+from lnbits.core.models.wallets import Wallet, WalletType
 from lnbits.decorators import (
     require_admin_key,
     require_invoice_key,
 )
+from lnbits.settings import settings
 from lnurl import LnurlPayResponse
 from lnurl import handle as lnurl_handle
 
@@ -25,9 +28,17 @@ from .helpers import (
     inventory_tags_to_string,
 )
 from .models import (
+    CreateFiatWalletData,
     CreateTposData,
     CreateUpdateItemData,
     Tpos,
+    TposWalletOption,
+    TposWallets,
+)
+from .services_fiat import (
+    create_user_fiat_wallet,
+    find_fiat_wallet,
+    resolve_tpos_fiat_wallet,
 )
 from .services_inventory import (
     get_default_inventory,
@@ -65,6 +76,11 @@ async def api_tposs(
 async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
 ):
+    if wallet.wallet.wallet_type == WalletType.FIAT.value:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="A TPoS requires a Lightning wallet.",
+        )
     data.wallet = wallet.wallet.id
     await _validate_watchonly_settings(
         wallet=wallet.wallet,
@@ -74,10 +90,9 @@ async def api_tpos_create(
     if not data.tabs_enabled:
         data.tabs_allow_create = False
     user = await get_user(wallet.wallet.user)
-    if not (user and user.super_user):
-        data.allow_cash_settlement = False
     if data.currency == "sats":
         data.allow_cash_settlement = False
+        data.fiat_provider = None
     if data.use_inventory and not inventory_available_for_user(user):
         data.use_inventory = False
     if data.use_inventory and not data.inventory_id:
@@ -88,6 +103,13 @@ async def api_tpos_create(
             data.inventory_id = inventory.get("id")
             data.inventory_tags = inventory.get("tags")
             data.inventory_omit_tags = inventory.get("omit_tags")
+    data.fiat_wallet_id = await resolve_tpos_fiat_wallet(
+        user_id=wallet.wallet.user,
+        currency=data.currency,
+        cash_settlement=data.allow_cash_settlement,
+        fiat_provider=data.fiat_provider,
+        requested_id=data.fiat_wallet_id,
+    )
     tpos = await create_tpos(data)
     return tpos
 
@@ -125,12 +147,20 @@ async def api_tpos_update(
     desired_currency = update_payload.get("currency", tpos.currency)
     if desired_currency == "sats":
         update_payload["allow_cash_settlement"] = False
-    if "allow_cash_settlement" in update_payload:
-        if update_payload["allow_cash_settlement"] and not (user and user.super_user):
-            raise HTTPException(
-                status_code=HTTPStatus.FORBIDDEN,
-                detail="Cash settlement can only be enabled by super users.",
-            )
+        update_payload["fiat_provider"] = None
+    update_payload["fiat_wallet_id"] = await resolve_tpos_fiat_wallet(
+        user_id=wallet.wallet.user,
+        currency=desired_currency,
+        cash_settlement=update_payload.get(
+            "allow_cash_settlement", tpos.allow_cash_settlement
+        ),
+        fiat_provider=update_payload.get("fiat_provider", tpos.fiat_provider),
+        requested_id=update_payload.get("fiat_wallet_id"),
+        provider_changed=(
+            "fiat_provider" in update_payload
+            and update_payload["fiat_provider"] != tpos.fiat_provider
+        ),
+    )
     if update_payload.get("use_inventory") and not update_payload.get("inventory_id"):
         inventory = await get_default_inventory(wallet.wallet.user)
         if inventory:
@@ -157,6 +187,51 @@ async def api_tpos_update(
         setattr(tpos, field, value)
     tpos = await update_tpos(tpos)
     return tpos
+
+
+def _wallet_option(wallet: Wallet) -> TposWalletOption:
+    return TposWalletOption(
+        id=wallet.id,
+        name=wallet.name,
+        currency=wallet.currency,
+        balance_msat=wallet.balance_msat,
+    )
+
+
+@tpos_api_router.get("/api/v1/wallets", status_code=HTTPStatus.OK)
+async def api_tpos_wallets(
+    key_info: WalletTypeInfo = Depends(require_invoice_key),
+) -> TposWallets:
+    user_id = key_info.wallet.user
+    lightning_wallets: list[TposWalletOption] = []
+    fiat_wallets: list[TposWalletOption] = []
+    for wallet in await get_wallets(user_id):
+        if wallet.wallet_type == WalletType.FIAT.value:
+            fiat_wallets.append(_wallet_option(wallet))
+        elif wallet.can_receive_payments:
+            lightning_wallets.append(_wallet_option(wallet))
+    return TposWallets(
+        can_create_fiat_wallet=settings.can_create_fiat_wallet(user_id),
+        lightning_wallets=lightning_wallets,
+        fiat_wallets=fiat_wallets,
+    )
+
+
+@tpos_api_router.post("/api/v1/fiat/wallets", status_code=HTTPStatus.CREATED)
+async def api_tpos_create_fiat_wallet(
+    data: CreateFiatWalletData,
+    response: Response,
+    wallet: WalletTypeInfo = Depends(require_admin_key),
+) -> TposWalletOption:
+    currency = data.currency.upper()
+    existing = await find_fiat_wallet(wallet.wallet.user, currency)
+    if existing:
+        response.status_code = HTTPStatus.OK
+        return _wallet_option(existing)
+    created = await create_user_fiat_wallet(
+        wallet.wallet.user, currency, name=data.name
+    )
+    return _wallet_option(created)
 
 
 @tpos_api_router.delete("/api/v1/tposs/{tpos_id}")
