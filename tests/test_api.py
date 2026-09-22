@@ -527,9 +527,10 @@ async def test_terminal_invoice_keeps_reader_and_tap_to_pay_payload(
         status=PaymentState.PENDING,
     )
     captured_invoice_data = []
+    captured_wallet_ids = []
 
     async def fake_create_payment_request(wallet_id, invoice_data):
-        assert wallet_id == wallet.id
+        captured_wallet_ids.append(wallet_id)
         captured_invoice_data.append(invoice_data)
         return payment
 
@@ -559,6 +560,9 @@ async def test_terminal_invoice_keeps_reader_and_tap_to_pay_payload(
 
     assert invoice_response.status_code == 201
     assert invoice_response.json()["payment_request"] == "tap_to_pay"
+    # the card payment is booked to the TPoS fiat wallet, not the lightning one
+    assert tpos["fiat_wallet_id"]
+    assert captured_wallet_ids == [tpos["fiat_wallet_id"]]
     invoice_data = captured_invoice_data[0]
     assert invoice_data.unit == "USD"
     assert invoice_data.amount == 6

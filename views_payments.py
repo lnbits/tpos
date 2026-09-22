@@ -38,6 +38,7 @@ from .models import (
     TposPayment,
 )
 from .services import ensure_tpos_tabs_access
+from .services_fiat import get_valid_tpos_fiat_wallet
 from .services_onchain import fetch_onchain_address
 from .services_tabs import get_tab_for_tpos, tab_settlement_tolerance
 from .views_onchain import _validate_watchonly_settings
@@ -106,6 +107,17 @@ async def api_tpos_create_invoice(
             status_code=HTTPStatus.FORBIDDEN,
             detail="Onchain payments are not enabled for this TPoS.",
         )
+    settlement_wallet = None
+    if cash_method or (data.pay_in_fiat and tpos.fiat_provider):
+        settlement_wallet = await get_valid_tpos_fiat_wallet(tpos)
+        if cash_method and not settlement_wallet:
+            raise HTTPException(
+                status_code=HTTPStatus.CONFLICT,
+                detail=(
+                    f"Cash settlement needs a fiat wallet in {tpos.currency} "
+                    "for this TPoS."
+                ),
+            )
     tab_settlement = data.tab_settlement
     if tab_settlement:
         user_id = await ensure_tpos_tabs_access(tpos)
@@ -134,6 +146,29 @@ async def api_tpos_create_invoice(
     if data.pay_in_fiat:
         amount = (data.amount_fiat or 0.0) + (data.tip_amount_fiat or 0.0)
 
+    if cash_method or onchain_method:
+        wallet = await get_wallet(tpos.wallet)
+        account = await get_account(wallet.user) if wallet else None
+        if onchain_method and account and not account.is_super_user:
+            raise HTTPException(
+                status_code=HTTPStatus.BAD_REQUEST,
+                detail="This tpos cannot create onchain invoices.",
+            )
+        if account:
+            existing = {label.name for label in account.extra.labels or []}
+            label_name = "cash" if cash_method else "onchain"
+            label_description = "Cash payment" if cash_method else "Onchain payment"
+            label_color = "#FFC107" if cash_method else "#ED8403"
+            if label_name not in existing:
+                account.extra.labels.append(
+                    UserLabel(
+                        name=label_name,
+                        description=label_description,
+                        color=label_color,
+                    )
+                )
+                await update_account(account)
+
     try:
         extra = {
             "tag": "tpos",
@@ -150,31 +185,6 @@ async def api_tpos_create_invoice(
         }
         if tab_settlement:
             extra["tab_settlement"] = tab_settlement.dict()
-        if cash_method or onchain_method:
-            wallet = await get_wallet(tpos.wallet)
-            if wallet:
-                account = await get_account(wallet.user)
-                if account:
-                    if not account.is_super_user:
-                        raise HTTPException(
-                            status_code=HTTPStatus.BAD_REQUEST,
-                            detail="This tpos cannot create cash or onchain invoices.",
-                        )
-                    existing = {label.name for label in account.extra.labels or []}
-                    label_name = "cash" if cash_method else "onchain"
-                    label_description = (
-                        "Cash payment" if cash_method else "Onchain payment"
-                    )
-                    label_color = "#FFC107" if cash_method else "#ED8403"
-                    if label_name not in existing:
-                        account.extra.labels.append(
-                            UserLabel(
-                                name=label_name,
-                                description=label_description,
-                                color=label_color,
-                            )
-                        )
-                        await update_account(account)
         if inventory_payload:
             extra["inventory"] = inventory_payload.dict()
         if data.pay_in_fiat:
@@ -195,7 +205,9 @@ async def api_tpos_create_invoice(
             internal=bool(cash_method or onchain_method),
             labels=["cash"] if cash_method else (["onchain"] if onchain_method else []),
         )
-        payment = await create_payment_request(tpos.wallet, invoice_data)
+        payment = await create_payment_request(
+            settlement_wallet.id if settlement_wallet else tpos.wallet, invoice_data
+        )
         if cash_method:
             new_checking_id = f"internal_cash_{payment.payment_hash}"
             await update_payment_checking_id(payment.checking_id, new_checking_id)

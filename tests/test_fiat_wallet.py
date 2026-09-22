@@ -5,13 +5,17 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
+from lnbits.core.crud.payments import create_payment
 from lnbits.core.crud.wallets import create_wallet, delete_wallet, update_wallet
+from lnbits.core.models import CreatePayment, PaymentState
 from lnbits.core.models.users import Account
 from lnbits.core.models.wallets import WalletType
 from lnbits.core.services.users import create_user_account_no_ckeck
 from lnbits.db import Connection
 
-from tpos.crud import db  # type: ignore[import]
+import tpos.tasks as tpos_tasks  # type: ignore[import]
+import tpos.views_payments as views_payments  # type: ignore[import]
+from tpos.crud import db, get_latest_tpos_payments  # type: ignore[import]
 from tpos.migrations import m028_backfill_fiat_wallets  # type: ignore[import]
 from tpos.services_fiat import (  # type: ignore[import]
     create_user_fiat_wallet,
@@ -81,6 +85,35 @@ async def _tpos_row(conn: Connection, tpos_id: str) -> dict:
         {"id": tpos_id},
     )
     return dict(row)
+
+
+async def _cash_payment(
+    *,
+    wallet_id: str,
+    tpos_id: str,
+    tip_amount: int | None = None,
+    fiat_method: str = "cash",
+):
+    """A settled tpos payment, as core stores it for a fiat wallet."""
+    payment_hash = uuid4().hex
+    return await create_payment(
+        f"internal_cash_{payment_hash}",
+        CreatePayment(
+            wallet_id=wallet_id,
+            payment_hash=payment_hash,
+            bolt11=f"lnbc1{payment_hash}",
+            amount_msat=1000,
+            memo="Cash sale",
+            extra={
+                "tag": "tpos",
+                "tpos_id": tpos_id,
+                "amount": 1,
+                "fiat_method": fiat_method,
+                "tip_amount": tip_amount,
+            },
+        ),
+        status=PaymentState.SUCCESS,
+    )
 
 
 @pytest.mark.asyncio
@@ -283,13 +316,258 @@ async def test_card_payments_require_admin_enablement(
     refused = await client.post("/tpos/api/v1/tposs", json=payload, headers=headers)
     assert refused.status_code == 400
     assert "Card payments are not enabled" in refused.json()["detail"]
-
     enable_stripe(user.id)
     allowed = await client.post("/tpos/api/v1/tposs", json=payload, headers=headers)
 
     assert allowed.status_code == 201, allowed.text
     fiat_wallet = await find_fiat_wallet(user.id, "EUR")
     assert allowed.json()["fiat_wallet_id"] == (fiat_wallet and fiat_wallet.id)
+
+
+async def _create_cash_tpos(client: AsyncClient, wallet, **overrides) -> dict:
+    response = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(allow_cash_settlement=True, **overrides),
+        headers={"X-API-KEY": wallet.adminkey},
+    )
+    assert response.status_code == 201, response.text
+    tpos = response.json()
+    assert tpos["fiat_wallet_id"]
+    return tpos
+
+
+@pytest.mark.asyncio
+async def test_cash_invoice_is_created_on_the_fiat_wallet(
+    client: AsyncClient, monkeypatch
+):
+    user, wallet = await _user("fiat_cash_pay")
+    assert not user.super_user
+    tpos = await _create_cash_tpos(client, wallet)
+    payment = await _cash_payment(wallet_id=tpos["fiat_wallet_id"], tpos_id=tpos["id"])
+    created_on = []
+
+    async def fake_create_payment_request(wallet_id, invoice_data):
+        created_on.append(wallet_id)
+        return payment
+
+    queued = []
+
+    async def fake_internal_invoice_queue_put(checking_id):
+        queued.append(checking_id)
+
+    monkeypatch.setattr(
+        views_payments, "create_payment_request", fake_create_payment_request
+    )
+    monkeypatch.setattr(
+        views_payments, "internal_invoice_queue_put", fake_internal_invoice_queue_put
+    )
+
+    response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={
+            "amount": 1,
+            "amount_fiat": 1,
+            "exchange_rate": 1,
+            "pay_in_fiat": True,
+            "fiat_method": "cash",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["payment_request"] == "cash"
+    assert created_on == [tpos["fiat_wallet_id"]]
+
+    validated = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/"
+        f"{payment.payment_hash}/cash/validate"
+    )
+    assert validated.status_code == 200, validated.text
+    assert queued == [payment.checking_id]
+
+
+@pytest.mark.asyncio
+async def test_cash_invoice_needs_a_live_fiat_wallet(client: AsyncClient):
+    user, wallet = await _user("fiat_cash_gone")
+    tpos = await _create_cash_tpos(client, wallet)
+    await delete_wallet(user.id, tpos["fiat_wallet_id"])
+
+    response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={
+            "amount": 1,
+            "amount_fiat": 1,
+            "exchange_rate": 1,
+            "pay_in_fiat": True,
+            "fiat_method": "cash",
+        },
+    )
+
+    assert response.status_code == 409
+    assert "fiat wallet" in response.json()["detail"]
+    assert await get_latest_tpos_payments(tpos["id"]) == []
+
+
+@pytest.mark.asyncio
+async def test_fiat_checkout_without_a_provider_stays_on_the_lightning_wallet(
+    client: AsyncClient, monkeypatch
+):
+    _account, wallet = await _user("fiat_no_provider")
+    tpos = await _create_cash_tpos(client, wallet)
+    payment = await _cash_payment(
+        wallet_id=wallet.id, tpos_id=tpos["id"], fiat_method="checkout"
+    )
+    created_on = []
+
+    async def fake_create_payment_request(wallet_id, invoice_data):
+        created_on.append(wallet_id)
+        return payment
+
+    monkeypatch.setattr(
+        views_payments, "create_payment_request", fake_create_payment_request
+    )
+
+    response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={
+            "amount": 1,
+            "amount_fiat": 1,
+            "exchange_rate": 1,
+            "pay_in_fiat": True,
+            "fiat_method": "checkout",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert created_on == [wallet.id]
+
+
+@pytest.mark.asyncio
+async def test_legacy_provider_payment_stays_on_the_lightning_wallet(
+    client: AsyncClient, monkeypatch, enable_stripe
+):
+    user, wallet = await _user("fiat_legacy_pay")
+    enable_stripe(user.id)
+    created = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(fiat_provider="stripe"),
+        headers={"X-API-KEY": wallet.adminkey},
+    )
+    assert created.status_code == 201, created.text
+    tpos = created.json()
+    assert tpos["fiat_wallet_id"]
+    # un-backfillable legacy state: provider kept, no fiat wallet assigned
+    async with db.connect() as conn:
+        await conn.execute(
+            "UPDATE tpos.pos SET fiat_wallet_id = NULL WHERE id = :id",
+            {"id": tpos["id"]},
+        )
+
+    payment = await _cash_payment(
+        wallet_id=wallet.id, tpos_id=tpos["id"], fiat_method="terminal"
+    )
+    created_on = []
+
+    async def fake_create_payment_request(wallet_id, invoice_data):
+        created_on.append(wallet_id)
+        return payment
+
+    monkeypatch.setattr(
+        views_payments, "create_payment_request", fake_create_payment_request
+    )
+
+    response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={
+            "amount": 1,
+            "amount_fiat": 5,
+            "exchange_rate": 5,
+            "pay_in_fiat": True,
+            "fiat_method": "terminal",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert created_on == [wallet.id]
+
+
+@pytest.mark.asyncio
+async def test_onchain_invoice_still_requires_a_superuser(client: AsyncClient):
+    user, wallet = await _user("fiat_onchain_gate")
+    assert not user.super_user
+    created = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(),
+        headers={"X-API-KEY": wallet.adminkey},
+    )
+    assert created.status_code == 201, created.text
+    tpos = created.json()
+    async with db.connect() as conn:
+        await conn.execute(
+            """
+            UPDATE tpos.pos
+            SET onchain_enabled = true, onchain_wallet_id = 'watch-wallet'
+            WHERE id = :id
+            """,
+            {"id": tpos["id"]},
+        )
+
+    response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={"amount": 42, "payment_method": "btc_onchain"},
+    )
+
+    assert response.status_code == 400
+    assert "onchain" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_fiat_settled_sale_keeps_the_tip_and_skips_the_lnaddress_cut(
+    client: AsyncClient, monkeypatch
+):
+    _account, wallet = await _user("fiat_tip")
+    tpos = await _create_cash_tpos(client, wallet, tip_wallet=wallet.id)
+    payment = await _cash_payment(
+        wallet_id=tpos["fiat_wallet_id"], tpos_id=tpos["id"], tip_amount=100
+    )
+    payment.extra["lnaddress"] = "alice@example.com"
+
+    payouts = []
+
+    async def fake_pay_invoice(**kwargs):
+        payouts.append(kwargs)
+        raise AssertionError("a fiat wallet cannot send")
+
+    async def fake_get_pr_from_lnurl(*args, **kwargs):
+        raise AssertionError("the lnaddress cut must be skipped for fiat settlement")
+
+    sent = []
+
+    async def fake_websocket_updater(channel, message):
+        sent.append(channel)
+
+    monkeypatch.setattr(tpos_tasks, "pay_invoice", fake_pay_invoice)
+    monkeypatch.setattr(tpos_tasks, "get_pr_from_lnurl", fake_get_pr_from_lnurl)
+    monkeypatch.setattr(tpos_tasks, "websocket_updater", fake_websocket_updater)
+
+    await tpos_tasks.on_invoice_paid(payment)
+
+    assert payouts == []
+    assert sent == [tpos["id"], payment.payment_hash]
+    assert payment.extra["tpos_processed"] is True
+    assert payment.extra["tip_amount"] == 100
+
+
+@pytest.mark.asyncio
+async def test_on_invoice_paid_survives_a_processing_error(monkeypatch):
+    _account, wallet = await _user("fiat_bad_payment")
+    payment = await _cash_payment(wallet_id=wallet.id, tpos_id="unknown-tpos")
+
+    async def boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(tpos_tasks, "process_paid_tpos_payment", boom)
+
+    await tpos_tasks.on_invoice_paid(payment)
 
 
 @pytest.mark.asyncio
