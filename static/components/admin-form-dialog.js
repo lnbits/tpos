@@ -16,14 +16,43 @@ window.app.component('tpos-admin-form-dialog', {
     'createOrUpdateDisabled'
   ],
   emits: ['close', 'submit', 'create-fiat-wallet'],
-  watch: {
-    fiatWalletOptions(options) {
-      if (
+  computed: {
+    // the wallet row (and its "you need one" note) only exists once the TPoS
+    // actually settles fiat: cash settlement or a card provider
+    needsFiatWallet() {
+      const data = this.dialog.data
+      return (
         this.isFiatCurrency &&
-        !this.dialog.data.fiat_wallet_id &&
-        options.length
-      ) {
-        this.dialog.data.fiat_wallet_id = options[0].value
+        !!(data.allow_cash_settlement || data.fiat_provider)
+      )
+    }
+  },
+  watch: {
+    'dialog.data.currency'() {
+      this.pickFiatWallet()
+    },
+    'dialog.data.allow_cash_settlement'() {
+      this.pickFiatWallet()
+    },
+    'dialog.data.fiat_provider'() {
+      this.pickFiatWallet()
+    },
+    fiatWalletOptions() {
+      this.pickFiatWallet()
+    }
+  },
+  methods: {
+    // The assigned wallet is never picked by hand: an existing one in the
+    // TPoS currency is selected automatically, otherwise the create button
+    // below does it (one fiat wallet per user + currency).
+    pickFiatWallet() {
+      const data = this.dialog.data
+      if (!this.needsFiatWallet || !this.fiatWalletOptions.length) return
+      const known = this.fiatWalletOptions.some(
+        option => option.value === data.fiat_wallet_id
+      )
+      if (!known) {
+        data.fiat_wallet_id = this.fiatWalletOptions[0].value
       }
     }
   },
@@ -52,11 +81,10 @@ window.app.component('tpos-admin-form-dialog', {
           dense
           emit-value
           v-model="dialog.data.currency"
-          @update:model-value="dialog.data.fiat_wallet_id = null"
           :options="currencyOptions"
           label="Currency *"
         ></q-select>
-        <template v-if="isFiatCurrency">
+        <template v-if="needsFiatWallet">
           <q-select
             v-if="fiatWalletOptions.length"
             filled
@@ -75,8 +103,8 @@ window.app.component('tpos-admin-form-dialog', {
               @click="$emit('create-fiat-wallet')"
             ></q-btn>
             <p class="text-caption q-mt-sm q-mb-none">
-              A fiat wallet in {{ dialog.data.currency }} will be created and
-              assigned to this TPoS.
+              A fiat wallet in {{ dialog.data.currency }} is required: it will
+              be created and assigned to this TPoS.
             </p>
           </div>
         </template>
@@ -161,6 +189,22 @@ window.app.component('tpos-admin-form-dialog', {
                 no bitcoin).</q-tooltip
               >
             </q-checkbox>
+            <p
+              v-if="needsFiatWallet"
+              class="text-caption q-ml-lg q-mb-none"
+            >
+              <span
+                v-if="!dialog.data.fiat_wallet_id"
+                class="text-orange-8 text-weight-medium"
+              >
+                A {{ dialog.data.currency }} fiat wallet is required — create it
+                above.
+              </span>
+              <span v-else>
+                Sales are booked to the {{ dialog.data.currency }} fiat wallet
+                above (accounting only, no bitcoin).
+              </span>
+            </p>
           </div>
         </div>
         <div v-if="g.user.super_user" class="row q-mt-sm">

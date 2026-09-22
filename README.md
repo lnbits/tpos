@@ -72,11 +72,13 @@ Taking cash in a fiat currency no longer needs a superuser: the sale is credited
 **LNbits fiat wallet**, so the till and the Lightning wallet stay apart.
 
 1. Create or edit a TPoS.
-2. Set a **fiat currency** (anything but `sats`). TPoS offers **Create fiat wallet (EUR)**;
-   it reuses the fiat wallet you already own in that currency, and one wallet serves every
-   TPoS you have in it.
-3. Tick **Allow cash settlement**. The public page then shows a **Cash** button next to the
-   Lightning one — the cashier confirms the sale with it.
+2. Set a **fiat currency** (anything but `sats`) and tick **Allow cash settlement** (or
+   pick a card provider). TPoS then shows the wallet that settles those sales: your
+   existing fiat wallet in that currency is reused, otherwise **Create fiat wallet (EUR)**
+   makes one. A TPoS cannot be saved until its fiat wallet is assigned, and one wallet
+   serves every TPoS you have in that currency.
+3. The public page then shows a **Cash** button next to the Lightning one — the cashier
+   confirms the sale with it.
 4. Card payments enabled for your account by the LNbits admin (Stripe, etc.) are booked to
    the same fiat wallet.
 

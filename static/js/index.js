@@ -233,9 +233,12 @@ window.app = Vue.createApp({
       if (!this.formDialog.show) return true
       const data = this.formDialog.data
       const stored = data.id && _.findWhere(this.tposs, {id: data.id})
-      const providerChanged =
-        data.fiat_provider &&
-        (!stored || stored.fiat_provider !== data.fiat_provider)
+      // R7b: an unchanged legacy provider row that could never be provisioned
+      // must stay editable; every other fiat-settled TPoS needs its wallet first.
+      const legacyProviderRow =
+        !!stored &&
+        !stored.fiat_wallet_id &&
+        stored.fiat_provider === data.fiat_provider
       return (
         !data.name ||
         !data.currency ||
@@ -243,11 +246,7 @@ window.app = Vue.createApp({
         (this.formDialog.advanced.otc && !data.withdraw_limit) ||
         (data.onchain_enabled &&
           (!this.onchainStatus.available || !data.onchain_wallet_id)) ||
-        // R7c: only a changed provider needs the admin to have enabled card
-        // payments; a legacy row with an unchanged provider must stay editable.
-        (providerChanged &&
-          !data.fiat_wallet_id &&
-          !this.walletStatus.can_create_fiat_wallet)
+        (this.fiatWalletMissing && !legacyProviderRow)
       )
     },
     inventoryModeOptions() {
@@ -276,6 +275,19 @@ window.app = Vue.createApp({
       return (
         !!this.formDialog.data.currency &&
         this.formDialog.data.currency !== 'sats'
+      )
+    },
+    fiatWalletNeeded() {
+      const data = this.formDialog.data
+      return (
+        this.isFiatCurrency &&
+        !!(data.allow_cash_settlement || data.fiat_provider)
+      )
+    },
+    fiatWalletMissing() {
+      if (!this.fiatWalletNeeded) return false
+      return !this.fiatWalletOptions.some(
+        wallet => wallet.value === this.formDialog.data.fiat_wallet_id
       )
     },
     onchainWalletOptions() {

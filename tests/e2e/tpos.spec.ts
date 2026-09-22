@@ -57,14 +57,21 @@ test('admin dialog provisions a fiat wallet for cash settlement', async ({
   await page.getByRole('option').filter({hasText: wallet.name}).click()
   await form.getByLabel('Currency *').click()
   await page.getByRole('option', {name: 'EUR', exact: true}).click()
+  const createTpos = form.getByRole('button', {name: 'Create TPoS'})
   const createFiatWallet = form.getByRole('button', {
     name: 'Create fiat wallet (EUR)'
   })
+  // neither cash nor a provider yet: no wallet row, TPoS saves as-is
+  await expect(createFiatWallet).toHaveCount(0)
+  await expect(createTpos).toBeEnabled()
+  await form.getByText('Allow cash settlement', {exact: true}).click()
+  // cash settlement without a wallet must not be creatable
   await expect(createFiatWallet).toBeVisible()
+  await expect(createTpos).toBeDisabled()
   await createFiatWallet.click()
   await expect(form.getByLabel('Fiat wallet *')).toBeVisible()
-  await form.getByText('Allow cash settlement', {exact: true}).click()
-  await form.getByRole('button', {name: 'Create TPoS'}).click()
+  await expect(createTpos).toBeEnabled()
+  await createTpos.click()
   await expect(
     page.locator('tr').filter({hasText: terminalName}).first()
   ).toBeVisible()
