@@ -4,6 +4,7 @@ Its functions include:
 
 - Generating invoices
 - Denomination in sats and ANY fiat currency
+- Cash settlement and card payments credited to a LNbits fiat wallet (accounting only)
 - Boltcard support
 - Adding items for a checkout experience
 - An ATM feature that allows you to sell Bitcoin back to your customers for a profit!
