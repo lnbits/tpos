@@ -40,7 +40,6 @@ async def find_fiat_wallet(
 async def create_user_fiat_wallet(
     user_id: str,
     currency: str,
-    name: str | None = None,
     conn: Connection | None = None,
 ) -> Wallet:
     """Find-or-create: idempotent, never a second wallet for a user + currency."""
@@ -54,7 +53,7 @@ async def create_user_fiat_wallet(
             # the wallet is the account's fiat wallet for that currency: every
             # extension that settles in fiat reuses it, so it is named after the
             # currency and the merchant can rename it in LNbits
-            wallet_name=name or currency,
+            wallet_name=currency,
             wallet_type=WalletType.FIAT,
             currency=currency,
             conn=conn,

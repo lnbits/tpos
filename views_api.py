@@ -230,9 +230,7 @@ async def api_tpos_create_fiat_wallet(
     if existing:
         response.status_code = HTTPStatus.OK
         return _wallet_option(existing)
-    created = await create_user_fiat_wallet(
-        wallet.wallet.user, currency, name=data.name
-    )
+    created = await create_user_fiat_wallet(wallet.wallet.user, currency)
     return _wallet_option(created)
 
 

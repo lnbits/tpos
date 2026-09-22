@@ -259,7 +259,7 @@ async def test_find_fiat_wallet_returns_the_oldest_match():
 async def test_create_user_fiat_wallet_is_idempotent():
     user, _ = await _user("fiat_create")
     wallet = await create_user_fiat_wallet(user.id, "eur")
-    again = await create_user_fiat_wallet(user.id, "EUR", name="Other name")
+    again = await create_user_fiat_wallet(user.id, "EUR")
 
     assert wallet.id == again.id
     assert wallet.name == "EUR"

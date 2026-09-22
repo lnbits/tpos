@@ -181,7 +181,6 @@ class TposWallets(BaseModel):
 
 class CreateFiatWalletData(BaseModel):
     currency: str = Field(..., min_length=3, max_length=3)
-    name: str | None = Field(None, max_length=64)
 
 
 class TposPaymentStatus(str, Enum):
