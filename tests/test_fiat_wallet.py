@@ -5,8 +5,14 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
+from lnbits.core.crud import get_standalone_payment
 from lnbits.core.crud.payments import create_payment
-from lnbits.core.crud.wallets import create_wallet, delete_wallet, update_wallet
+from lnbits.core.crud.wallets import (
+    create_wallet,
+    delete_wallet,
+    get_wallet,
+    update_wallet,
+)
 from lnbits.core.models import CreatePayment, PaymentState
 from lnbits.core.models.users import Account
 from lnbits.core.models.wallets import WalletType
@@ -17,6 +23,7 @@ import tpos.tasks as tpos_tasks  # type: ignore[import]
 import tpos.views_payments as views_payments  # type: ignore[import]
 from tpos.crud import db, get_latest_tpos_payments  # type: ignore[import]
 from tpos.migrations import m028_backfill_fiat_wallets  # type: ignore[import]
+from tpos.models import Tpos, TposClean  # type: ignore[import]
 from tpos.services_fiat import (  # type: ignore[import]
     create_user_fiat_wallet,
     find_fiat_wallet,
@@ -93,6 +100,7 @@ async def _cash_payment(
     tpos_id: str,
     tip_amount: int | None = None,
     fiat_method: str = "cash",
+    status: PaymentState = PaymentState.SUCCESS,
 ):
     """A settled tpos payment, as core stores it for a fiat wallet."""
     payment_hash = uuid4().hex
@@ -112,7 +120,7 @@ async def _cash_payment(
                 "tip_amount": tip_amount,
             },
         ),
-        status=PaymentState.SUCCESS,
+        status=status,
     )
 
 
@@ -322,6 +330,126 @@ async def test_card_payments_require_admin_enablement(
     assert allowed.status_code == 201, allowed.text
     fiat_wallet = await find_fiat_wallet(user.id, "EUR")
     assert allowed.json()["fiat_wallet_id"] == (fiat_wallet and fiat_wallet.id)
+
+
+@pytest.mark.asyncio
+async def test_cash_settlement_rejects_an_unsupported_currency(client: AsyncClient):
+    _account, wallet = await _user("fiat_api_unsupported")
+
+    response = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(currency="XYZ", allow_cash_settlement=True),
+        headers={"X-API-KEY": wallet.adminkey},
+    )
+
+    assert response.status_code == 400, response.text
+    assert "fiat wallet" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_cash_validate_credits_the_fiat_wallet(client: AsyncClient, monkeypatch):
+    _account, wallet = await _user("fiat_cash_credit")
+    tpos = await _create_cash_tpos(client, wallet)
+    pending = await _cash_payment(
+        wallet_id=tpos["fiat_wallet_id"],
+        tpos_id=tpos["id"],
+        status=PaymentState.PENDING,
+    )
+
+    async def fake_create_payment_request(wallet_id, invoice_data):
+        return pending
+
+    async def fake_internal_invoice_queue_put(checking_id):
+        return None
+
+    monkeypatch.setattr(
+        views_payments, "create_payment_request", fake_create_payment_request
+    )
+    monkeypatch.setattr(
+        views_payments, "internal_invoice_queue_put", fake_internal_invoice_queue_put
+    )
+
+    created = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={
+            "amount": 1,
+            "amount_fiat": 1,
+            "exchange_rate": 1,
+            "pay_in_fiat": True,
+            "fiat_method": "cash",
+        },
+    )
+    assert created.status_code == 201, created.text
+    assert (await get_wallet(tpos["fiat_wallet_id"])).balance_msat == 0
+
+    validated = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{pending.payment_hash}/cash/validate"
+    )
+
+    assert validated.status_code == 200, validated.text
+    settled = await get_standalone_payment(pending.payment_hash, incoming=True)
+    assert settled and settled.success
+    credited = await get_wallet(tpos["fiat_wallet_id"])
+    assert credited and credited.balance_msat == pending.amount
+    # the whole point of the fiat wallet: booked, never spendable
+    assert credited.withdrawable_balance == 0
+
+
+@pytest.mark.asyncio
+async def test_cash_invoice_ignores_a_foreign_fiat_wallet(client: AsyncClient):
+    _account, wallet = await _user("fiat_foreign")
+    other_user, _other_wallet = await _user("fiat_foreign_other")
+    tpos = await _create_cash_tpos(client, wallet)
+    foreign = await create_user_fiat_wallet(other_user.id, "EUR")
+    async with db.connect() as conn:
+        await conn.execute(
+            "UPDATE tpos.pos SET fiat_wallet_id = :fiat WHERE id = :id",
+            {"fiat": foreign.id, "id": tpos["id"]},
+        )
+
+    response = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={
+            "amount": 1,
+            "amount_fiat": 1,
+            "exchange_rate": 1,
+            "pay_in_fiat": True,
+            "fiat_method": "cash",
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert await get_latest_tpos_payments(tpos["id"]) == []
+
+
+@pytest.mark.asyncio
+async def test_wallet_endpoints_require_the_admin_key(client: AsyncClient):
+    _account, wallet = await _user("fiat_wallets_auth")
+    invoice_key = {"X-API-KEY": wallet.inkey}
+
+    status = await client.get("/tpos/api/v1/wallets", headers=invoice_key)
+    assert status.status_code == 403
+
+    created = await client.post(
+        "/tpos/api/v1/fiat/wallets", json={"currency": "EUR"}, headers=invoice_key
+    )
+    assert created.status_code == 403
+    assert await find_fiat_wallet(wallet.user, "EUR") is None
+
+
+@pytest.mark.asyncio
+async def test_public_surfaces_never_expose_the_fiat_wallet(client: AsyncClient):
+    _account, wallet = await _user("fiat_public_surface")
+    tpos = await _create_cash_tpos(client, wallet)
+    assert tpos["fiat_wallet_id"]
+
+    manifest = await client.get(f"/tpos/manifest/{tpos['id']}.webmanifest")
+    assert manifest.status_code == 200, manifest.text
+    assert "fiat_wallet_id" not in manifest.text
+    # the public page renders exactly this projection (views.py)
+    assert "fiat_wallet_id" not in TposClean(**tpos).dict()
+    # ...while the owner API keeps the field for the admin UI
+    assert Tpos(**tpos).fiat_wallet_id == tpos["fiat_wallet_id"]
 
 
 async def _create_cash_tpos(client: AsyncClient, wallet, **overrides) -> dict:
@@ -689,7 +817,7 @@ async def test_wallet_endpoints_share_and_never_leak_keys(client: AsyncClient):
     assert bad_currency.status_code == 400
 
     status = await client.get(
-        "/tpos/api/v1/wallets", headers={"X-API-KEY": wallet.inkey}
+        "/tpos/api/v1/wallets", headers={"X-API-KEY": wallet.adminkey}
     )
     assert status.status_code == 200, status.text
     status_json = status.json()

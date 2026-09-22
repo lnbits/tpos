@@ -200,8 +200,10 @@ def _wallet_option(wallet: Wallet) -> TposWalletOption:
 
 @tpos_api_router.get("/api/v1/wallets", status_code=HTTPStatus.OK)
 async def api_tpos_wallets(
-    key_info: WalletTypeInfo = Depends(require_invoice_key),
+    key_info: WalletTypeInfo = Depends(require_admin_key),
 ) -> TposWallets:
+    # account-wide wallet inventory (ids, names, balances): admin key only,
+    # like core's wallet list — an invoice key must not enumerate the account.
     user_id = key_info.wallet.user
     lightning_wallets: list[TposWalletOption] = []
     fiat_wallets: list[TposWalletOption] = []

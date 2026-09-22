@@ -74,7 +74,7 @@ test('admin dialog provisions a fiat wallet for cash settlement', async ({
     'GET',
     '/tpos/api/v1/wallets',
     undefined,
-    wallet.inkey
+    wallet.adminkey
   )) as {fiat_wallets: {id: string; currency: string}[]}
   expect(fiat_wallets).toHaveLength(1)
   expect(fiat_wallets[0].currency).toBe('EUR')
