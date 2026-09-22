@@ -51,7 +51,10 @@ async def create_user_fiat_wallet(
     try:
         return await create_wallet(
             user_id=user_id,
-            wallet_name=name or f"TPoS {currency}",
+            # the wallet is the account's fiat wallet for that currency: every
+            # extension that settles in fiat reuses it, so it is named after the
+            # currency and the merchant can rename it in LNbits
+            wallet_name=name or currency,
             wallet_type=WalletType.FIAT,
             currency=currency,
             conn=conn,

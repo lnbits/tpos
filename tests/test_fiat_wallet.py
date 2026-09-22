@@ -262,7 +262,7 @@ async def test_create_user_fiat_wallet_is_idempotent():
     again = await create_user_fiat_wallet(user.id, "EUR", name="Other name")
 
     assert wallet.id == again.id
-    assert wallet.name == "TPoS EUR"
+    assert wallet.name == "EUR"
     assert wallet.wallet_type == WalletType.FIAT.value
     assert wallet.currency == "EUR"
     assert len(await get_user_fiat_wallets(user.id)) == 1

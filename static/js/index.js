@@ -311,13 +311,7 @@ window.app = Vue.createApp({
       const currency = (this.formDialog.data.currency || '').toUpperCase()
       return this.walletStatus.fiat_wallets
         .filter(wallet => (wallet.currency || '').toUpperCase() === currency)
-        .map(wallet => ({
-          label: `${wallet.name} · ${this.formatAmount(
-            wallet.balance_msat / 1000,
-            'sats'
-          )}`,
-          value: wallet.id
-        }))
+        .map(wallet => ({label: wallet.name, value: wallet.id}))
     }
   },
   methods: {
