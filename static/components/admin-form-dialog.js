@@ -7,12 +7,26 @@ window.app.component('tpos-admin-form-dialog', {
     'hasFiatProvider',
     'fiatProviders',
     'isFiatCurrency',
+    'canCreateFiatWallet',
+    'lightningWalletOptions',
+    'fiatWalletOptions',
     'onchainStatus',
     'onchainWalletOptions',
     'withdrawOptions',
     'createOrUpdateDisabled'
   ],
-  emits: ['close', 'submit'],
+  emits: ['close', 'submit', 'create-fiat-wallet'],
+  watch: {
+    fiatWalletOptions(options) {
+      if (
+        this.isFiatCurrency &&
+        !this.dialog.data.fiat_wallet_id &&
+        options.length
+      ) {
+        this.dialog.data.fiat_wallet_id = options[0].value
+      }
+    }
+  },
   template: `
   <q-dialog v-model="dialog.show" position="top" @hide="$emit('close')">
     <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
@@ -29,7 +43,7 @@ window.app.component('tpos-admin-form-dialog', {
           dense
           emit-value
           v-model="dialog.data.wallet"
-          :options="g.user.walletOptions"
+          :options="lightningWalletOptions"
           label="Wallet *"
         ></q-select>
         <q-select
@@ -38,9 +52,34 @@ window.app.component('tpos-admin-form-dialog', {
           dense
           emit-value
           v-model="dialog.data.currency"
+          @update:model-value="dialog.data.fiat_wallet_id = null"
           :options="currencyOptions"
           label="Currency *"
         ></q-select>
+        <template v-if="isFiatCurrency">
+          <q-select
+            v-if="fiatWalletOptions.length"
+            filled
+            dense
+            emit-value
+            v-model="dialog.data.fiat_wallet_id"
+            :options="fiatWalletOptions"
+            label="Fiat wallet *"
+            hint="Cash and card sales are credited to this wallet."
+          ></q-select>
+          <div v-else>
+            <q-btn
+              outline
+              color="primary"
+              :label="'Create fiat wallet (' + dialog.data.currency + ')'"
+              @click="$emit('create-fiat-wallet')"
+            ></q-btn>
+            <p class="text-caption q-mt-sm q-mb-none">
+              A fiat wallet in {{ dialog.data.currency }} will be created and
+              assigned to this TPoS.
+            </p>
+          </div>
+        </template>
         <q-select
           v-if="dialog.data.currency != g.settings.denomination && hasFiatProvider"
           filled
@@ -59,6 +98,15 @@ window.app.component('tpos-admin-form-dialog', {
             />
           </template>
         </q-select>
+        <q-banner
+          v-if="dialog.data.fiat_provider && !canCreateFiatWallet"
+          dense
+          rounded
+          class="bg-orange-2 text-dark"
+        >
+          Card payments are not enabled for you. Ask your admin to enable fiat
+          payments.
+        </q-banner>
         <div
           v-if="(dialog.data.fiat_provider || []).includes('stripe')"
           class="row"
@@ -98,16 +146,20 @@ window.app.component('tpos-admin-form-dialog', {
             ></q-input>
           </div>
         </div>
-        <div v-if="g.user.super_user" class="row q-mt-sm">
+        <div class="row q-mt-sm">
           <div class="col">
             <q-checkbox
               v-model="dialog.data.allow_cash_settlement"
               :disable="!isFiatCurrency"
               label="Allow cash settlement"
             >
-              <q-tooltip v-if="!isFiatCurrency">
-                currency must be set to fiat
-              </q-tooltip>
+              <q-tooltip v-if="!isFiatCurrency"
+                >currency must be set to fiat</q-tooltip
+              >
+              <q-tooltip v-else
+                >Cash sales are credited to the fiat wallet (accounting only,
+                no bitcoin).</q-tooltip
+              >
             </q-checkbox>
           </div>
         </div>
@@ -281,7 +333,7 @@ window.app.component('tpos-admin-form-dialog', {
             dense
             emit-value
             v-model="dialog.data.tip_wallet"
-            :options="g.user.walletOptions"
+            :options="lightningWalletOptions"
             label="Tip Wallet"
           ></q-select>
           <q-select

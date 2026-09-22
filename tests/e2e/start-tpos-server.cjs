@@ -43,6 +43,7 @@ const server = childProcess.spawn(
       DEBUG: 'true',
       HOST: host,
       LNBITS_ADMIN_UI: 'true',
+      LNBITS_ALLOWED_CURRENCIES: 'EUR,USD,GBP',
       LNBITS_BACKEND_WALLET_CLASS: 'FakeWallet',
       LNBITS_DATABASE_URL: '',
       LNBITS_DATA_FOLDER: dataDir,
