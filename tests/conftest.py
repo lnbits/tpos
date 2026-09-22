@@ -67,13 +67,13 @@ async def client(monkeypatch):
 
 
 @pytest.fixture
-def enable_stripe():
+def enable_stripe(monkeypatch):
     """Enable the fiat provider as an admin would (`allowed_users=[]` = everyone)."""
 
     def _enable(user_id: str | None = None):
-        settings.stripe_enabled = True
-        settings.stripe_limits.allowed_users = [user_id] if user_id else []
+        monkeypatch.setattr(settings, "stripe_enabled", True)
+        monkeypatch.setattr(
+            settings.stripe_limits, "allowed_users", [user_id] if user_id else []
+        )
 
-    yield _enable
-    settings.stripe_enabled = False
-    settings.stripe_limits.allowed_users = []
+    return _enable

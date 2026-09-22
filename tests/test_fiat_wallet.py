@@ -179,6 +179,27 @@ async def test_backfill_disables_cash_when_no_wallet_can_be_assigned():
 
 
 @pytest.mark.asyncio
+async def test_backfill_disables_cash_for_an_unsupported_currency():
+    user, wallet = await _user("fiat_unsupported")
+    async with db.connect() as conn:
+        await _add_tpos(
+            conn,
+            tpos_id="unsupported-pos",
+            wallet=wallet.id,
+            currency="XYZ",
+            cash=True,
+            provider="stripe",
+        )
+        await m028_backfill_fiat_wallets(conn)
+        row = await _tpos_row(conn, "unsupported-pos")
+
+    assert row["allow_cash_settlement"] in (False, 0)
+    assert row["fiat_provider"] == "stripe"
+    assert row["fiat_wallet_id"] is None
+    assert await get_user_fiat_wallets(user.id) == []
+
+
+@pytest.mark.asyncio
 async def test_find_fiat_wallet_returns_the_oldest_match():
     user, _ = await _user("fiat_canonical")
     older = await create_wallet(
@@ -397,7 +418,10 @@ async def test_wallet_endpoints_share_and_never_leak_keys(client: AsyncClient):
     assert status_json["can_create_fiat_wallet"] is False
     assert [item["id"] for item in status_json["lightning_wallets"]] == [wallet.id]
     assert {item["currency"] for item in status_json["fiat_wallets"]} == {"EUR", "USD"}
-    assert "adminkey" not in status.text and "inkey" not in status.text
+    assert all(
+        set(item) == {"id", "name", "currency", "balance_msat"}
+        for item in status_json["lightning_wallets"] + status_json["fiat_wallets"]
+    )
 
 
 @pytest.mark.asyncio
