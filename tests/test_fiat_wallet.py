@@ -380,7 +380,8 @@ async def test_cash_validate_credits_the_fiat_wallet(client: AsyncClient, monkey
         },
     )
     assert created.status_code == 201, created.text
-    assert (await get_wallet(tpos["fiat_wallet_id"])).balance_msat == 0
+    fiat_wallet = await get_wallet(tpos["fiat_wallet_id"])
+    assert fiat_wallet and fiat_wallet.balance_msat == 0
 
     validated = await client.post(
         f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{pending.payment_hash}/cash/validate"
