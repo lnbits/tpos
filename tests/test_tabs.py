@@ -5,7 +5,7 @@ from httpx import AsyncClient
 from lnbits.core.crud import get_standalone_payment
 from lnbits.core.services import pay_invoice, update_wallet_balance
 from lnbits.core.services.users import create_user_account_no_ckeck
-from lnbits.tasks import internal_invoice_queue
+from lnbits.task_manager import task_manager
 
 from tpos.crud import get_tpos_payment_by_hash  # type: ignore[import]
 from tpos.tasks import on_invoice_paid  # type: ignore[import]
@@ -14,7 +14,7 @@ from tpos.tasks import on_invoice_paid  # type: ignore[import]
 async def _drain_internal_invoice_queue() -> None:
     while True:
         try:
-            internal_invoice_queue.get_nowait()
+            task_manager.internal_invoice_queue.get_nowait()
         except asyncio.QueueEmpty:
             return
 

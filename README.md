@@ -28,6 +28,7 @@ _For video content about the TPoS extension, watch the [official demo](https://w
 
 - [Overview](#overview)
 - [Usage](#usage)
+- [Cash Settlement & Fiat Wallet](#cash-settlement--fiat-wallet)
 - [Receiving Tips](#receiving-tips)
 - [LN Address Funding](#ln-address-funding)
 - [Adding Items to PoS](#adding-items-to-pos)
@@ -42,6 +43,7 @@ _For video content about the TPoS extension, watch the [official demo](https://w
 - **Item management** — products, cart, JSON import/export
 - **OTC ATM** — LNURL withdraw limits and cooldown
 - **Stripe fiat payment integration** — accept tap-to-pay via Stripe
+- **Cash settlement & fiat wallet** — cash and card sales booked to a LNbits fiat wallet
 - **Tax settings** — global/per-item, inclusive or exclusive
 
 ## Overview
@@ -63,6 +65,33 @@ TPoS lets you take Lightning payments right from the browser. Every TPoS runs is
 4. **Present** the invoice QR to the customer.
 
    <img src="https://github.com/user-attachments/assets/1d5341e2-cfba-45d5-b2c5-99f61a3d07a4" alt="Invoice QR" width="720">
+
+## Cash Settlement & Fiat Wallet
+
+Taking cash in a fiat currency no longer needs a superuser: the sale is credited to a
+**LNbits fiat wallet**, so the till and the Lightning wallet stay apart.
+
+1. Create or edit a TPoS.
+2. Set a **fiat currency** (anything but `sats`) and tick **Allow cash settlement** (or
+   pick a card provider). TPoS then shows the wallet that settles those sales: your
+   existing fiat wallet in that currency is reused, otherwise **Create fiat wallet (EUR)**
+   makes one. A TPoS cannot be saved until its fiat wallet is assigned, and one wallet
+   serves every TPoS you have in that currency. It is named after the currency (e.g.
+   `EUR`) so any other extension that settles in fiat can reuse it, and you can rename it
+   in LNbits whenever you like.
+3. The public page then shows a **Cash** button next to the Lightning one — the cashier
+   confirms the sale with it.
+4. Card payments enabled for your account by the LNbits admin (Stripe, etc.) are booked to
+   the same fiat wallet.
+
+The fiat wallet is an accounting wallet: it records what you took in cash or on card, it
+cannot send, and its balance is never withdrawable. Lightning sales keep going to the
+TPoS wallet, and tips / LN Address funding are not paid out from a fiat wallet (the tip
+stays in the fiat wallet and on the receipt).
+
+> [!NOTE]
+> Fiat wallets need **LNbits 1.6.2 or newer**. Cash settlement is available to every
+> merchant; card payments must be enabled for your account by the LNbits admin.
 
 ## Receiving Tips
 

@@ -369,12 +369,16 @@
     :has-fiat-provider="hasFiatProvider"
     :fiat-providers="fiatProviders"
     :is-fiat-currency="isFiatCurrency"
+    :can-create-fiat-wallet="walletStatus.can_create_fiat_wallet"
+    :lightning-wallet-options="lightningWalletOptions"
+    :fiat-wallet-options="fiatWalletOptions"
     :onchain-status="onchainStatus"
     :onchain-wallet-options="onchainWalletOptions"
     :withdraw-options="withdraw_options"
     :create-or-update-disabled="createOrUpdateDisabled"
     @close="closeFormDialog"
     @submit="sendTposData"
+    @create-fiat-wallet="createFiatWallet()"
   ></tpos-admin-form-dialog>
   <tpos-admin-item-dialog
     :dialog="itemDialog"

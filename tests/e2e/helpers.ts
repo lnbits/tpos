@@ -17,8 +17,18 @@ export async function login(page: Page, e2eServer: E2EServer): Promise<void> {
 
 export async function superuserWallet(page: Page): Promise<Wallet> {
   return page.evaluate(() => {
-    const wallet = (window as typeof window & {g: {user: {wallets: Wallet[]}}})
-      .g.user.wallets[0]
+    // accounts also own fiat wallets now, and they sort before the lightning
+    // one: pick a wallet that can actually receive, like the admin form does
+    type MappedWallet = Wallet & {
+      walletType?: string
+      canReceivePayments?: boolean
+    }
+    const wallets = (
+      window as typeof window & {g: {user: {wallets: MappedWallet[]}}}
+    ).g.user.wallets
+    const wallet =
+      wallets.find(w => w.walletType !== 'fiat' && w.canReceivePayments) ??
+      wallets[0]
     return {
       adminkey: wallet.adminkey,
       id: wallet.id,

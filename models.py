@@ -91,6 +91,7 @@ class CreateTposData(BaseModel):
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
     allow_cash_settlement: bool = Field(False)
+    fiat_wallet_id: str | None = Field(None)
     onchain_enabled: bool = Field(False)
     onchain_wallet_id: str | None = None
     onchain_zero_conf: bool = Field(True)
@@ -160,6 +161,26 @@ class TposClean(BaseModel):
 class Tpos(TposClean, BaseModel):
     wallet: str
     tip_wallet: str | None = None
+    fiat_wallet_id: str | None = None
+
+
+class TposWalletOption(BaseModel):
+    """Wallet data for the admin UI — never carries keys."""
+
+    id: str
+    name: str
+    currency: str | None = None
+    balance_msat: int = 0
+
+
+class TposWallets(BaseModel):
+    can_create_fiat_wallet: bool
+    lightning_wallets: list[TposWalletOption] = Field(default_factory=list)
+    fiat_wallets: list[TposWalletOption] = Field(default_factory=list)
+
+
+class CreateFiatWalletData(BaseModel):
+    currency: str = Field(..., min_length=3, max_length=3)
 
 
 class TposPaymentStatus(str, Enum):

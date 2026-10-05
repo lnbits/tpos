@@ -129,18 +129,25 @@ async def on_invoice_paid(payment: Payment) -> None:
     ):
         return
 
-    payment_method = payment.extra.get("payment_method") or _payment_method(payment)
-    tpos_payment = await get_tpos_payment_by_hash(payment.payment_hash)
-    if tpos_payment and not tpos_payment.paid:
-        tpos_payment.paid = True
-        tpos_payment.status = TposPaymentStatus.PAID
-        tpos_payment.payment_method = payment_method
-        await update_tpos_payment(tpos_payment)
+    try:
+        payment_method = payment.extra.get("payment_method") or _payment_method(payment)
+        tpos_payment = await get_tpos_payment_by_hash(payment.payment_hash)
+        if tpos_payment and not tpos_payment.paid:
+            tpos_payment.paid = True
+            tpos_payment.status = TposPaymentStatus.PAID
+            tpos_payment.payment_method = payment_method
+            await update_tpos_payment(tpos_payment)
 
-    if payment.extra.get("tpos_processed"):
-        return
+        if payment.extra.get("tpos_processed"):
+            return
 
-    await process_paid_tpos_payment(payment, payment_method=payment_method)
+        await process_paid_tpos_payment(payment, payment_method=payment_method)
+    except Exception as exc:
+        # one bad payment must never stop the invoice listener
+        logger.error(
+            f"tpos: failed to process payment {payment.payment_hash}: "
+            f"{type(exc).__name__}: {exc}"
+        )
 
 
 async def settle_onchain_tpos_payment(tpos_payment) -> None:
@@ -186,7 +193,14 @@ async def process_paid_tpos_payment(
 
     tpos = await get_tpos(tpos_id)
     assert tpos
-    if payment.extra.get("lnaddress") and payment.extra["lnaddress"] != "":
+    settlement_wallet = await get_wallet(payment.wallet_id)
+    can_split = bool(settlement_wallet and settlement_wallet.can_send_payments)
+
+    if (
+        can_split
+        and payment.extra.get("lnaddress")
+        and payment.extra["lnaddress"] != ""
+    ):
         calc_amount = payment.amount - ((payment.amount / 100) * tpos.lnaddress_cut)
         address = payment.extra.get("lnaddress")
         if address:
@@ -198,12 +212,17 @@ async def process_paid_tpos_payment(
 
             if pr:
                 payment.extra["lnaddress"] = ""
-                paid_payment = await pay_invoice(
-                    payment_request=pr,
-                    wallet_id=payment.wallet_id,
-                    extra={**payment.extra},
-                )
-                logger.debug(f"tpos: LNaddress paid cut: {paid_payment.checking_id}")
+                try:
+                    paid_payment = await pay_invoice(
+                        payment_request=pr,
+                        wallet_id=payment.wallet_id,
+                        extra={**payment.extra},
+                    )
+                    logger.debug(
+                        f"tpos: LNaddress paid cut: {paid_payment.checking_id}"
+                    )
+                except Exception as exc:
+                    logger.error(f"tpos: LNaddress cut failed: {exc}")
 
     await websocket_updater(tpos_id, json.dumps(stripped_payment))
     await websocket_updater(payment.payment_hash, json.dumps(stripped_payment))
@@ -219,6 +238,10 @@ async def process_paid_tpos_payment(
             logger.warning(f"tpos: inventory deduction failed: {exc}")
 
     if not tip_amount:
+        return
+
+    if not can_split:
+        logger.debug(f"tpos: tip kept in fiat wallet {payment.wallet_id}")
         return
 
     wallet_id = tpos.tip_wallet

@@ -1,4 +1,4 @@
-import {test, expect, randomHex} from './fixtures'
+import {test, expect, browserJson, randomHex} from './fixtures'
 import {
   createTpos,
   createWallet,
@@ -39,6 +39,76 @@ test('admin can create a terminal and add an item through the extracted dialogs'
   await itemDialog.getByLabel(/Price \(sats\)/).fill('13')
   await itemDialog.getByRole('button', {name: 'Create Item'}).click()
   await expect(page.getByText(itemName, {exact: true})).toBeVisible()
+})
+
+test('admin dialog provisions a fiat wallet for cash settlement', async ({
+  page,
+  lnbitsServer
+}) => {
+  await login(page, lnbitsServer)
+  const wallet = await superuserWallet(page)
+  const terminalName = `Cash terminal ${randomHex()}`
+
+  await page.goto('/tpos/')
+  await page.getByRole('button', {name: 'New TPoS'}).click()
+  const form = page.locator('.q-dialog').filter({hasText: 'Name *'}).last()
+  await form.getByLabel('Name *').fill(terminalName)
+  await form.getByLabel('Wallet *').click()
+  await page.getByRole('option').filter({hasText: wallet.name}).click()
+  await form.getByLabel('Currency *').click()
+  await page.getByRole('option', {name: 'EUR', exact: true}).click()
+  const createTpos = form.getByRole('button', {name: 'Create TPoS'})
+  const createFiatWallet = form.getByRole('button', {
+    name: 'Create fiat wallet (EUR)'
+  })
+  // neither cash nor a provider yet: no wallet row, TPoS saves as-is
+  await expect(createFiatWallet).toHaveCount(0)
+  await expect(createTpos).toBeEnabled()
+  await form.getByText('Allow cash settlement', {exact: true}).click()
+  // cash settlement without a wallet must not be creatable
+  await expect(createFiatWallet).toBeVisible()
+  await expect(createTpos).toBeDisabled()
+  await createFiatWallet.click()
+  await expect(form.getByLabel('Fiat wallet *')).toBeVisible()
+  await expect(createTpos).toBeEnabled()
+  await createTpos.click()
+  await expect(
+    page.locator('tr').filter({hasText: terminalName}).first()
+  ).toBeVisible()
+
+  const {fiat_wallets} = (await browserJson(
+    page,
+    'GET',
+    '/tpos/api/v1/wallets',
+    undefined,
+    wallet.adminkey
+  )) as {fiat_wallets: {id: string; currency: string}[]}
+  expect(fiat_wallets).toHaveLength(1)
+  expect(fiat_wallets[0].currency).toBe('EUR')
+  const tposs = (await browserJson(
+    page,
+    'GET',
+    '/tpos/api/v1/tposs?all_wallets=true',
+    undefined,
+    wallet.inkey
+  )) as {id: string; name: string; fiat_wallet_id: string | null}[]
+  const terminal = tposs.find(tpos => tpos.name === terminalName)
+  expect(terminal?.fiat_wallet_id).toBe(fiat_wallets[0].id)
+
+  const itemName = `Cash coffee ${randomHex()}`
+  await browserJson(
+    page,
+    'PUT',
+    `/tpos/api/v1/tposs/${terminal?.id}/items`,
+    {items: [{title: itemName, price: 5, tax: 0, disabled: false}]},
+    wallet.adminkey
+  )
+  await page.goto(`/tpos/${terminal?.id}`)
+  await page
+    .locator('.item-grid-title:visible')
+    .filter({hasText: itemName})
+    .click()
+  await expect(page.getByRole('button', {name: 'Cash EUR'})).toBeVisible()
 })
 
 test('ATM uses an owner session or password fallback and exits locally', async ({

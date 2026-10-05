@@ -65,6 +65,11 @@ window.app = Vue.createApp({
         wallets: [],
         mempool_endpoint: null
       },
+      walletStatus: {
+        can_create_fiat_wallet: false,
+        lightning_wallets: [],
+        fiat_wallets: []
+      },
       tpossTable: {
         columns: [
           {name: 'name', align: 'left', label: 'Name', field: 'name'},
@@ -134,6 +139,7 @@ window.app = Vue.createApp({
           stripe_card_payments: false,
           stripe_reader_id: '',
           allow_cash_settlement: false,
+          fiat_wallet_id: null,
           onchain_enabled: false,
           onchain_wallet_id: null,
           onchain_zero_conf: true,
@@ -226,13 +232,21 @@ window.app = Vue.createApp({
     createOrUpdateDisabled() {
       if (!this.formDialog.show) return true
       const data = this.formDialog.data
+      const stored = data.id && _.findWhere(this.tposs, {id: data.id})
+      // R7b: an unchanged legacy provider row that could never be provisioned
+      // must stay editable; every other fiat-settled TPoS needs its wallet first.
+      const legacyProviderRow =
+        !!stored &&
+        !stored.fiat_wallet_id &&
+        stored.fiat_provider === data.fiat_provider
       return (
         !data.name ||
         !data.currency ||
         !data.wallet ||
         (this.formDialog.advanced.otc && !data.withdraw_limit) ||
         (data.onchain_enabled &&
-          (!this.onchainStatus.available || !data.onchain_wallet_id))
+          (!this.onchainStatus.available || !data.onchain_wallet_id)) ||
+        (this.fiatWalletMissing && !legacyProviderRow)
       )
     },
     inventoryModeOptions() {
@@ -263,11 +277,41 @@ window.app = Vue.createApp({
         this.formDialog.data.currency !== 'sats'
       )
     },
+    fiatWalletNeeded() {
+      const data = this.formDialog.data
+      return (
+        this.isFiatCurrency &&
+        !!(data.allow_cash_settlement || data.fiat_provider)
+      )
+    },
+    fiatWalletMissing() {
+      if (!this.fiatWalletNeeded) return false
+      return !this.fiatWalletOptions.some(
+        wallet => wallet.value === this.formDialog.data.fiat_wallet_id
+      )
+    },
     onchainWalletOptions() {
       return (this.onchainStatus.wallets || []).map(wallet => ({
         label: wallet.title,
         value: wallet.id
       }))
+    },
+    lightningWalletOptions() {
+      const wallets = this.walletStatus.lightning_wallets.length
+        ? this.walletStatus.lightning_wallets
+        : this.g.user.wallets.filter(
+            wallet => wallet.canReceivePayments && wallet.walletType !== 'fiat'
+          )
+      return wallets.map(wallet => ({
+        label: [wallet.name, ' - ', wallet.id.substring(0, 5), '...'].join(''),
+        value: wallet.id
+      }))
+    },
+    fiatWalletOptions() {
+      const currency = (this.formDialog.data.currency || '').toUpperCase()
+      return this.walletStatus.fiat_wallets
+        .filter(wallet => (wallet.currency || '').toUpperCase() === currency)
+        .map(wallet => ({label: wallet.name, value: wallet.id}))
     }
   },
   methods: {
@@ -292,6 +336,7 @@ window.app = Vue.createApp({
         stripe_card_payments: false,
         stripe_reader_id: '',
         allow_cash_settlement: false,
+        fiat_wallet_id: null,
         onchain_enabled: false,
         onchain_wallet_id: null,
         onchain_zero_conf: true,
@@ -351,7 +396,36 @@ window.app = Vue.createApp({
         }
       }
     },
-    sendTposData() {
+    async loadWalletStatus() {
+      if (!this.g.user.wallets.length) return
+      try {
+        const {data} = await LNbits.api.request(
+          'GET',
+          '/tpos/api/v1/wallets',
+          this.g.user.wallets[0].adminkey
+        )
+        this.walletStatus = data
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    async createFiatWallet(currency = this.formDialog.data.currency) {
+      try {
+        const {data} = await LNbits.api.request(
+          'POST',
+          '/tpos/api/v1/fiat/wallets',
+          this.g.user.wallets[0].adminkey,
+          {currency}
+        )
+        await this.loadWalletStatus()
+        this.formDialog.data.fiat_wallet_id = data.id
+        return data.id
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+        return null
+      }
+    },
+    async sendTposData() {
       const data = {
         ...this.formDialog.data,
         tip_options:
@@ -384,6 +458,8 @@ window.app = Vue.createApp({
       }
       if (data.currency === 'sats') {
         data.allow_cash_settlement = false
+        data.fiat_provider = null
+        data.fiat_wallet_id = null
       }
       if (!data.onchain_enabled) {
         data.onchain_wallet_id = null
@@ -391,6 +467,14 @@ window.app = Vue.createApp({
       }
       if (!data.tabs_enabled) {
         data.tabs_allow_create = false
+      }
+      if (
+        !data.fiat_wallet_id &&
+        (data.allow_cash_settlement || data.fiat_provider)
+      ) {
+        // On failure the API decides: cash fails loudly, an unchanged legacy
+        // provider row keeps its lightning wallet (R7b).
+        data.fiat_wallet_id = await this.createFiatWallet(data.currency)
       }
       const wallet = _.findWhere(this.g.user.wallets, {
         id: this.formDialog.data.wallet
@@ -814,6 +898,7 @@ window.app = Vue.createApp({
       this.getTposs()
       this.loadInventoryStatus()
       this.loadOnchainStatus()
+      this.loadWalletStatus()
     }
     LNbits.api
       .request('GET', '/api/v1/currencies')
