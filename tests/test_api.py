@@ -17,8 +17,8 @@ from lnbits.core.services import (
     update_wallet_balance,
 )
 from lnbits.core.services.users import create_user_account_no_ckeck
+from lnbits.helpers import create_access_token
 from lnbits.settings import settings
-from lnbits.tasks import internal_invoice_queue
 from tabs.crud import (  # type: ignore[import]
     get_tab_by_id,
     get_tab_entries,
@@ -45,6 +45,8 @@ from tpos.tasks import (  # type: ignore[import]
     on_invoice_paid,
     settle_onchain_tpos_payment,
 )
+
+from . import internal_invoice_queue
 
 
 def _tpos_payload(**overrides):
@@ -398,7 +400,7 @@ async def test_paid_tpos_invoice_settles_tab_via_real_tabs_api(
     assert len(settlements) == 1
     assert settlements[0].status == "completed"
     assert settlements[0].method == "other"
-    assert settlements[0].idempotency_key == "tpos-settlement-1"
+    assert settlements[0].idempotency_key == f"tpos:{payment.payment_hash}"
 
 
 @pytest.mark.asyncio
@@ -432,6 +434,10 @@ async def test_lnaddress_forwarding_uses_whole_sat_amount(
         status=PaymentState.SUCCESS,
     )
     requested_amounts = []
+
+    await create_tpos_payment(
+        TposPayment(id=uuid4().hex, tpos_id=tpos["id"], payment_hash=payment_hash)
+    )
 
     async def fake_get_pr_from_lnurl(address, amount):
         assert address == "user@example.com"
@@ -1014,7 +1020,7 @@ async def test_inventory_items_and_lnaddress_check(client: AsyncClient, monkeypa
     async def bad_lnaddress(_lnaddress):
         return object()
 
-    monkeypatch.setattr(views_api, "lnurl_handle", bad_lnaddress)
+    monkeypatch.setattr(views_api.core_lnurl, "handle", bad_lnaddress)
     lnaddress = await client.get(
         "/tpos/api/v1/tposs/lnaddresscheck?lnaddress=alice@example.com"
     )
@@ -1160,7 +1166,10 @@ async def test_atm_and_lnurl_withdraw_routes(client: AsyncClient, monkeypatch):
     tpos = create.json()
 
     charge_response = await client.post(
-        f"/tpos/api/v1/atm/{tpos['id']}/create?usr={user.id}"
+        f"/tpos/api/v1/atm/{tpos['id']}/create",
+        headers={
+            "Authorization": f"Bearer {create_access_token({'sub': user.username})}"
+        },
     )
     assert charge_response.status_code == 200
     charge = charge_response.json()
@@ -1201,7 +1210,10 @@ async def test_atm_and_lnurl_withdraw_routes(client: AsyncClient, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_atm_create_requires_authenticated_tpos_owner(client: AsyncClient):
+async def test_atm_create_requires_authenticated_tpos_owner(
+    client: AsyncClient, monkeypatch
+):
+    monkeypatch.setattr(settings, "auth_allowed_methods", ["username-password"])
     owner_account = Account(id=uuid4().hex, username=f"atmowner_{uuid4().hex[:8]}")
     owner_account.hash_password("secret1234")
     owner = await create_user_account_no_ckeck(account=owner_account)
@@ -1216,8 +1228,18 @@ async def test_atm_create_requires_authenticated_tpos_owner(client: AsyncClient)
     assert create.status_code == 201
     tpos = create.json()
 
-    owner_create = await client.post(
+    anonymous_create = await client.post(f"/tpos/api/v1/atm/{tpos['id']}/create")
+    assert anonymous_create.status_code == 401
+    user_id_only_create = await client.post(
         f"/tpos/api/v1/atm/{tpos['id']}/create?usr={owner.id}"
+    )
+    assert user_id_only_create.status_code == 401
+
+    owner_create = await client.post(
+        f"/tpos/api/v1/atm/{tpos['id']}/create",
+        headers={
+            "Authorization": f"Bearer {create_access_token({'sub': owner.username})}"
+        },
     )
     assert owner_create.status_code == 200
 
@@ -1246,7 +1268,10 @@ async def test_atm_create_requires_authenticated_tpos_owner(client: AsyncClient)
     assert locked.status_code == 429
 
     other_create = await client.post(
-        f"/tpos/api/v1/atm/{tpos['id']}/create?usr={other.id}"
+        f"/tpos/api/v1/atm/{tpos['id']}/create",
+        headers={
+            "Authorization": f"Bearer {create_access_token({'sub': other.username})}"
+        },
     )
     assert other_create.status_code == 403
     assert other_create.json()["detail"] == (
@@ -1267,33 +1292,29 @@ async def test_atm_pay_endpoint(client: AsyncClient, monkeypatch):
     tpos = create.json()
 
     charge_response = await client.post(
-        f"/tpos/api/v1/atm/{tpos['id']}/create?usr={user.id}"
+        f"/tpos/api/v1/atm/{tpos['id']}/create",
+        headers={
+            "Authorization": f"Bearer {create_access_token({'sub': user.username})}"
+        },
     )
     assert charge_response.status_code == 200
     charge = charge_response.json()
 
-    async def fake_lnurl_handle(pay_link, user_agent=None):
-        return views_atm.LnurlPayResponse(
-            callback="https://example.com/cb",
-            minSendable=1000,
-            maxSendable=1000,
-            metadata='[["text/plain","test"]]',
-        )
+    await update_wallet_balance(wallet, 100)
+    configured = await client.get(f"/tpos/api/v1/atm/withdraw/{charge['id']}/25")
+    assert configured.status_code == 200
 
-    class FakePayResponse:
-        pr = "lnbc1test"
+    async def fake_get_pr_from_lnurl(pay_link, amount):
+        assert amount == 25_000
+        return "lnbc1test"
 
-    async def fake_execute_pay_request(response, msat, user_agent=None):
-        assert msat == 25_000
-        return FakePayResponse()
-
-    async def fake_execute_withdraw(response, pr, user_agent=None):
+    async def fake_lnurl_callback(pr, k1):
         assert pr == "lnbc1test"
-        return None
+        assert k1 == charge["id"]
+        return views_lnurl.LnurlSuccessResponse()
 
-    monkeypatch.setattr(views_atm, "lnurl_handle", fake_lnurl_handle)
-    monkeypatch.setattr(views_atm, "execute_pay_request", fake_execute_pay_request)
-    monkeypatch.setattr(views_atm, "execute_withdraw", fake_execute_withdraw)
+    monkeypatch.setattr(views_atm, "get_pr_from_lnurl", fake_get_pr_from_lnurl)
+    monkeypatch.setattr(views_atm, "lnurl_callback", fake_lnurl_callback)
     paid = await client.post(
         f"/tpos/api/v1/atm/withdraw/{charge['id']}/25/pay",
         json={"pay_link": "lnurl1test"},
@@ -1316,36 +1337,11 @@ async def test_pay_invoice_lnurl_withdraw_endpoint(client: AsyncClient, monkeypa
     assert create.status_code == 201
     tpos = create.json()
 
-    class FakeResponse:
-        is_error = False
+    async def fake_perform_withdraw(lnurl, payment_request):
+        assert lnurl == "https://example.com/withdraw"
+        assert payment_request == "lnbc1test"
 
-        def __init__(self, payload):
-            self.payload = payload
-
-        def json(self):
-            return self.payload
-
-    class FakeClient:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        async def get(self, url, **kwargs):
-            if "callback" in str(url):
-                return FakeResponse({"status": "OK"})
-            return FakeResponse(
-                {
-                    "tag": "withdrawRequest",
-                    "callback": "https://example.com/callback",
-                    "k1": "abc",
-                }
-            )
-
-    monkeypatch.setattr(
-        views_payments.httpx, "AsyncClient", lambda *args, **kwargs: FakeClient()
-    )
+    monkeypatch.setattr(views_payments, "perform_withdraw", fake_perform_withdraw)
     paid = await client.post(
         f"/tpos/api/v1/tposs/{tpos['id']}/invoices/lnbc1test/pay",
         json={"lnurl": "example.com/withdraw"},

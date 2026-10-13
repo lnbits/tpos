@@ -1,26 +1,17 @@
 from http import HTTPStatus
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Path
 from lnbits.core.crud import (
     get_account,
     get_wallet,
 )
 from lnbits.core.models import User
 from lnbits.core.models.misc import SimpleStatus
+from lnbits.core.services import get_pr_from_lnurl
 from lnbits.decorators import check_user_exists
 from lnbits.utils.cache import cache
-from lnurl import (
-    CallbackUrl,
-    LnurlErrorResponse,
-    LnurlPayResponse,
-    LnurlWithdrawResponse,
-    MilliSatoshi,
-    execute_pay_request,
-    execute_withdraw,
-)
-from lnurl import handle as lnurl_handle
+from lnurl import LnurlErrorResponse
 from loguru import logger
-from pydantic import parse_obj_as
 
 from .crud import (
     create_lnurlcharge,
@@ -33,6 +24,7 @@ from .models import (
     CreateWithdrawPay,
     LnurlCharge,
 )
+from .views_lnurl import lnurl_callback
 
 tpos_atm_router = APIRouter(prefix="/api/v1/atm", tags=["TPoS ATM"])
 
@@ -103,7 +95,10 @@ async def api_tpos_atm_authorize(tpos_id: str, data: AuthorizeAtm) -> LnurlCharg
 
 
 @tpos_atm_router.get("/withdraw/{charge_id}/{amount}")
-async def api_tpos_create_withdraw(charge_id: str, amount: str) -> LnurlCharge:
+async def api_tpos_create_withdraw(
+    charge_id: str,
+    amount: int = Path(..., gt=0),
+) -> LnurlCharge:
     lnurlcharge = await get_lnurlcharge(charge_id)
     if not lnurlcharge:
         raise HTTPException(
@@ -121,6 +116,8 @@ async def api_tpos_create_withdraw(charge_id: str, amount: str) -> LnurlCharge:
             status_code=HTTPStatus.NOT_FOUND,
             detail=f"TPoS {lnurlcharge.tpos_id} does not exist.",
         )
+    if not tpos.can_withdraw or amount > tpos.withdraw_maximum:
+        raise HTTPException(HTTPStatus.BAD_REQUEST, "Withdrawal is not allowed.")
 
     wallet = await get_wallet(tpos.wallet)
     if not wallet:
@@ -130,62 +127,34 @@ async def api_tpos_create_withdraw(charge_id: str, amount: str) -> LnurlCharge:
         )
 
     balance = int(wallet.balance_msat / 1000)
-    if balance < int(amount):
+    if balance < amount:
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
             detail=f"Insufficient balance. Your balance is {balance} sats",
         )
-    lnurlcharge.amount = int(amount)
+    lnurlcharge.amount = amount
     await update_lnurlcharge(lnurlcharge)
     return lnurlcharge
 
 
 @tpos_atm_router.post("/withdraw/{charge_id}/{amount}/pay", status_code=HTTPStatus.OK)
 async def api_tpos_atm_pay(
-    request: Request, charge_id: str, amount: int, data: CreateWithdrawPay
+    charge_id: str,
+    data: CreateWithdrawPay,
+    amount: int = Path(..., gt=0),
 ) -> SimpleStatus:
+    charge = await get_lnurlcharge(charge_id)
+    if not charge or charge.claimed or charge.amount != amount:
+        raise HTTPException(HTTPStatus.BAD_REQUEST, "Invalid ATM charge.")
     try:
-        res = await lnurl_handle(data.pay_link, user_agent="lnbits/tpos")
-        if not isinstance(res, LnurlPayResponse):
-            raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail="Excepted LNURL pay reponse.",
-            )
-        if isinstance(res, LnurlErrorResponse):
-            raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail=f"Error processing lnurl pay link: {res.reason}",
-            )
-        res2 = await execute_pay_request(
-            res, msat=amount * 1000, user_agent="lnbits/tpos"
-        )
-        if isinstance(res2, LnurlErrorResponse):
-            raise HTTPException(
-                status_code=HTTPStatus.BAD_REQUEST,
-                detail=f"Error processing pay request: {res2.reason}",
-            )
-        callback_url = str(request.url_for("tpos.tposlnurlcharge.callback"))
-        withdraw_res = LnurlWithdrawResponse(
-            k1=charge_id,
-            callback=parse_obj_as(CallbackUrl, callback_url),
-            maxWithdrawable=MilliSatoshi(amount * 1000),
-            minWithdrawable=MilliSatoshi(amount * 1000),
-        )
-        try:
-            res3 = await execute_withdraw(
-                withdraw_res, res2.pr, user_agent="lnbits/tpos"
-            )
-            if isinstance(res3, LnurlErrorResponse):
-                raise HTTPException(
-                    status_code=HTTPStatus.BAD_REQUEST,
-                    detail=f"Error processing withdraw: {res3.reason}",
-                )
-        except Exception as exc:
-            logger.error(f"Error processing withdraw: {exc}")
-
+        pr = await get_pr_from_lnurl(data.pay_link, amount * 1000)
+        result = await lnurl_callback(pr=pr, k1=charge_id)
+        if isinstance(result, LnurlErrorResponse):
+            raise ValueError("ATM payment was not completed.")
         return SimpleStatus(success=True, message="Withdraw processed successfully.")
 
     except Exception as exc:
+        logger.warning("tpos: ATM payment failed: {}", exc)
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
             detail="Cannot process atm withdraw",

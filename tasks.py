@@ -1,5 +1,6 @@
 import asyncio
 import json
+from math import ceil
 
 from lnbits.core.crud import get_user_active_extensions_ids, get_wallet
 from lnbits.core.crud.payments import get_standalone_payment, update_payment
@@ -126,11 +127,22 @@ async def on_invoice_paid(payment: Payment) -> None:
         not payment.extra
         or payment.extra.get("tag") != "tpos"
         or payment.extra.get("tipSplitted")
+        or not payment.success
+        or not payment.is_in
     ):
         return
 
     payment_method = payment.extra.get("payment_method") or _payment_method(payment)
     tpos_payment = await get_tpos_payment_by_hash(payment.payment_hash)
+    tpos_id = payment.extra.get("tpos_id")
+    tpos = await get_tpos(tpos_id) if tpos_id else None
+    if (
+        not tpos
+        or payment.wallet_id != tpos.wallet
+        or not tpos_payment
+        or tpos_payment.tpos_id != tpos.id
+    ):
+        return
     if tpos_payment and not tpos_payment.paid:
         tpos_payment.paid = True
         tpos_payment.status = TposPaymentStatus.PAID
@@ -245,6 +257,33 @@ async def maybe_settle_tab(payment: Payment, tpos, payment_method: str) -> None:
     settlement = (payment.extra or {}).get("tab_settlement")
     if not settlement:
         return
+    amount_msat = settlement.get("amount_msat")
+    if amount_msat is None and tpos.currency.lower() == "sats":
+        amount_msat = (
+            ceil(settlement["amount"]) + (payment.extra.get("tip_amount") or 0)
+        ) * 1000
+    # Pre-update fiat invoices retain their original settlement behavior.
+    if (
+        not payment.success
+        or not payment.is_in
+        or payment.wallet_id != tpos.wallet
+        or payment.extra.get("tpos_id") != tpos.id
+        or (
+            amount_msat is not None
+            and (
+                amount_msat <= 0
+                or (
+                    payment.amount != amount_msat
+                    if "amount_msat" in settlement
+                    else payment.amount < amount_msat
+                )
+            )
+        )
+    ):
+        logger.warning(
+            "tpos: refusing unverified tab settlement for {}", payment.payment_hash
+        )
+        return
 
     try:
         user_id = await ensure_tpos_tabs_access(tpos)
@@ -265,7 +304,11 @@ async def maybe_settle_tab(payment: Payment, tpos, payment_method: str) -> None:
                         "payment_method": payment_method,
                     }
                 ),
-                "idempotency_key": settlement["idempotency_key"],
+                "idempotency_key": (
+                    f"tpos:{payment.payment_hash}"
+                    if "amount_msat" in settlement
+                    else settlement["idempotency_key"]
+                ),
             },
         )
     except Exception as exc:
