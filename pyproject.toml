@@ -20,6 +20,11 @@ dev = [
 [tool.poetry]
 package-mode = false
 
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["../../..", ".."]
+
 [tool.mypy]
 exclude = "(nostr/*)"
 plugins = ["pydantic.mypy"]

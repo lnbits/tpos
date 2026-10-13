@@ -115,6 +115,7 @@ async def test_atm_rejects_non_positive_amounts_and_enforces_cooldown(client):
     )
     assert params.json()["k1"] == charge["id"]
     stored_pos = await get_tpos(pos["id"])
+    assert stored_pos is not None
     stored_pos.withdraw_time = int(time())
     await update_tpos(stored_pos)
     assert not stored_pos.can_withdraw
@@ -124,12 +125,15 @@ async def test_atm_rejects_non_positive_amounts_and_enforces_cooldown(client):
     await update_tpos(stored_pos)
     assert stored_pos.can_withdraw
     saved = await get_lnurlcharge(charge["id"])
+    assert saved is not None
     saved.amount = -25
     await update_lnurlcharge(saved)
     negative = await client.get(f"/tpos/api/v1/lnurl/cb?k1={charge['id']}&pr=bad")
     assert negative.json()["status"] == "ERROR"
-    assert not (await get_lnurlcharge(charge["id"])).claimed
-    assert (await get_tpos(pos["id"])).withdrawn_amount == 0
+    saved = await get_lnurlcharge(charge["id"])
+    stored_pos = await get_tpos(pos["id"])
+    assert saved is not None and not saved.claimed
+    assert stored_pos is not None and stored_pos.withdrawn_amount == 0
 
 
 @pytest.mark.asyncio
@@ -186,6 +190,7 @@ async def test_tab_settlement_matches_paid_amount_and_deduplicates(client, monke
     await pay_invoice(wallet_id=wallet.id, payment_request=invoice["bolt11"])
     payment = await get_standalone_payment(invoice["payment_hash"], incoming=True)
     stored_pos = await get_tpos(pos["id"])
+    assert payment is not None and stored_pos is not None
     for _ in range(2):
         await tasks.maybe_settle_tab(payment, stored_pos, "lightning")
     tabs = (await client.get(f"{base}/tabs")).json()["data"]
@@ -208,6 +213,7 @@ async def test_tab_settlement_matches_paid_amount_and_deduplicates(client, monke
 async def test_inventory_validates_catalog_quantities_and_value(client, monkeypatch):
     _, _, pos = await terminal(client)
     stored = await get_tpos(pos["id"])
+    assert stored is not None
     stored.use_inventory = True
     stored.inventory_id = "inventory"
     stored.inventory_tags = "allowed"
@@ -247,9 +253,9 @@ async def test_inventory_validates_catalog_quantities_and_value(client, monkeypa
         modified["inventory"]["items"][0].update(id=item_id, quantity=stock_qty)
         rejected = await client.post(url, json=modified)
         assert rejected.status_code == 400
-    catalog.assert_awaited_with(
-        (await get_wallet(stored.wallet)).user, "inventory", "allowed", None
-    )
+    wallet = await get_wallet(stored.wallet)
+    assert wallet is not None
+    catalog.assert_awaited_with(wallet.user, "inventory", "allowed", None)
     stored.allow_price_adjustment = True
     await update_tpos(stored)
     payload["amount"] = 2
@@ -306,6 +312,7 @@ async def test_inventory_preserves_tax_and_currency_rounding(
 ):
     _, _, pos = await terminal(client, currency=currency)
     stored = await get_tpos(pos["id"])
+    assert stored is not None
     stored.use_inventory = True
     stored.inventory_id = "inventory"
     stored.inventory_tags = "allowed"
@@ -391,15 +398,17 @@ async def test_fiat_tab_amount_uses_server_rate_and_preserves_legacy(
     await update_wallet_balance(wallet, 200_000)
     await pay_invoice(wallet_id=wallet.id, payment_request=invoice["bolt11"])
     payment = await get_standalone_payment(invoice["payment_hash"], incoming=True)
+    stored_pos = await get_tpos(pos["id"])
+    assert payment is not None and stored_pos is not None
     original_bridge = tasks.create_tab_settlement_for_tpos
     bridge = AsyncMock()
     monkeypatch.setattr(tasks, "create_tab_settlement_for_tpos", bridge)
-    await tasks.maybe_settle_tab(payment, await get_tpos(pos["id"]), "lightning")
+    await tasks.maybe_settle_tab(payment, stored_pos, "lightning")
     bridge.assert_awaited_once()
     monkeypatch.setattr(tasks, "create_tab_settlement_for_tpos", original_bridge)
     payment.extra["tab_settlement"].pop("amount_msat")
     for _ in range(2):
-        await tasks.maybe_settle_tab(payment, await get_tpos(pos["id"]), "lightning")
+        await tasks.maybe_settle_tab(payment, stored_pos, "lightning")
     settlements = await get_tab_settlements(tab["id"])
     assert len(settlements) == 1
     assert settlements[0].idempotency_key == "fiat-security-settlement"
@@ -410,7 +419,9 @@ async def test_fiat_tab_amount_uses_server_rate_and_preserves_legacy(
 async def test_fractional_sats_tab_balance_rounds_up_without_changing_balance(client):
     _, _, pos = await terminal(client)
     data = CreateTposInvoice(amount=22)
-    await services.validate_tpos_sale_amount(await get_tpos(pos["id"]), data, 21.5)
+    stored_pos = await get_tpos(pos["id"])
+    assert stored_pos is not None
+    await services.validate_tpos_sale_amount(stored_pos, data, 21.5)
     assert data.amount == 22
 
 
