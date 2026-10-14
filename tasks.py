@@ -27,13 +27,14 @@ from .services_onchain import fetch_onchain_balance
 from .services_orders import push_order_to_orders
 from .services_tabs import create_tab_settlement_for_tpos
 
+tpos_invoice_queue: asyncio.Queue[Payment] = asyncio.Queue()
+
 
 async def wait_for_paid_invoices():
-    invoice_queue = asyncio.Queue()
-    register_invoice_listener(invoice_queue, "ext_tpos")
+    register_invoice_listener(tpos_invoice_queue, "ext_tpos")
 
     while True:
-        payment = await invoice_queue.get()
+        payment = await tpos_invoice_queue.get()
         await on_invoice_paid(payment)
 
 
@@ -149,10 +150,11 @@ async def on_invoice_paid(payment: Payment) -> None:
         tpos_payment.payment_method = payment_method
         await update_tpos_payment(tpos_payment)
 
-    if payment.extra.get("tpos_processed"):
+    stored_payment = await get_standalone_payment(payment.payment_hash, incoming=True)
+    if not stored_payment or stored_payment.extra.get("tpos_processed"):
         return
 
-    await process_paid_tpos_payment(payment, payment_method=payment_method)
+    await process_paid_tpos_payment(stored_payment, payment_method=payment_method)
 
 
 async def settle_onchain_tpos_payment(tpos_payment) -> None:

@@ -46,6 +46,7 @@ from .services import (
 from .services_inventory import validate_inventory_sale
 from .services_onchain import fetch_onchain_address
 from .services_tabs import get_tab_for_tpos, tab_settlement_tolerance
+from .tasks import tpos_invoice_queue
 from .views_onchain import _validate_watchonly_settings
 
 tpos_payments_router = APIRouter()
@@ -209,7 +210,8 @@ async def api_tpos_create_invoice(
         payment = await create_payment_request(tpos.wallet, invoice_data)
         if tab_settlement:
             payment.extra["tab_settlement"]["amount_msat"] = payment.amount
-            await update_payment(payment)
+            # A provider may already have completed the payment; save only metadata.
+            await update_payment(payment.copy(include={"checking_id", "extra"}))
         if cash_method:
             new_checking_id = f"internal_cash_{payment.payment_hash}"
             await update_payment_checking_id(payment.checking_id, new_checking_id)
@@ -252,6 +254,12 @@ async def api_tpos_create_invoice(
                 mempool_endpoint=mempool_endpoint,
             )
         )
+        # Replay payments whose original event arrived before the tracking row.
+        stored_payment = await get_standalone_payment(
+            payment.payment_hash, incoming=True
+        )
+        if stored_payment and stored_payment.success:
+            await tpos_invoice_queue.put(stored_payment)
         response_payload = _serialize_tpos_invoice_response(payment, tpos_payment)
 
         if tpos.enable_remote:

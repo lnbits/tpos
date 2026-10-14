@@ -1,3 +1,4 @@
+import asyncio
 import ipaddress
 import json
 from decimal import Decimal
@@ -20,10 +21,86 @@ from lnbits.core.services import payments as core_payments
 from lnbits.helpers import create_access_token
 from tabs.crud import get_tab_settlements  # type: ignore[import]
 
-from .. import services, services_inventory, tasks, views_atm, views_lnurl
-from ..crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos
+from .. import (
+    services,
+    services_inventory,
+    tasks,
+    views_atm,
+    views_lnurl,
+    views_payments,
+)
+from ..crud import (
+    get_lnurlcharge,
+    get_tpos,
+    get_tpos_payment_by_hash,
+    update_lnurlcharge,
+    update_tpos,
+)
 from ..models import CreateTposInvoice, TposClean
 from .test_api import _tpos_payload, _user_with_tabs
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("early_event", [False, True])
+async def test_paid_tab_invoice_during_creation_is_preserved_and_processed_once(
+    client, monkeypatch, early_event
+):
+    _, wallet, pos = await terminal(client, tabs_enabled=True, tabs_allow_create=True)
+    base = f"/tpos/api/v1/tposs/{pos['id']}"
+    tab = (await client.post(f"{base}/tabs", json={"name": "Customer"})).json()
+    await client.post(
+        f"{base}/tabs/{tab['id']}/charges",
+        json={"amount": 21, "idempotency_key": "early-payment-charge"},
+    )
+    await update_wallet_balance(wallet, 100)
+    create_request = views_payments.create_payment_request
+    replay = asyncio.Queue()
+    paid_events = []
+    monkeypatch.setattr(views_payments, "tpos_invoice_queue", replay)
+
+    async def pay_during_creation(wallet_id, invoice_data):
+        payment = await create_request(wallet_id, invoice_data)
+        await pay_invoice(wallet_id=wallet.id, payment_request=payment.bolt11)
+        paid = await get_standalone_payment(payment.payment_hash, incoming=True)
+        assert paid is not None and paid.success
+        paid_events.append(paid)
+        if early_event:
+            await tasks.on_invoice_paid(paid)
+        return payment
+
+    monkeypatch.setattr(views_payments, "create_payment_request", pay_during_creation)
+    response = await client.post(
+        f"{base}/invoices",
+        json={
+            "amount": 21,
+            "tab_settlement": {
+                "tab_id": tab["id"],
+                "amount": 21,
+                "idempotency_key": "early-payment-settlement",
+            },
+        },
+    )
+    assert response.status_code == 201, response.text
+    payment_hash = response.json()["payment_hash"]
+    payment = await get_standalone_payment(payment_hash, incoming=True)
+    assert payment is not None and payment.success
+    assert payment.preimage
+    assert payment.extra["tab_settlement"]["amount_msat"] == 21_000
+    assert replay.qsize() == 1
+    replayed_payment = replay.get_nowait()
+    assert replayed_payment.checking_id == payment.checking_id
+
+    order = AsyncMock()
+    monkeypatch.setattr(tasks, "maybe_push_order", order)
+    # The original event predates the amount binding; the replay is also unprocessed.
+    for event in [*paid_events, replayed_payment]:
+        await tasks.on_invoice_paid(event.copy(deep=True))
+    order.assert_awaited_once()
+    settlements = await get_tab_settlements(tab["id"])
+    assert len(settlements) == 1
+    assert settlements[0].idempotency_key == f"tpos:{payment_hash}"
+    tracked = await get_tpos_payment_by_hash(payment_hash)
+    assert tracked is not None and tracked.paid
 
 
 async def terminal(client, **settings):
