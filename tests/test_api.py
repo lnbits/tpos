@@ -1352,3 +1352,151 @@ async def test_pay_invoice_lnurl_withdraw_endpoint(client: AsyncClient, monkeypa
     )
     assert paid.status_code == 200
     assert paid.json()["success"] is True
+
+
+class _FakeLnurlResponse:
+    is_error = False
+
+    def __init__(self, payload):
+        self.payload = payload
+
+    def json(self):
+        return self.payload
+
+
+def _fake_withdraw_client(pin_limit, valid_pin="1234", callbacks=None):
+    """Fake httpx client emulating a LUD-24 service (e.g. boltcards)."""
+    callbacks = callbacks if callbacks is not None else []
+
+    class FakeClient:
+        wrong = 0
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def get(self, url, **kwargs):
+            if "callback" not in str(url):
+                request = {
+                    "tag": "withdrawRequest",
+                    "callback": "https://example.com/callback",
+                    "k1": "abc",
+                }
+                if pin_limit is not None:
+                    request["pinLimit"] = pin_limit
+                return _FakeLnurlResponse(request)
+            params = kwargs["params"]
+            callbacks.append(params)
+            if params.get("pin") != valid_pin:
+                FakeClient.wrong += 1
+                if FakeClient.wrong >= 3:
+                    reason = "Card blocked: too many incorrect PIN attempts"
+                else:
+                    reason = "Invalid PIN"
+                return _FakeLnurlResponse({"status": "ERROR", "reason": reason})
+            return _FakeLnurlResponse({"status": "OK"})
+
+    return FakeClient
+
+
+async def _tpos_for_pin_tests(client: AsyncClient, name: str):
+    _user, wallet = await _user_with_tabs(name)
+    create = await client.post(
+        "/tpos/api/v1/tposs",
+        json=_tpos_payload(),
+        headers={"X-API-KEY": wallet.adminkey},
+    )
+    assert create.status_code == 201
+    return create.json()
+
+
+def _patch_withdraw(monkeypatch, fake_client, amount_msat):
+    monkeypatch.setattr(
+        views_payments.httpx, "AsyncClient", lambda *args, **kwargs: fake_client()
+    )
+    monkeypatch.setattr(
+        views_payments,
+        "bolt11_decode",
+        lambda _pr: SimpleNamespace(amount_msat=amount_msat),
+    )
+
+
+@pytest.mark.asyncio
+async def test_pay_invoice_below_pin_limit_needs_no_pin(
+    client: AsyncClient, monkeypatch
+):
+    tpos = await _tpos_for_pin_tests(client, "pinbelowuser")
+    callbacks: list = []
+    _patch_withdraw(
+        monkeypatch, _fake_withdraw_client(10_000_000, callbacks=callbacks), 9_999_000
+    )
+    paid = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/lnbc1test/pay",
+        json={"lnurl": "example.com/withdraw"},
+    )
+    assert paid.json()["success"] is False  # fake service wants a PIN anyway
+    assert "pin_required" not in paid.json()
+    assert "pin" not in callbacks[0]
+
+
+@pytest.mark.asyncio
+async def test_pay_invoice_pin_flow(client: AsyncClient, monkeypatch):
+    tpos = await _tpos_for_pin_tests(client, "pinflowuser")
+    callbacks: list = []
+    _patch_withdraw(
+        monkeypatch, _fake_withdraw_client(10_000_000, callbacks=callbacks), 10_000_000
+    )
+    first = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/lnbc1test/pay",
+        json={"lnurl": "example.com/withdraw"},
+    )
+    data = first.json()
+    assert data["success"] is False
+    assert data["pin_required"] is True
+    assert callbacks == []  # callback must not be called without a PIN
+
+    url = f"/tpos/api/v1/tposs/{tpos['id']}/invoices/pay-pin"
+    wrong = await client.post(url, json={"pin_token": data["pin_token"], "pin": "0000"})
+    assert wrong.json()["success"] is False
+    assert wrong.json()["pin_retry"] is True
+
+    ok = await client.post(url, json={"pin_token": data["pin_token"], "pin": "1234"})
+    assert ok.json()["success"] is True
+    assert callbacks[-1] == {"k1": "abc", "pr": "lnbc1test", "pin": "1234"}
+
+    # token is single use once the payment succeeded
+    again = await client.post(url, json={"pin_token": data["pin_token"], "pin": "1234"})
+    assert again.json()["pin_expired"] is True
+
+
+@pytest.mark.asyncio
+async def test_pay_invoice_pin_card_blocked(client: AsyncClient, monkeypatch):
+    tpos = await _tpos_for_pin_tests(client, "pinblockuser")
+    _patch_withdraw(monkeypatch, _fake_withdraw_client(1000), 5_000)
+    first = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices/lnbc1test/pay",
+        json={"lnurl": "example.com/withdraw"},
+    )
+    token = first.json()["pin_token"]
+    url = f"/tpos/api/v1/tposs/{tpos['id']}/invoices/pay-pin"
+    for _ in range(2):
+        res = await client.post(url, json={"pin_token": token, "pin": "0000"})
+        assert res.json()["pin_retry"] is True
+    blocked = await client.post(url, json={"pin_token": token, "pin": "0000"})
+    assert blocked.json()["success"] is False
+    assert "pin_retry" not in blocked.json()
+    assert "blocked" in blocked.json()["detail"]
+    gone = await client.post(url, json={"pin_token": token, "pin": "1234"})
+    assert gone.json()["pin_expired"] is True
+
+
+@pytest.mark.asyncio
+async def test_pay_invoice_pin_validation(client: AsyncClient):
+    tpos = await _tpos_for_pin_tests(client, "pinvaliduser")
+    url = f"/tpos/api/v1/tposs/{tpos['id']}/invoices/pay-pin"
+    bad = await client.post(url, json={"pin_token": "x", "pin": "12ab"})
+    assert bad.status_code == 422
+    unknown = await client.post(url, json={"pin_token": "nope", "pin": "1234"})
+    assert unknown.json()["pin_expired"] is True

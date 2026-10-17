@@ -1,9 +1,11 @@
 import json
 from http import HTTPStatus
 from typing import Any, Literal
+from time import time
 from uuid import uuid4
 
 import httpx
+from bolt11 import decode as bolt11_decode
 from fastapi import APIRouter, HTTPException, Query, Request
 from lnbits.core.crud import get_account, get_standalone_payment, get_wallet
 from lnbits.core.crud.payments import update_payment, update_payment_checking_id
@@ -26,6 +28,7 @@ from .models import (
     CreateTposInvoice,
     InventorySale,
     PayLnurlWData,
+    PayLnurlWPin,
     PrintReceiptRequest,
     ReceiptData,
     ReceiptDetailsData,
@@ -306,6 +309,50 @@ async def api_tpos_get_latest_invoices(tpos_id: str):
     return result
 
 
+LNURLW_HEADERS = {"user-agent": "lnbits/tpos"}
+PIN_PENDING_TTL = 120  # seconds a withdrawRequest waits for the PIN
+PIN_PENDING_MAX = 100
+# LUD-24: the card link is single use, so after the first GET the
+# callback/k1 are kept server side until the customer entered the PIN.
+_pin_pending: dict[str, dict[str, Any]] = {}
+
+
+def _pin_pending_cleanup() -> None:
+    now = time()
+    for token in [t for t, v in _pin_pending.items() if v["expires"] < now]:
+        _pin_pending.pop(token, None)
+    while len(_pin_pending) > PIN_PENDING_MAX:
+        _pin_pending.pop(next(iter(_pin_pending)), None)
+
+
+async def _call_withdraw_callback(
+    client: httpx.AsyncClient,
+    callback: str,
+    k1: str,
+    payment_request: str,
+    pin: str | None = None,
+) -> tuple[dict, bool]:
+    """Call the LNURL-withdraw callback. Returns (response, is_error)."""
+    params = {"k1": k1, "pr": payment_request}
+    if pin:
+        params["pin"] = pin
+    r = await client.get(
+        callback, follow_redirects=True, headers=LNURLW_HEADERS, params=params
+    )
+    try:
+        return r.json(), r.is_error
+    except ValueError:
+        return {}, True
+
+
+def _callback_result(resp: dict, is_error: bool) -> dict:
+    if is_error:
+        return {"success": False, "detail": "Error loading callback"}
+    if resp.get("status") == "ERROR":
+        return {"success": False, "detail": resp.get("reason", "")}
+    return {"success": True, "detail": resp}
+
+
 @tpos_payments_router.post(
     "/api/v1/tposs/{tpos_id}/invoices/{payment_request}/pay", status_code=HTTPStatus.OK
 )
@@ -334,45 +381,97 @@ async def api_tpos_pay_invoice(
 
     async with httpx.AsyncClient() as client:
         try:
-            headers = {"user-agent": "lnbits/tpos"}
-            r = await client.get(lnurl, follow_redirects=True, headers=headers)
+            r = await client.get(lnurl, follow_redirects=True, headers=LNURLW_HEADERS)
             if r.is_error:
-                lnurl_response = {"success": False, "detail": "Error loading"}
-            else:
-                resp = r.json()
-                if resp.get("status") == "ERROR":
-                    lnurl_response = {
-                        "success": False,
-                        "detail": resp.get("reason", ""),
-                    }
-                    return lnurl_response
+                return {"success": False, "detail": "Error loading"}
+            resp = r.json()
+            if resp.get("status") == "ERROR":
+                return {"success": False, "detail": resp.get("reason", "")}
+            if resp.get("tag") != "withdrawRequest":
+                return {"success": False, "detail": "Wrong tag type"}
 
-                if resp.get("tag") != "withdrawRequest":
-                    lnurl_response = {"success": False, "detail": "Wrong tag type"}
-                else:
-                    r2 = await client.get(
-                        resp.get("callback", ""),
-                        follow_redirects=True,
-                        headers=headers,
-                        params={
-                            "k1": resp.get("k1", ""),
-                            "pr": payment_request,
-                        },
-                    )
-                    resp2 = r2.json()
-                    if r2.is_error:
-                        lnurl_response = {
+            callback = resp.get("callback", "")
+            k1 = resp.get("k1", "")
+
+            # LUD-24: PIN is mandatory if amount >= pinLimit
+            pin_limit = resp.get("pinLimit")
+            if pin_limit is not None:
+                try:
+                    amount_msat = bolt11_decode(payment_request).amount_msat
+                except Exception:
+                    return {"success": False, "detail": "Invalid payment request"}
+                if amount_msat is None or amount_msat >= int(pin_limit):
+                    if not callback.lower().startswith("https://"):
+                        return {
                             "success": False,
-                            "detail": "Error loading callback",
+                            "detail": "PIN required but callback is not HTTPS",
                         }
-                    elif resp2.get("status") == "ERROR":
-                        lnurl_response = {"success": False, "detail": resp2["reason"]}
-                    else:
-                        lnurl_response = {"success": True, "detail": resp2}
-        except (httpx.ConnectError, httpx.RequestError):
-            lnurl_response = {"success": False, "detail": "Unexpected error occurred"}
+                    _pin_pending_cleanup()
+                    pin_token = uuid4().hex
+                    _pin_pending[pin_token] = {
+                        "tpos_id": tpos_id,
+                        "callback": callback,
+                        "k1": k1,
+                        "payment_request": payment_request,
+                        "expires": time() + PIN_PENDING_TTL,
+                    }
+                    return {
+                        "success": False,
+                        "pin_required": True,
+                        "pin_token": pin_token,
+                        "detail": "PIN required",
+                    }
 
-    return lnurl_response
+            cb_resp, is_error = await _call_withdraw_callback(
+                client, callback, k1, payment_request
+            )
+            return _callback_result(cb_resp, is_error)
+        except (httpx.ConnectError, httpx.RequestError):
+            return {"success": False, "detail": "Unexpected error occurred"}
+
+
+@tpos_payments_router.post(
+    "/api/v1/tposs/{tpos_id}/invoices/pay-pin", status_code=HTTPStatus.OK
+)
+async def api_tpos_pay_invoice_pin(data: PayLnurlWPin, tpos_id: str):
+    tpos = await get_tpos(tpos_id)
+    if not tpos:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
+        )
+
+    _pin_pending_cleanup()
+    pending = _pin_pending.get(data.pin_token)
+    if not pending or pending["tpos_id"] != tpos_id:
+        return {
+            "success": False,
+            "pin_expired": True,
+            "detail": "PIN request expired. Please tap the card again.",
+        }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            cb_resp, is_error = await _call_withdraw_callback(
+                client,
+                pending["callback"],
+                pending["k1"],
+                pending["payment_request"],
+                data.pin,
+            )
+        except (httpx.ConnectError, httpx.RequestError):
+            _pin_pending.pop(data.pin_token, None)
+            return {"success": False, "detail": "Unexpected error occurred"}
+
+    result = _callback_result(cb_resp, is_error)
+    if result["success"]:
+        _pin_pending.pop(data.pin_token, None)
+    elif str(result["detail"]).strip().lower() == "invalid pin":
+        # the card allows retries after a wrong PIN
+        result["pin_retry"] = True
+        pending["expires"] = time() + PIN_PENDING_TTL
+    else:
+        _pin_pending.pop(data.pin_token, None)
+    return result
 
 
 @tpos_payments_router.get(

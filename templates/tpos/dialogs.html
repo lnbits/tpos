@@ -57,6 +57,16 @@
     </q-card>
   </q-dialog>
 
+  <tpos-pin-dialog
+    :show="pinDialog.show"
+    :amount="activePaymentAmountWithTipFormatted"
+    :attempts-left="pinDialog.attemptsLeft"
+    :error="pinDialog.error"
+    :loading="pinDialog.loading"
+    @submit="submitPin"
+    @cancel="cancelPin"
+  ></tpos-pin-dialog>
+
   <tpos-print-dialog
     v-model:show="printDialog.show"
     :payment-hash="printDialog.paymentHash"
