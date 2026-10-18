@@ -39,6 +39,7 @@ const pages = [
       'static/components/keypad.js',
       'static/components/payment-method-selector.js',
       'static/components/payment-dialog.js',
+      'static/components/pin-dialog.js',
       'static/components/held-carts-dialog.js',
       'static/components/print-dialog.js',
       'static/components/receipt.js',

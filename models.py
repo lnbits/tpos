@@ -13,6 +13,11 @@ class PayLnurlWData(BaseModel):
     lnurl: str
 
 
+class PayLnurlWPin(BaseModel):
+    pin_token: str = Field(..., min_length=1, max_length=64)
+    pin: str = Field(..., pattern=r"^\d{4}$")
+
+
 class CreateWithdrawPay(BaseModel):
     pay_link: str
 

@@ -42,6 +42,14 @@ window.app = Vue.createApp({
       atmMode: false,
       atmToken: '',
       nfcTagReading: false,
+      pinDialog: {
+        show: false,
+        token: null,
+                failedAttempts: 0,
+        attemptsLeft: 0,
+        error: '',
+        loading: false
+      },
       lnaddressDialog: {
         show: false,
         lnaddress: ''
@@ -1642,26 +1650,82 @@ window.app = Vue.createApp({
           }
         )
         .then(response => {
-          if (!response.data.success) {
-            Quasar.Notify.create({
-              type: 'negative',
-              message: response.data.detail,
-              timeout: 0,
-              actions: [
-                {
-                  icon: 'close',
-                  color: 'white',
-                  round: true,
-                  handler: () => {
-                    this.readNfcTag()
-                  }
-                }
-              ]
-            })
+          if (response.data.pin_required) {
+            this.openPinDialog(response.data.pin_token)
+          } else if (!response.data.success) {
+            this.notifyNfcError(response.data.detail)
           }
         })
         .catch(error => {
           console.error(error)
+          LNbits.utils.notifyApiError(error)
+        })
+    },
+    notifyNfcError(message) {
+      Quasar.Notify.create({
+        type: 'negative',
+        message,
+        timeout: 0,
+        actions: [
+          {
+            icon: 'close',
+            color: 'white',
+            round: true,
+            handler: () => {
+              this.readNfcTag()
+            }
+          }
+        ]
+      })
+    },
+    // LUD-24: the card asks for a PIN, it allows 3 wrong attempts in total
+    openPinDialog(token) {
+      this.pinDialog = {
+        show: true,
+        token,
+        failedAttempts: 0,
+        attemptsLeft: 0,
+        error: '',
+        loading: false
+      }
+    },
+    closePinDialog() {
+      this.pinDialog.show = false
+      this.pinDialog.token = null
+      this.pinDialog.loading = false
+    },
+    cancelPin() {
+      this.closePinDialog()
+      this.readNfcTag()
+    },
+    submitPin(pin) {
+      this.pinDialog.loading = true
+      this.pinDialog.error = ''
+      return axios
+        .post(`/tpos/api/v1/tposs/${this.tposId}/invoices/pay-pin`, {
+          pin_token: this.pinDialog.token,
+          pin
+        })
+        .then(response => {
+          const data = response.data
+          if (data.success) {
+            this.closePinDialog()
+          } else if (data.pin_retry) {
+            this.pinDialog.failedAttempts += 1
+            this.pinDialog.attemptsLeft = Math.max(
+              0,
+              3 - this.pinDialog.failedAttempts
+            )
+            this.pinDialog.error = 'Wrong PIN'
+            this.pinDialog.loading = false
+          } else {
+            this.closePinDialog()
+            this.notifyNfcError(data.detail)
+          }
+        })
+        .catch(error => {
+          console.error(error)
+          this.closePinDialog()
           LNbits.utils.notifyApiError(error)
         })
     },
