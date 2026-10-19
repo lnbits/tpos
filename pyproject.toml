@@ -20,6 +20,9 @@ dev = [
 [tool.poetry]
 package-mode = false
 
+# Keep UV configuration independent of a parent LNbits checkout.
+[tool.uv]
+
 [tool.mypy]
 exclude = "(nostr/*)"
 plugins = ["pydantic.mypy"]
