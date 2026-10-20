@@ -6,12 +6,11 @@ from lnbits.core.crud import (
     get_user,
 )
 from lnbits.core.models import WalletTypeInfo
+from lnbits.core.services import lnurl as core_lnurl
 from lnbits.decorators import (
     require_admin_key,
-    require_invoice_key,
 )
 from lnurl import LnurlPayResponse
-from lnurl import handle as lnurl_handle
 
 from .crud import (
     create_tpos,
@@ -52,7 +51,7 @@ tpos_api_router.include_router(tpos_payments_router)
 @tpos_api_router.get("/api/v1/tposs", status_code=HTTPStatus.OK)
 async def api_tposs(
     all_wallets: bool = Query(False),
-    key_info: WalletTypeInfo = Depends(require_invoice_key),
+    key_info: WalletTypeInfo = Depends(require_admin_key),
 ) -> list[Tpos]:
     wallet_ids = [key_info.wallet.id]
     if all_wallets:
@@ -199,7 +198,7 @@ async def api_tpos_create_items(
 @tpos_api_router.get("/api/v1/tposs/lnaddresscheck", status_code=HTTPStatus.OK)
 async def api_tpos_check_lnaddress(lnaddress: str):
     try:
-        res = await lnurl_handle(lnaddress)
+        res = await core_lnurl.handle(lnaddress)
     except Exception as exc:
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
