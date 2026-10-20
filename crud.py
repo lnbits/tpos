@@ -60,7 +60,7 @@ async def set_wrapper_assetlinks_cache(
 
 async def create_tpos(data: CreateTposData) -> Tpos:
     tpos_id = urlsafe_short_hash()
-    data_dict = data.dict()
+    data_dict = data.model_dump()
     data_dict["inventory_tags"] = serialize_inventory_tags(data.inventory_tags)
     data_dict["inventory_omit_tags"] = serialize_inventory_tags(
         data.inventory_omit_tags

@@ -20,7 +20,7 @@ from lnurl import (
 )
 from lnurl import handle as lnurl_handle
 from loguru import logger
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 
 from .crud import (
     create_lnurlcharge,
@@ -167,7 +167,7 @@ async def api_tpos_atm_pay(
         callback_url = str(request.url_for("tpos.tposlnurlcharge.callback"))
         withdraw_res = LnurlWithdrawResponse(
             k1=charge_id,
-            callback=parse_obj_as(CallbackUrl, callback_url),
+            callback=TypeAdapter(CallbackUrl).validate_python(callback_url),
             maxWithdrawable=MilliSatoshi(amount * 1000),
             minWithdrawable=MilliSatoshi(amount * 1000),
         )

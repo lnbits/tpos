@@ -6,7 +6,7 @@ from time import time
 from typing import Any, Literal
 
 from fastapi import Query
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PayLnurlWData(BaseModel):
@@ -20,8 +20,7 @@ class CreateWithdrawPay(BaseModel):
 class AuthorizeAtm(BaseModel):
     password: str = Field(..., min_length=1, max_length=256)
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class CreateTposInvoiceTabSettlement(BaseModel):
@@ -62,15 +61,15 @@ class InventorySale(BaseModel):
 
 
 class CreateTposData(BaseModel):
-    wallet: str | None
-    name: str | None
-    currency: str | None
+    wallet: str | None = None
+    name: str | None = None
+    currency: str | None = None
     use_inventory: bool = Field(False)
     inventory_id: str | None = None
     inventory_tags: list[str] | None = None
     inventory_omit_tags: list[str] | None = None
     tax_inclusive: bool = Field(True)
-    tax_default: float | None = Field(0.0)
+    tax_default: float | None = Field(0.0, validate_default=True)
     tip_options: str = Field("[]")
     tip_wallet: str = Field("")
     withdraw_time: int = Field(0)
@@ -82,9 +81,9 @@ class CreateTposData(BaseModel):
     lnaddress_cut: int | None = Field(0)
     enable_receipt_print: bool = Query(False)
     enable_remote: bool = Query(False)
-    business_name: str | None
-    business_address: str | None
-    business_vat_id: str | None
+    business_name: str | None = None
+    business_address: str | None = None
+    business_vat_id: str | None = None
     only_show_sats_on_bitcoin: bool = Query(True)
     allow_price_adjustment: bool = Field(True)
     fiat_provider: str | None = Field(None)
@@ -97,7 +96,8 @@ class CreateTposData(BaseModel):
     tabs_enabled: bool = Field(False)
     tabs_allow_create: bool = Field(False)
 
-    @validator("tax_default", pre=True, always=True)
+    @field_validator("tax_default", mode="before")
+    @classmethod
     def default_tax_when_none(cls, v):
         return 0.0 if v is None else v
 
@@ -236,7 +236,7 @@ class CreateTposTabData(BaseModel):
 class CreateTposTabCharge(BaseModel):
     amount: float = Field(..., gt=0)
     description: str | None = Field(None, max_length=512)
-    items: list[dict[str, Any]] = Field(default_factory=list, max_items=200)
+    items: list[dict[str, Any]] = Field(default_factory=list, max_length=200)
     notes: dict[str, Any] | None = None
     internal_memo: str | None = Field(None, max_length=512)
     idempotency_key: str = Field(..., min_length=8, max_length=128)
@@ -250,15 +250,16 @@ class LnurlCharge(BaseModel):
 
 
 class Item(BaseModel):
-    image: str | None
+    image: str | None = None
     price: float
     title: str
-    description: str | None
-    tax: float | None = Field(0, ge=0.0)
+    description: str | None = None
+    tax: float | None = Field(0, ge=0.0, validate_default=True)
     disabled: bool = False
     categories: list[str] | None = []
 
-    @validator("tax", pre=True, always=True)
+    @field_validator("tax", mode="before")
+    @classmethod
     def set_default_tax(cls, v):
         return v or 0
 
@@ -405,7 +406,7 @@ class ReceiptData(BaseModel):
         return "\n".join(lines)
 
     def to_api_dict(self) -> dict[str, Any]:
-        data = self.dict()
+        data = self.model_dump()
         details = data.get("extra", {}).get("details", {})
         details["exchangeRate"] = details.pop("exchange_rate", 1.0)
         details["taxValue"] = details.pop("tax_value", 0.0)
@@ -425,4 +426,4 @@ class ReceiptPrint(BaseModel):
     receipt: dict[str, Any] = Field(default_factory=dict)
 
 
-CreateTposInvoice.update_forward_refs(InventorySale=InventorySale)
+CreateTposInvoice.model_rebuild()

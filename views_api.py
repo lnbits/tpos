@@ -106,7 +106,7 @@ async def api_tpos_update(
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
     user = await get_user(wallet.wallet.user)
-    update_payload = data.dict(exclude_unset=True)
+    update_payload = data.model_dump(exclude_unset=True)
     update_payload.pop("wallet", None)
     desired_onchain_enabled = update_payload.get(
         "onchain_enabled", tpos.onchain_enabled
@@ -191,7 +191,7 @@ async def api_tpos_create_items(
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
 
-    tpos.items = json.dumps(data.dict()["items"])
+    tpos.items = json.dumps(data.model_dump()["items"])
     tpos = await update_tpos(tpos)
     return tpos
 

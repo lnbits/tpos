@@ -18,7 +18,7 @@ from lnbits.core.services import (
 )
 from lnbits.core.services.users import create_user_account_no_ckeck
 from lnbits.settings import settings
-from lnbits.tasks import internal_invoice_queue
+from lnbits.task_manager import task_manager
 from tabs.crud import (  # type: ignore[import]
     get_tab_by_id,
     get_tab_entries,
@@ -76,7 +76,7 @@ async def _user_with_tabs(username: str = "tposuser"):
 async def _drain_internal_invoice_queue() -> None:
     while True:
         try:
-            internal_invoice_queue.get_nowait()
+            task_manager.internal_invoice_queue.get_nowait()
         except asyncio.QueueEmpty:
             return
 
@@ -1273,11 +1273,13 @@ async def test_atm_pay_endpoint(client: AsyncClient, monkeypatch):
     charge = charge_response.json()
 
     async def fake_lnurl_handle(pay_link, user_agent=None):
-        return views_atm.LnurlPayResponse(
-            callback="https://example.com/cb",
-            minSendable=1000,
-            maxSendable=1000,
-            metadata='[["text/plain","test"]]',
+        return views_atm.LnurlPayResponse.model_validate(
+            {
+                "callback": "https://example.com/cb",
+                "minSendable": 1000,
+                "maxSendable": 1000,
+                "metadata": '[["text/plain","test"]]',
+            }
         )
 
     class FakePayResponse:
