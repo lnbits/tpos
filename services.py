@@ -1,9 +1,11 @@
 from http import HTTPStatus
+from math import ceil, isfinite
 
 from fastapi import HTTPException
 from lnbits.core.crud import get_wallet
+from lnbits.utils.exchange_rates import fiat_amount_as_satoshis
 
-from .models import Tpos
+from .models import CreateTposInvoice, Tpos
 from .services_tabs import (
     tabs_available_for_user,
 )
@@ -32,3 +34,32 @@ async def ensure_tpos_tabs_access(tpos: Tpos) -> str:
             detail="Tabs integration is unavailable for this TPoS.",
         )
     return user_id
+
+
+async def validate_tpos_sale_amount(
+    tpos: Tpos, data: CreateTposInvoice, amount: float, *, minimum: bool = False
+) -> None:
+    if not isfinite(amount) or amount <= 0:
+        raise HTTPException(HTTPStatus.BAD_REQUEST, "Invalid sale amount.")
+    if tpos.currency.lower() == "sats":
+        expected = ceil(amount)
+        if data.amount < expected if minimum else data.amount != expected:
+            raise HTTPException(
+                HTTPStatus.BAD_REQUEST, "Invoice amount does not match the sale."
+            )
+        return
+
+    supplied = data.amount_fiat if data.amount_fiat is not None else amount
+    if not minimum and abs(supplied - amount) > 0.01:
+        raise HTTPException(
+            HTTPStatus.BAD_REQUEST, "Invoice amount does not match the sale."
+        )
+    if minimum:
+        amount = max(supplied, amount)
+    data.amount = await fiat_amount_as_satoshis(amount, tpos.currency)
+    if data.amount <= 0:
+        raise HTTPException(HTTPStatus.BAD_REQUEST, "Sale amount is below one satoshi.")
+    data.amount_fiat = amount
+    data.exchange_rate = data.amount / amount
+    if data.details:
+        data.details["exchangeRate"] = data.exchange_rate

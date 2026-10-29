@@ -305,7 +305,7 @@ window.app = Vue.createApp({
         .request(
           'GET',
           '/tpos/api/v1/tposs?all_wallets=true',
-          this.g.user.wallets[0].inkey
+          this.g.user.wallets[0].adminkey
         )
         .then(response => {
           this.tposs = response.data.map(obj => {

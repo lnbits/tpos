@@ -61,6 +61,13 @@ async def lnurl_params(
             reason=f"TPoS {lnurlcharge.tpos_id} not found on this server"
         )
 
+    if (
+        lnurlcharge.claimed
+        or amount <= 0
+        or amount != lnurlcharge.amount
+        or not tpos.can_withdraw
+    ):
+        return LnurlErrorResponse(reason="Invalid or expired ATM charge")
     if amount > tpos.withdraw_maximum:
         return LnurlErrorResponse(
             reason=(
@@ -96,7 +103,7 @@ async def lnurl_callback(
     if not lnurlcharge:
         return LnurlErrorResponse(reason=f"lnurlcharge {k1} not found on this server")
 
-    if not lnurlcharge.amount:
+    if lnurlcharge.amount <= 0:
         return LnurlErrorResponse(reason=f"LnurlCharge {k1} has no amount specified")
 
     if lnurlcharge.claimed:
@@ -108,6 +115,8 @@ async def lnurl_callback(
             reason=f"TPoS {lnurlcharge.tpos_id} not found on this server"
         )
 
+    if not tpos.can_withdraw:
+        return LnurlErrorResponse(reason="Withdrawals are not allowed at this time")
     if lnurlcharge.amount > tpos.withdraw_maximum:
         return LnurlErrorResponse(
             reason=(

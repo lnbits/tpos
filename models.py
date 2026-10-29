@@ -153,8 +153,7 @@ class TposClean(BaseModel):
             if self.withdraw_time_option != "secs"
             else self.withdraw_between
         )
-        last_withdraw_time = self.withdraw_time - now
-        return last_withdraw_time < seconds
+        return now - self.withdraw_time >= seconds
 
 
 class Tpos(TposClean, BaseModel):
