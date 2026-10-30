@@ -1,6 +1,6 @@
 {
   "id": "tpos",
-  "version": "1.2.0",
+  "version": "1.7.0",
   "name": "TPoS",
   "repo": "https://github.com/lnbits/tpos",
   "short_description": "A shareable PoS terminal!",
