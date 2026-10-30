@@ -159,7 +159,7 @@ async def api_tpos_create_invoice(
             "base_url": str(request.base_url),
         }
         if tab_settlement:
-            extra["tab_settlement"] = tab_settlement.dict()
+            extra["tab_settlement"] = tab_settlement.model_dump()
         if (inventory_payload or tab_settlement) and data.amount_fiat is not None:
             extra["amount_fiat"] = data.amount_fiat
         if cash_method or onchain_method:
@@ -188,7 +188,7 @@ async def api_tpos_create_invoice(
                         )
                         await update_account(account)
         if inventory_payload:
-            extra["inventory"] = inventory_payload.dict()
+            extra["inventory"] = inventory_payload.model_dump()
         if data.pay_in_fiat:
             extra["fiat_method"] = data.fiat_method if data.fiat_method else "checkout"
             if data.fiat_method == "terminal" and tpos.stripe_reader_id:
@@ -211,7 +211,9 @@ async def api_tpos_create_invoice(
         if tab_settlement:
             payment.extra["tab_settlement"]["amount_msat"] = payment.amount
             # A provider may already have completed the payment; save only metadata.
-            await update_payment(payment.copy(include={"checking_id", "extra"}))
+            await update_payment(
+                payment.copy(include={"checking_id", "wallet_id", "extra"})
+            )
         if cash_method:
             new_checking_id = f"internal_cash_{payment.payment_hash}"
             await update_payment_checking_id(payment.checking_id, new_checking_id)
@@ -294,8 +296,10 @@ async def api_tpos_create_invoice(
                     tpos_id=tpos_id,
                     payment_hash=payment.payment_hash,
                 )
-                await websocket_updater(tpos_id, json.dumps(tap_to_pay_payload.dict()))
-        return response_payload.dict()
+                await websocket_updater(
+                    tpos_id, json.dumps(tap_to_pay_payload.model_dump())
+                )
+        return response_payload.model_dump()
 
     except Exception as exc:
         raise HTTPException(
@@ -437,7 +441,7 @@ async def api_tpos_print_invoice(
         print_text=receipt.render_text(receipt_type),
         receipt=receipt.to_api_dict(),
     )
-    await websocket_updater(tpos_id, json.dumps(payload.dict()))
+    await websocket_updater(tpos_id, json.dumps(payload.model_dump()))
     return {"success": True}
 
 

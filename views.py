@@ -20,7 +20,7 @@ def tpos_renderer():
 @tpos_generic_router.get("/", response_class=HTMLResponse)
 async def index(request: Request, user: User = Depends(check_user_exists)):
     return tpos_renderer().TemplateResponse(
-        "tpos/index.html", {"request": request, "user": user.json()}
+        "tpos/index.html", {"request": request, "user": user.model_dump_json()}
     )
 
 
@@ -32,12 +32,12 @@ async def tpos(request: Request, tpos_id, lnaddress: str | None = ""):
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS does not exist."
         )
 
-    tpos_clean = TposClean(**tpos.dict())
+    tpos_clean = TposClean(**tpos.model_dump())
     response = tpos_renderer().TemplateResponse(
         "tpos/tpos.html",
         {
             "request": request,
-            "tpos": tpos_clean.json(),
+            "tpos": tpos_clean.model_dump_json(),
             "lnaddressparam": lnaddress,
             "withdraw_maximum": tpos.withdraw_maximum,
             "web_manifest": f"/tpos/manifest/{tpos_id}.webmanifest",

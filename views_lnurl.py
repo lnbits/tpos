@@ -10,7 +10,7 @@ from lnurl import (
     MilliSatoshi,
 )
 from loguru import logger
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 
 from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos
 
@@ -77,8 +77,8 @@ async def lnurl_params(
         )
 
     logger.debug(f"Amount to withdraw: {amount}")
-    callback = parse_obj_as(
-        CallbackUrl, str(request.url_for("tpos.tposlnurlcharge.callback"))
+    callback = TypeAdapter(CallbackUrl).validate_python(
+        str(request.url_for("tpos.tposlnurlcharge.callback"))
     )
     return LnurlWithdrawResponse(
         callback=callback,

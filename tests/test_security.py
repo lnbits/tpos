@@ -94,7 +94,7 @@ async def test_paid_tab_invoice_during_creation_is_preserved_and_processed_once(
     monkeypatch.setattr(tasks, "maybe_push_order", order)
     # The original event predates the amount binding; the replay is also unprocessed.
     for event in [*paid_events, replayed_payment]:
-        await tasks.on_invoice_paid(event.copy(deep=True))
+        await tasks.on_invoice_paid(event.model_copy(deep=True))
     order.assert_awaited_once()
     settlements = await get_tab_settlements(tab["id"])
     assert len(settlements) == 1
@@ -135,7 +135,7 @@ async def test_owner_listing_requires_admin_key_and_stays_in_account(client):
     )
     assert {row["id"] for row in listing.json()} == {pos["id"], second.json()["id"]}
     assert all(set(row) == set(pos) for row in listing.json())
-    public = TposClean(**pos).dict()
+    public = TposClean(**pos).model_dump()
     assert "wallet" not in public
     assert "tip_wallet" not in public
     assert "adminkey" not in pos and "inkey" not in pos
@@ -281,7 +281,7 @@ async def test_tab_settlement_matches_paid_amount_and_deduplicates(client, monke
         {"extra": {**payment.extra, "tpos_id": uuid4().hex}},
     ):
         await tasks.maybe_settle_tab(
-            payment.copy(update=changed), stored_pos, "lightning"
+            payment.model_copy(update=changed), stored_pos, "lightning"
         )
     bridge.assert_not_awaited()
 

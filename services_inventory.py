@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from lnbits.core.crud import get_wallet
 from lnbits.core.models import User
 from lnbits.settings import settings
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .helpers import create_internal_user_access_token, from_csv, inventory_tags_to_list
 from .models import CreateTposInvoice, Tpos
@@ -20,8 +20,7 @@ class InventoryCartItem(BaseModel):
     quantity: int = Field(..., ge=1)
     price: float = Field(..., ge=0)
 
-    class Config:
-        allow_inf_nan = False
+    model_config = ConfigDict(allow_inf_nan=False)
 
 
 async def validate_inventory_sale(tpos: Tpos, data: CreateTposInvoice) -> None:
