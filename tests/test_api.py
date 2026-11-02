@@ -25,6 +25,7 @@ from tabs.crud import (  # type: ignore[import]
     get_tab_settlements,
 )
 
+import tpos.services as services  # type: ignore[import]
 import tpos.tasks as tpos_tasks  # type: ignore[import]
 import tpos.views_api as views_api  # type: ignore[import]
 import tpos.views_atm as views_atm  # type: ignore[import]
@@ -478,6 +479,9 @@ async def test_remote_invoice_payload_keeps_fiat_tip_amount(
         sent_messages.append((channel, json.loads(message)))
 
     monkeypatch.setattr(views_payments, "websocket_updater", fake_websocket_updater)
+    monkeypatch.setattr(
+        services, "fiat_amount_as_satoshis", AsyncMock(return_value=36800)
+    )
     invoice_response = await client.post(
         f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
         json={

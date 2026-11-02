@@ -493,6 +493,68 @@ async def test_fiat_tab_amount_uses_server_rate_and_preserves_legacy(
 
 
 @pytest.mark.asyncio
+async def test_fiat_keypad_sale_uses_server_rate(client, monkeypatch):
+    _, _, pos = await terminal(client, currency="BRL")
+    url = f"/tpos/api/v1/tposs/{pos['id']}/invoices"
+
+    async def convert(value, _currency):
+        return int(Decimal(str(value)) * 229)
+
+    monkeypatch.setattr(services, "fiat_amount_as_satoshis", convert)
+    # A client whose rate fetch failed and fell back to 1 sat per BRL (#264).
+    data = {
+        "amount": 15,
+        "amount_fiat": 14.45,
+        "exchange_rate": 1,
+    }
+    created = await client.post(url, json=data)
+    assert created.status_code == 201, created.text
+    extra = created.json()["extra"]
+    assert extra["amount"] == 3309
+    assert extra["exchangeRate"] == pytest.approx(3309 / 14.45)
+    assert extra["details"]["exchangeRate"] == pytest.approx(3309 / 14.45)
+
+    async def no_rate(_value, currency):
+        raise ValueError(f"Could not get exchange rate for {currency}.")
+
+    monkeypatch.setattr(services, "fiat_amount_as_satoshis", no_rate)
+    unavailable = await client.post(url, json=data)
+    assert unavailable.status_code == 503
+    assert "Exchange rate not available" in unavailable.text
+
+
+@pytest.mark.asyncio
+async def test_fiat_keypad_sale_tax_uses_repriced_amount(client, monkeypatch):
+    _, _, pos = await terminal(client, currency="BRL", tax_default=10)
+
+    async def convert(value, _currency):
+        return int(Decimal(str(value)) * 229)
+
+    monkeypatch.setattr(services, "fiat_amount_as_satoshis", convert)
+    created = await client.post(
+        f"/tpos/api/v1/tposs/{pos['id']}/invoices",
+        json={"amount": 15, "amount_fiat": 14.45, "exchange_rate": 1},
+    )
+    assert created.status_code == 201, created.text
+    details = created.json()["extra"]["details"]
+    assert details["taxValue"] == pytest.approx(14.45 * 0.1 / 1.1)
+
+
+@pytest.mark.asyncio
+async def test_sats_keypad_sale_amount_is_unchanged(client, monkeypatch):
+    _, _, pos = await terminal(client)
+    convert = AsyncMock(side_effect=AssertionError("no conversion for sats"))
+    monkeypatch.setattr(services, "fiat_amount_as_satoshis", convert)
+    created = await client.post(
+        f"/tpos/api/v1/tposs/{pos['id']}/invoices",
+        json={"amount": 21, "tip_amount": 3},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["extra"]["amount"] == 21
+    assert created.json()["extra"]["tip_amount"] == 3
+
+
+@pytest.mark.asyncio
 async def test_fractional_sats_tab_balance_rounds_up_without_changing_balance(client):
     _, _, pos = await terminal(client)
     data = CreateTposInvoice(amount=22)

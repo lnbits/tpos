@@ -87,6 +87,16 @@ async def api_tpos_create_invoice(
                 detail="Provided tags are not allowed for this TPoS.",
             )
 
+    if (
+        tpos.currency.lower() != "sats"
+        and data.amount_fiat is not None
+        and not (data.tab_settlement or inventory_payload or data.pay_in_fiat)
+    ):
+        # Keypad sales: price the sats on the server, so a client that fell back
+        # to a wrong exchange rate can't undercharge. Runs before the
+        # default details, so their tax uses the repriced amount.
+        await validate_tpos_sale_amount(tpos, data, data.amount_fiat)
+
     if not data.details:
         tax_value = 0.0
         if tpos.tax_default and data.exchange_rate:

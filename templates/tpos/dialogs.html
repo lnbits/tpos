@@ -180,6 +180,7 @@
               <q-item-label v-if="payment.amountFiat">
                 <span class="text-bold" v-text="payment.amountFiat"></span>
                 <span
+                  v-if="payment.amountFiatNow"
                   class="text-italic q-ml-sm"
                   v-text="`(${payment.amountFiatNow})`"
                 >
