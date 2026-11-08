@@ -1187,7 +1187,7 @@ async def test_atm_and_lnurl_withdraw_routes(client: AsyncClient, monkeypatch):
     assert params.json()["k1"] == charge["id"]
 
     async def fake_pay_invoice(**kwargs):
-        return None
+        return SimpleNamespace(success=True, failed=False)
 
     async def fake_websocket_updater(channel, message):
         return None
