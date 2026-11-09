@@ -166,6 +166,7 @@ async def api_tpos_create_invoice(
             extra["amount_fiat"] = data.amount_fiat
         onchain_address = None
         mempool_endpoint = None
+        wallet = None
         if cash_method or onchain_method:
             wallet = await get_wallet(tpos.wallet)
             account = await get_account(wallet.user) if wallet else None

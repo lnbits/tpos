@@ -120,6 +120,7 @@ def mempool_transport(client, monkeypatch):
 
     async def resolve(self, host, port, **kwargs):
         address = destinations.get(host, host)
+        assert address is not None
         try:
             ipaddress.ip_address(address)
         except ValueError:
@@ -256,17 +257,13 @@ async def test_onchain_endpoint_entry_and_polling_are_protected(
         "fetch_watchonly_wallet",
         AsyncMock(return_value={"network": network}),
     )
-    monkeypatch.setattr(
-        views_payments,
-        "fetch_onchain_address",
-        AsyncMock(return_value={"address": address}),
-    )
+    fetch_address = AsyncMock(return_value={"address": address})
+    monkeypatch.setattr(views_payments, "fetch_onchain_address", fetch_address)
     url = f"/tpos/api/v1/tposs/{pos['id']}/invoices"
     payload = {"amount": 42, "payment_method": "btc_onchain"}
     create_invoice = AsyncMock(wraps=views_payments.create_payment_request)
     create_tracking = AsyncMock(wraps=views_payments.create_tpos_payment)
     update_account = AsyncMock(wraps=views_payments.update_account)
-    fetch_address = views_payments.fetch_onchain_address
 
     async def address_after_invoice(*args):
         create_invoice.assert_awaited_once()
