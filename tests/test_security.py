@@ -1,11 +1,13 @@
 import asyncio
 import ipaddress
 import json
+import socket
 from decimal import Decimal
 from time import time
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import httpx
 import pytest
 from lnbits.core.crud import get_wallet
 from lnbits.core.crud.payments import get_standalone_payment
@@ -19,14 +21,18 @@ from lnbits.core.services import (
 from lnbits.core.services import lnurl as core_lnurl
 from lnbits.core.services import payments as core_payments
 from lnbits.helpers import create_access_token
+from lnbits.settings import settings
+from lnbits.utils import safe_http
 from tabs.crud import get_tab_settlements  # type: ignore[import]
 
 from .. import (
     services,
     services_inventory,
+    services_onchain,
     tasks,
     views_atm,
     views_lnurl,
+    views_onchain,
     views_payments,
 )
 from ..crud import (
@@ -35,6 +41,7 @@ from ..crud import (
     get_tpos_payment_by_hash,
     update_lnurlcharge,
     update_tpos,
+    update_tpos_payment,
 )
 from ..models import CreateTposInvoice, TposClean
 from .test_api import _tpos_payload, _user_with_tabs
@@ -101,6 +108,240 @@ async def test_paid_tab_invoice_during_creation_is_preserved_and_processed_once(
     assert settlements[0].idempotency_key == f"tpos:{payment_hash}"
     tracked = await get_tpos_payment_by_hash(payment_hash)
     assert tracked is not None and tracked.paid
+
+
+@pytest.fixture
+def mempool_transport(client, monkeypatch):
+    monkeypatch.setattr(settings, "lnbits_baseurl", "https://instance.example")
+    monkeypatch.setattr(settings, "lnbits_outbound_host_ips", ["9.9.9.9"])
+    destinations = {"127.0.0.1.nip.io": "127.0.0.1"}
+    requests = []
+    original_send = type(client).send
+
+    async def resolve(self, host, port, **kwargs):
+        address = destinations.get(host, host)
+        assert address is not None
+        try:
+            ipaddress.ip_address(address)
+        except ValueError:
+            address = "8.8.8.8"
+        family = socket.AF_INET6 if ":" in address else socket.AF_INET
+        return [(family, socket.SOCK_STREAM, 6, "", (address, port))]
+
+    async def send(self, request, **kwargs):
+        if request.url.host == "testserver":
+            return await original_send(self, request, **kwargs)
+        requests.append(request)
+        address = request.url.path.split("/")[-2]
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "txid": "confirmed",
+                    "status": {"confirmed": True},
+                    "vout": [
+                        {"scriptpubkey_address": address, "value": 20},
+                        {"scriptpubkey_address": "other", "value": 500},
+                    ],
+                },
+                {
+                    "txid": "unconfirmed",
+                    "status": {"confirmed": False},
+                    "vout": [{"scriptpubkey_address": address, "value": 10}],
+                },
+            ],
+            request=request,
+        )
+
+    def reject_callback_rules(_url):
+        pytest.fail("Mempool requests must not apply callback rules")
+
+    monkeypatch.setattr(asyncio.BaseEventLoop, "getaddrinfo", resolve)
+    # Outbound clients must not inherit conftest's ASGI base URL.
+    monkeypatch.setattr(httpx, "AsyncClient", type(client))
+    monkeypatch.setattr(type(client), "send", send)
+    monkeypatch.setattr(safe_http, "check_callback_url", reject_callback_rules)
+    return requests, destinations
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "target",
+    [
+        "http://127.0.0.1:5099",
+        "http://192.168.1.200:5099",
+        "http://127.0.0.1.nip.io:5099",
+        "http://169.254.169.254",
+        "http://[fc00::1]",
+        "https://instance.example",
+        "https://9.9.9.9",
+    ],
+)
+async def test_onchain_balance_blocks_unsafe_destinations(mempool_transport, target):
+    requests, _ = mempool_transport
+    balance = await services_onchain.fetch_onchain_balance(
+        "https://mempool.example", "bc1qtposaddress"
+    )
+    assert balance == {
+        "confirmed": 20,
+        "unconfirmed": 10,
+        "txids": ["confirmed", "unconfirmed"],
+    }
+    assert len(requests) == 1
+    requests.clear()
+    with pytest.raises(ValueError):
+        await services_onchain.fetch_onchain_balance(target, "bc1qtposaddress")
+    assert requests == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "target",
+    [
+        "http://127.0.0.1:5099",
+        "http://192.168.1.200:5099",
+        "http://127.0.0.1.nip.io:5099",
+        "http://169.254.169.254",
+        "http://[fc00::1]",
+        "https://instance.example",
+        "https://9.9.9.9",
+        "file:///etc/passwd",
+        "https://user:secret@mempool.example",
+    ],
+)
+@pytest.mark.parametrize(
+    "endpoint,address,expected_endpoint",
+    [
+        ("https://mempool.example/", "bc1qtposaddress", "https://mempool.example"),
+        (None, "bc1qtposaddress", "https://mempool.space"),
+        (
+            "https://mempool.example/",
+            "tb1qtposaddress",
+            "https://mempool.example/testnet",
+        ),
+        (
+            "https://mempool.example/signet/",
+            "tb1qtposaddress",
+            "https://mempool.example/signet",
+        ),
+    ],
+)
+async def test_onchain_endpoint_entry_and_polling_are_protected(
+    client, monkeypatch, mempool_transport, target, endpoint, address, expected_endpoint
+):
+    requests, destinations = mempool_transport
+    monkeypatch.setattr(
+        core_payments, "satoshis_amount_as_fiat", AsyncMock(return_value=1)
+    )
+    user, _, pos = await terminal(client)
+    monkeypatch.setattr(settings, "super_user", user.id)
+    stored_pos = await get_tpos(pos["id"])
+    assert stored_pos is not None
+    stored_pos.onchain_enabled = True
+    stored_pos.onchain_wallet_id = "watch-wallet"
+    stored_pos.onchain_zero_conf = False
+    await update_tpos(stored_pos)
+    network = "Mainnet" if address.startswith("bc1") else "Testnet"
+    config = {"network": network, "mempool_endpoint": endpoint}
+    monkeypatch.setattr(
+        views_onchain, "watchonly_available_for_user", AsyncMock(return_value=True)
+    )
+    monkeypatch.setattr(
+        views_onchain, "fetch_watchonly_config", AsyncMock(return_value=config)
+    )
+    monkeypatch.setattr(
+        views_onchain, "fetch_watchonly_wallets", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(
+        views_onchain,
+        "fetch_watchonly_wallet",
+        AsyncMock(return_value={"network": network}),
+    )
+    fetch_address = AsyncMock(return_value={"address": address})
+    monkeypatch.setattr(views_payments, "fetch_onchain_address", fetch_address)
+    url = f"/tpos/api/v1/tposs/{pos['id']}/invoices"
+    payload = {"amount": 42, "payment_method": "btc_onchain"}
+    create_invoice = AsyncMock(wraps=views_payments.create_payment_request)
+    create_tracking = AsyncMock(wraps=views_payments.create_tpos_payment)
+    update_account = AsyncMock(wraps=views_payments.update_account)
+
+    async def address_after_invoice(*args):
+        create_invoice.assert_awaited_once()
+        return {"address": address}
+
+    fetch_address.side_effect = address_after_invoice
+    monkeypatch.setattr(views_payments, "create_payment_request", create_invoice)
+    monkeypatch.setattr(views_payments, "create_tpos_payment", create_tracking)
+    monkeypatch.setattr(views_payments, "update_account", update_account)
+    config["mempool_endpoint"] = target
+    rejected = await client.post(url, json=payload)
+    assert rejected.status_code == 500
+    assert "Invalid mempool endpoint." in rejected.json()["detail"]
+    assert target not in rejected.json()["detail"]
+    assert requests == []
+    create_invoice.assert_not_awaited()
+    create_tracking.assert_not_awaited()
+    update_account.assert_not_awaited()
+    fetch_address.assert_not_awaited()
+
+    config["mempool_endpoint"] = endpoint
+    create_invoice.side_effect = ValueError("Invoice creation failed.")
+    failed = await client.post(url, json=payload)
+    assert failed.status_code == 500
+    assert failed.json()["detail"] == "Invoice creation failed."
+    fetch_address.assert_not_awaited()
+    create_tracking.assert_not_awaited()
+    create_invoice.reset_mock(side_effect=True)
+
+    response = await client.post(url, json=payload)
+    assert response.status_code == 201, response.text
+    tracked = await get_tpos_payment_by_hash(response.json()["payment_hash"])
+    assert tracked is not None
+    assert tracked.mempool_endpoint == expected_endpoint
+    create_invoice.assert_awaited_once()
+    create_tracking.assert_awaited_once()
+    fetch_address.assert_awaited_once()
+
+    class PollingStoppedError(Exception):
+        pass
+
+    async def stop_polling(_seconds):
+        raise PollingStoppedError
+
+    monkeypatch.setattr(tasks.asyncio, "sleep", stop_polling)
+    monkeypatch.setattr(
+        tasks, "get_pending_tpos_payments", AsyncMock(return_value=[tracked])
+    )
+    settle = AsyncMock()
+    monkeypatch.setattr(tasks, "settle_onchain_tpos_payment", settle)
+    with pytest.raises(PollingStoppedError):
+        await tasks.poll_onchain_payments()
+    assert len(requests) == 1
+    expected_url = httpx.URL(f"{expected_endpoint}/api/address/{address}/txs")
+    assert requests[0].url.path == expected_url.path
+    assert requests[0].headers["host"] == expected_url.host
+    assert requests[0].url.host == "8.8.8.8"
+    updated = await get_tpos_payment_by_hash(tracked.payment_hash)
+    assert updated is not None
+    assert updated.balance == 20
+    assert updated.pending == 10
+    requests.clear()
+
+    # Previously stored unsafe URLs must also be blocked at request time.
+    tracked.mempool_endpoint = target
+    await update_tpos_payment(tracked)
+    with pytest.raises(PollingStoppedError):
+        await tasks.poll_onchain_payments()
+    assert requests == []
+    settle.assert_not_awaited()
+
+    # A public endpoint can resolve privately after entry validation.
+    tracked.mempool_endpoint = expected_endpoint
+    destinations[expected_url.host] = "127.0.0.1"
+    with pytest.raises(PollingStoppedError):
+        await tasks.poll_onchain_payments()
+    assert requests == []
+    settle.assert_not_awaited()
 
 
 async def terminal(client, **settings):

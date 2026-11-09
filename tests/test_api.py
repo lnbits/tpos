@@ -591,6 +591,9 @@ async def test_terminal_invoice_keeps_reader_and_tap_to_pay_payload(
 async def test_onchain_invoice_option_creates_internal_payment(
     client: AsyncClient, monkeypatch
 ):
+    monkeypatch.setattr(views_payments, "validate_url", AsyncMock())
+    wallet_lookup = AsyncMock(wraps=views_payments.get_wallet)
+    monkeypatch.setattr(views_payments, "get_wallet", wallet_lookup)
     user, wallet = await _user_with_tabs("onchainuser")
     settings.super_user = user.id
     headers = {"X-API-KEY": wallet.adminkey}
@@ -624,6 +627,7 @@ async def test_onchain_invoice_option_creates_internal_payment(
     )
     assert invoice_response.status_code == 201
     invoice = invoice_response.json()
+    wallet_lookup.assert_awaited_once_with(wallet.id)
     assert invoice["payment_request"] == "bc1qtposaddress"
     assert invoice["payment_options"] == ["btc", "btc_onchain"]
     assert invoice["payment_method"] == "onchain"
@@ -670,6 +674,7 @@ async def test_onchain_invoice_option_creates_internal_payment(
 async def test_poll_onchain_payments_balance_updates_and_settlement(
     client: AsyncClient, monkeypatch
 ):
+    monkeypatch.setattr(views_payments, "validate_url", AsyncMock())
     user, wallet = await _user_with_tabs("polleruser")
     settings.super_user = user.id
     headers = {"X-API-KEY": wallet.adminkey}
@@ -1187,7 +1192,7 @@ async def test_atm_and_lnurl_withdraw_routes(client: AsyncClient, monkeypatch):
     assert params.json()["k1"] == charge["id"]
 
     async def fake_pay_invoice(**kwargs):
-        return None
+        return SimpleNamespace(success=True, failed=False)
 
     async def fake_websocket_updater(channel, message):
         return None

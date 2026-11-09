@@ -1284,7 +1284,7 @@ wheels = [
 
 [[package]]
 name = "lnbits"
-version = "1.7.0rc1"
+version = "1.7.0rc2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -1337,9 +1337,9 @@ dependencies = [
     { name = "websocket-client" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/eb/d0/f3c539ba700ea8c6441ce1487fc6f0b99b610cc62b0021ffefe06e501c84/lnbits-1.7.0rc1.tar.gz", hash = "sha256:2205c9e211198947c53997772f08ddc24f5d6b9fb2aad409b92f0852217556f2", size = 6254983, upload-time = "2026-10-29T11:17:31.885Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7c/d9/0af67927194d744909bd6cfbe38a07f31a271eff9e1071023c6b78818835/lnbits-1.7.0rc2.tar.gz", hash = "sha256:93df2edd2231bee38b073b56f26aabbf8d25636fc24355208581d687020c7fd3", size = 6284276, upload-time = "2026-11-09T14:46:51.862Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/21/a6/1509a06ca8d6de2516d13bea286eda81fca88c732c36de9a01a711495cc3/lnbits-1.7.0rc1-py3-none-any.whl", hash = "sha256:d41a053af62dab452072a9d7efac43ead05d0e7314ed172ca103db62e1f12c66", size = 4452276, upload-time = "2026-10-29T11:17:29.533Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/88/3304ba60cd1da828f5a55030e4e946b85a185c6501f1c9267eca71607164/lnbits-1.7.0rc2-py3-none-any.whl", hash = "sha256:cab8cc8c4705684d2e347cbe68c0f3a4fb4573f1f0861b7e72e34599c3dad4c3", size = 4461220, upload-time = "2026-11-09T14:46:49.877Z" },
 ]
 
 [[package]]
@@ -1361,7 +1361,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "lnbits", specifier = ">=1.7.0rc1" }]
+requires-dist = [{ name = "lnbits", specifier = ">=1.7.0rc2" }]
 
 [package.metadata.requires-dev]
 dev = [

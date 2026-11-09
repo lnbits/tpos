@@ -6,6 +6,7 @@ from lnbits.core.crud import (
     get_user_active_extensions_ids,
 )
 from lnbits.settings import settings
+from lnbits.utils.safe_http import SafeHttpClient
 
 
 async def watchonly_available_for_user(user_id: str) -> bool:
@@ -16,6 +17,7 @@ async def watchonly_available_for_user(user_id: str) -> bool:
     return "watchonly" in active_extensions
 
 
+# Watchonly bridge URLs use deployment-trusted host/port, not user destinations.
 async def fetch_watchonly_config(api_key: str) -> dict[str, Any]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(
@@ -72,7 +74,7 @@ async def fetch_onchain_balance(
     mempool_endpoint: str, onchain_address: str
 ) -> dict[str, Any]:
     endpoint = normalize_mempool_endpoint(mempool_endpoint, onchain_address)
-    async with httpx.AsyncClient() as client:
+    async with SafeHttpClient(apply_callback_rules=False) as client:
         resp = await client.get(f"{endpoint}/api/address/{onchain_address}/txs")
         resp.raise_for_status()
         data = resp.json()

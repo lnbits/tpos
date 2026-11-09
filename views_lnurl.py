@@ -133,15 +133,23 @@ async def lnurl_callback(
     await update_tpos(tpos)
 
     try:
-        await pay_invoice(
+        payment = await pay_invoice(
             wallet_id=tpos.wallet,
             payment_request=pr,
             max_sat=int(lnurlcharge.amount),
             extra={"tag": "TPoSWithdraw", "tpos_id": lnurlcharge.tpos_id},
         )
-        await websocket_updater(k1, "paid")
-    except Exception as exc:
-        return LnurlErrorResponse(reason=f"withdraw not working. {exc!s}")
+    except Exception:
+        return LnurlErrorResponse(reason="Withdrawal failed.")
+
+    if payment.failed:
+        return LnurlErrorResponse(reason="Withdrawal failed.")
+    if not payment.success:
+        # A pending payment may still fail. Waive tribute for these withdrawals
+        # rather than charging before their outcome is known.
+        return LnurlSuccessResponse()
+
+    await websocket_updater(k1, "paid")
 
     # pay tribute to help support LNbits
     await pay_tribute(withdraw_amount=int(lnurlcharge.amount), wallet_id=tpos.wallet)
