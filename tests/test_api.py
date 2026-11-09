@@ -591,6 +591,7 @@ async def test_terminal_invoice_keeps_reader_and_tap_to_pay_payload(
 async def test_onchain_invoice_option_creates_internal_payment(
     client: AsyncClient, monkeypatch
 ):
+    monkeypatch.setattr(views_payments, "validate_url", AsyncMock())
     user, wallet = await _user_with_tabs("onchainuser")
     settings.super_user = user.id
     headers = {"X-API-KEY": wallet.adminkey}
@@ -670,6 +671,7 @@ async def test_onchain_invoice_option_creates_internal_payment(
 async def test_poll_onchain_payments_balance_updates_and_settlement(
     client: AsyncClient, monkeypatch
 ):
+    monkeypatch.setattr(views_payments, "validate_url", AsyncMock())
     user, wallet = await _user_with_tabs("polleruser")
     settings.super_user = user.id
     headers = {"X-API-KEY": wallet.adminkey}

@@ -4,6 +4,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from httpx import InvalidURL
 from lnbits.core.crud import get_account, get_standalone_payment, get_wallet
 from lnbits.core.crud.payments import update_payment, update_payment_checking_id
 from lnbits.core.crud.users import update_account
@@ -15,6 +16,7 @@ from lnbits.core.services import (
     websocket_updater,
 )
 from lnbits.tasks import internal_invoice_queue_put
+from lnbits.utils.safe_http import validate_url
 
 from .crud import (
     create_tpos_payment,
@@ -44,7 +46,7 @@ from .services import (
     validate_tpos_sale_amount,
 )
 from .services_inventory import validate_inventory_sale
-from .services_onchain import fetch_onchain_address
+from .services_onchain import fetch_onchain_address, normalize_mempool_endpoint
 from .services_tabs import get_tab_for_tpos, tab_settlement_tolerance
 from .tasks import tpos_invoice_queue
 from .views_onchain import _validate_watchonly_settings
@@ -162,31 +164,49 @@ async def api_tpos_create_invoice(
             extra["tab_settlement"] = tab_settlement.model_dump()
         if (inventory_payload or tab_settlement) and data.amount_fiat is not None:
             extra["amount_fiat"] = data.amount_fiat
+        onchain_address = None
+        mempool_endpoint = None
         if cash_method or onchain_method:
             wallet = await get_wallet(tpos.wallet)
-            if wallet:
-                account = await get_account(wallet.user)
-                if account:
-                    if not account.is_super_user:
-                        raise HTTPException(
-                            status_code=HTTPStatus.BAD_REQUEST,
-                            detail="This tpos cannot create cash or onchain invoices.",
-                        )
-                    existing = {label.name for label in account.extra.labels or []}
-                    label_name = "cash" if cash_method else "onchain"
-                    label_description = (
-                        "Cash payment" if cash_method else "Onchain payment"
+            account = await get_account(wallet.user) if wallet else None
+            if account and not account.is_super_user:
+                raise HTTPException(
+                    status_code=HTTPStatus.BAD_REQUEST,
+                    detail="This tpos cannot create cash or onchain invoices.",
+                )
+            if onchain_method:
+                if not wallet:
+                    raise HTTPException(
+                        status_code=HTTPStatus.BAD_REQUEST,
+                        detail="Wallet not found for this TPoS.",
                     )
-                    label_color = "#FFC107" if cash_method else "#ED8403"
-                    if label_name not in existing:
-                        account.extra.labels.append(
-                            UserLabel(
-                                name=label_name,
-                                description=label_description,
-                                color=label_color,
-                            )
+                validation = await _validate_watchonly_settings(
+                    wallet=wallet,
+                    onchain_enabled=tpos.onchain_enabled,
+                    onchain_wallet_id=tpos.onchain_wallet_id,
+                )
+                assert validation
+                mempool_endpoint = normalize_mempool_endpoint(
+                    validation.get("mempool_endpoint"), ""
+                )
+                try:
+                    await validate_url(mempool_endpoint, apply_callback_rules=False)
+                except (ValueError, InvalidURL) as exc:
+                    raise ValueError("Invalid mempool endpoint.") from exc
+            if account:
+                existing = {label.name for label in account.extra.labels or []}
+                label_name = "cash" if cash_method else "onchain"
+                label_description = "Cash payment" if cash_method else "Onchain payment"
+                label_color = "#FFC107" if cash_method else "#ED8403"
+                if label_name not in existing:
+                    account.extra.labels.append(
+                        UserLabel(
+                            name=label_name,
+                            description=label_description,
+                            color=label_color,
                         )
-                        await update_account(account)
+                    )
+                    await update_account(account)
         if inventory_payload:
             extra["inventory"] = inventory_payload.model_dump()
         if data.pay_in_fiat:
@@ -223,8 +243,6 @@ async def api_tpos_create_invoice(
             await update_payment_checking_id(payment.checking_id, new_checking_id)
             payment.checking_id = new_checking_id
 
-        onchain_address = None
-        mempool_endpoint = None
         if onchain_method:
             wallet_record = await get_wallet(tpos.wallet)
             if not wallet_record:
@@ -232,17 +250,13 @@ async def api_tpos_create_invoice(
                     status_code=HTTPStatus.BAD_REQUEST,
                     detail="Wallet not found for this TPoS.",
                 )
-            validation = await _validate_watchonly_settings(
-                wallet=wallet_record,
-                onchain_enabled=tpos.onchain_enabled,
-                onchain_wallet_id=tpos.onchain_wallet_id,
-            )
-            assert validation
             address_data = await fetch_onchain_address(
                 wallet_record.inkey, tpos.onchain_wallet_id or ""
             )
             onchain_address = address_data.get("address")
-            mempool_endpoint = validation.get("mempool_endpoint")
+            mempool_endpoint = normalize_mempool_endpoint(
+                mempool_endpoint, onchain_address or ""
+            )
 
         tpos_payment = await create_tpos_payment(
             TposPayment(
