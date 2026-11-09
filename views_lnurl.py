@@ -43,7 +43,11 @@ async def pay_tribute(
     return
 
 
-@tpos_lnurl_router.get("/{lnurlcharge_id}/{amount}", name="tpos.tposlnurlcharge")
+@tpos_lnurl_router.get(
+    "/{lnurlcharge_id}/{amount}",
+    name="tpos.tposlnurlcharge",
+    openapi_extra={"x-lnbits-local-lnurl": True},
+)
 async def lnurl_params(
     request: Request,
     lnurlcharge_id: str,
@@ -89,7 +93,11 @@ async def lnurl_params(
     )
 
 
-@tpos_lnurl_router.get("/cb", name="tpos.tposlnurlcharge.callback")
+@tpos_lnurl_router.get(
+    "/cb",
+    name="tpos.tposlnurlcharge.callback",
+    openapi_extra={"x-lnbits-local-lnurl": True},
+)
 async def lnurl_callback(
     pr: str | None = None,
     k1: str | None = None,
