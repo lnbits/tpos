@@ -244,14 +244,13 @@ async def api_tpos_create_invoice(
             payment.checking_id = new_checking_id
 
         if onchain_method:
-            wallet_record = await get_wallet(tpos.wallet)
-            if not wallet_record:
+            if not wallet:
                 raise HTTPException(
                     status_code=HTTPStatus.BAD_REQUEST,
                     detail="Wallet not found for this TPoS.",
                 )
             address_data = await fetch_onchain_address(
-                wallet_record.inkey, tpos.onchain_wallet_id or ""
+                wallet.inkey, tpos.onchain_wallet_id or ""
             )
             onchain_address = address_data.get("address")
             mempool_endpoint = normalize_mempool_endpoint(
