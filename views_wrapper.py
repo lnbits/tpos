@@ -115,7 +115,7 @@ async def api_tpos_create_wrapper_token(
         sub=account.username, api_token_id=api_token_id, auth_time=int(time())
     )
     api_token = create_access_token(
-        data=payload.dict(), token_expire_minutes=token_expire_minutes
+        data=payload.model_dump(), token_expire_minutes=token_expire_minutes
     )
 
     acl.token_id_list.append(

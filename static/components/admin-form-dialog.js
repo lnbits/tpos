@@ -15,45 +15,14 @@ window.app.component('tpos-admin-form-dialog', {
     'withdrawOptions',
     'createOrUpdateDisabled'
   ],
-  emits: ['close', 'submit', 'create-fiat-wallet'],
+  emits: ['close', 'submit'],
   computed: {
-    // the wallet row (and its "you need one" note) only exists once the TPoS
-    // actually settles fiat: cash settlement or a card provider
     needsFiatWallet() {
       const data = this.dialog.data
       return (
         this.isFiatCurrency &&
         !!(data.allow_cash_settlement || data.fiat_provider)
       )
-    }
-  },
-  watch: {
-    'dialog.data.currency'() {
-      this.pickFiatWallet()
-    },
-    'dialog.data.allow_cash_settlement'() {
-      this.pickFiatWallet()
-    },
-    'dialog.data.fiat_provider'() {
-      this.pickFiatWallet()
-    },
-    fiatWalletOptions() {
-      this.pickFiatWallet()
-    }
-  },
-  methods: {
-    // The assigned wallet is never picked by hand: an existing one in the
-    // TPoS currency is selected automatically, otherwise the create button
-    // below does it (one fiat wallet per user + currency).
-    pickFiatWallet() {
-      const data = this.dialog.data
-      if (!this.needsFiatWallet || !this.fiatWalletOptions.length) return
-      const known = this.fiatWalletOptions.some(
-        option => option.value === data.fiat_wallet_id
-      )
-      if (!known) {
-        data.fiat_wallet_id = this.fiatWalletOptions[0].value
-      }
     }
   },
   template: `
@@ -90,23 +59,17 @@ window.app.component('tpos-admin-form-dialog', {
             filled
             dense
             emit-value
+            map-options
             v-model="dialog.data.fiat_wallet_id"
             :options="fiatWalletOptions"
             label="Fiat wallet *"
             hint="Cash and card sales are credited to this wallet."
           ></q-select>
-          <div v-else>
-            <q-btn
-              outline
-              color="primary"
-              :label="'Create fiat wallet (' + dialog.data.currency + ')'"
-              @click="$emit('create-fiat-wallet')"
-            ></q-btn>
-            <p class="text-caption q-mt-sm q-mb-none">
-              A fiat wallet in {{ dialog.data.currency }} is required: it will
-              be created and assigned to this TPoS.
-            </p>
-          </div>
+          <p v-else class="text-caption q-mb-none">
+            A {{ dialog.data.currency }} fiat wallet is required.
+            <a v-if="canCreateFiatWallet" href="/wallets">Create it in Wallets.</a>
+            <span v-else>Ask your LNbits admin to enable fiat wallets.</span>
+          </p>
         </template>
         <q-select
           v-if="dialog.data.currency != g.settings.denomination && hasFiatProvider"
@@ -126,15 +89,6 @@ window.app.component('tpos-admin-form-dialog', {
             />
           </template>
         </q-select>
-        <q-banner
-          v-if="dialog.data.fiat_provider && !canCreateFiatWallet"
-          dense
-          rounded
-          class="bg-orange-2 text-dark"
-        >
-          Card payments are not enabled for you. Ask your admin to enable fiat
-          payments.
-        </q-banner>
         <div
           v-if="(dialog.data.fiat_provider || []).includes('stripe')"
           class="row"
@@ -185,26 +139,10 @@ window.app.component('tpos-admin-form-dialog', {
                 >currency must be set to fiat</q-tooltip
               >
               <q-tooltip v-else
-                >Cash sales are credited to the fiat wallet (accounting only,
-                no bitcoin).</q-tooltip
+                >Anyone with the terminal link can confirm cash sales.
+                The selected fiat wallet receives the credit.</q-tooltip
               >
             </q-checkbox>
-            <p
-              v-if="needsFiatWallet"
-              class="text-caption q-ml-lg q-mb-none"
-            >
-              <span
-                v-if="!dialog.data.fiat_wallet_id"
-                class="text-orange-8 text-weight-medium"
-              >
-                A {{ dialog.data.currency }} fiat wallet is required — create it
-                above.
-              </span>
-              <span v-else>
-                Sales are booked to the {{ dialog.data.currency }} fiat wallet
-                above (accounting only, no bitcoin).
-              </span>
-            </p>
           </div>
         </div>
         <div v-if="g.user.super_user" class="row q-mt-sm">

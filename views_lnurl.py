@@ -10,7 +10,7 @@ from lnurl import (
     MilliSatoshi,
 )
 from loguru import logger
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 
 from .crud import get_lnurlcharge, get_tpos, update_lnurlcharge, update_tpos
 
@@ -43,7 +43,11 @@ async def pay_tribute(
     return
 
 
-@tpos_lnurl_router.get("/{lnurlcharge_id}/{amount}", name="tpos.tposlnurlcharge")
+@tpos_lnurl_router.get(
+    "/{lnurlcharge_id}/{amount}",
+    name="tpos.tposlnurlcharge",
+    openapi_extra={"x-lnbits-local-lnurl": True},
+)
 async def lnurl_params(
     request: Request,
     lnurlcharge_id: str,
@@ -61,6 +65,13 @@ async def lnurl_params(
             reason=f"TPoS {lnurlcharge.tpos_id} not found on this server"
         )
 
+    if (
+        lnurlcharge.claimed
+        or amount <= 0
+        or amount != lnurlcharge.amount
+        or not tpos.can_withdraw
+    ):
+        return LnurlErrorResponse(reason="Invalid or expired ATM charge")
     if amount > tpos.withdraw_maximum:
         return LnurlErrorResponse(
             reason=(
@@ -70,8 +81,8 @@ async def lnurl_params(
         )
 
     logger.debug(f"Amount to withdraw: {amount}")
-    callback = parse_obj_as(
-        CallbackUrl, str(request.url_for("tpos.tposlnurlcharge.callback"))
+    callback = TypeAdapter(CallbackUrl).validate_python(
+        str(request.url_for("tpos.tposlnurlcharge.callback"))
     )
     return LnurlWithdrawResponse(
         callback=callback,
@@ -82,7 +93,11 @@ async def lnurl_params(
     )
 
 
-@tpos_lnurl_router.get("/cb", name="tpos.tposlnurlcharge.callback")
+@tpos_lnurl_router.get(
+    "/cb",
+    name="tpos.tposlnurlcharge.callback",
+    openapi_extra={"x-lnbits-local-lnurl": True},
+)
 async def lnurl_callback(
     pr: str | None = None,
     k1: str | None = None,
@@ -96,7 +111,7 @@ async def lnurl_callback(
     if not lnurlcharge:
         return LnurlErrorResponse(reason=f"lnurlcharge {k1} not found on this server")
 
-    if not lnurlcharge.amount:
+    if lnurlcharge.amount <= 0:
         return LnurlErrorResponse(reason=f"LnurlCharge {k1} has no amount specified")
 
     if lnurlcharge.claimed:
@@ -108,6 +123,8 @@ async def lnurl_callback(
             reason=f"TPoS {lnurlcharge.tpos_id} not found on this server"
         )
 
+    if not tpos.can_withdraw:
+        return LnurlErrorResponse(reason="Withdrawals are not allowed at this time")
     if lnurlcharge.amount > tpos.withdraw_maximum:
         return LnurlErrorResponse(
             reason=(
@@ -124,15 +141,23 @@ async def lnurl_callback(
     await update_tpos(tpos)
 
     try:
-        await pay_invoice(
+        payment = await pay_invoice(
             wallet_id=tpos.wallet,
             payment_request=pr,
             max_sat=int(lnurlcharge.amount),
             extra={"tag": "TPoSWithdraw", "tpos_id": lnurlcharge.tpos_id},
         )
-        await websocket_updater(k1, "paid")
-    except Exception as exc:
-        return LnurlErrorResponse(reason=f"withdraw not working. {exc!s}")
+    except Exception:
+        return LnurlErrorResponse(reason="Withdrawal failed.")
+
+    if payment.failed:
+        return LnurlErrorResponse(reason="Withdrawal failed.")
+    if not payment.success:
+        # A pending payment may still fail. Waive tribute for these withdrawals
+        # rather than charging before their outcome is known.
+        return LnurlSuccessResponse()
+
+    await websocket_updater(k1, "paid")
 
     # pay tribute to help support LNbits
     await pay_tribute(withdraw_amount=int(lnurlcharge.amount), wallet_id=tpos.wallet)

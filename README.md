@@ -68,30 +68,23 @@ TPoS lets you take Lightning payments right from the browser. Every TPoS runs is
 
 ## Cash Settlement & Fiat Wallet
 
-Taking cash in a fiat currency no longer needs a superuser: the sale is credited to a
-**LNbits fiat wallet**, so the till and the Lightning wallet stay apart.
+Set the terminal to a fiat currency, enable cash settlement or select an enabled
+card provider, and choose an active fiat wallet you own in that currency. Create
+a wallet from LNbits Wallets if you need one. Your LNbits admin controls fiat
+wallet creation and which accounts can use each card provider.
 
-1. Create or edit a TPoS.
-2. Set a **fiat currency** (anything but `sats`) and tick **Allow cash settlement** (or
-   pick a card provider). TPoS then shows the wallet that settles those sales: your
-   existing fiat wallet in that currency is reused, otherwise **Create fiat wallet (EUR)**
-   makes one. A TPoS cannot be saved until its fiat wallet is assigned, and one wallet
-   serves every TPoS you have in that currency. It is named after the currency (e.g.
-   `EUR`) so any other extension that settles in fiat can reuse it, and you can rename it
-   in LNbits whenever you like.
-3. The public page then shows a **Cash** button next to the Lightning one — the cashier
-   confirms the sale with it.
-4. Card payments enabled for your account by the LNbits admin (Stripe, etc.) are booked to
-   the same fiat wallet.
+Anyone with the public terminal link can confirm a cash checkout when cash
+settlement is enabled. Share the link with the people you trust to record cash
+sales. Card sales settle when the configured provider verifies the payment.
 
-The fiat wallet is an accounting wallet: it records what you took in cash or on card, it
-cannot send, and its balance is never withdrawable. Lightning sales keep going to the
-TPoS wallet, and tips / LN Address funding are not paid out from a fiat wallet (the tip
-stays in the fiat wallet and on the receipt).
+Both types of sale credit the selected fiat wallet. Cash uses an internal
+accounting record. Tips from fiat sales stay in that wallet. Lightning sales
+continue to use the terminal’s Lightning wallet.
 
-> [!NOTE]
-> Fiat wallets need **LNbits 1.6.2 or newer**. Cash settlement is available to every
-> merchant; card payments must be enabled for your account by the LNbits admin.
+Before upgrading, finish any outstanding cash checkouts on the old version.
+Select a fiat wallet for each cash or card terminal after upgrading. New cash
+and card sales pause until a valid wallet is selected. The upgrade preserves
+terminal settings and historical payments.
 
 ## Receiving Tips
 

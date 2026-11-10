@@ -118,4 +118,8 @@ async def api_tpos_add_tab_charge(
         payload=payload,
     )
     updated_tab = await get_tab_for_tpos(user_id, tpos, tab_id)
-    return {"tab_id": tab_id, "entry": entry, "tab": TposTab(**updated_tab).dict()}
+    return {
+        "tab_id": tab_id,
+        "entry": entry,
+        "tab": TposTab(**updated_tab).model_dump(),
+    }

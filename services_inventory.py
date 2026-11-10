@@ -1,11 +1,107 @@
+from decimal import ROUND_HALF_UP, Decimal
+from http import HTTPStatus
+from math import ceil
 from typing import Any
 
 import httpx
+from fastapi import HTTPException
 from lnbits.core.crud import get_wallet
 from lnbits.core.models import User
 from lnbits.settings import settings
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from .helpers import create_internal_user_access_token, from_csv, inventory_tags_to_list
+from .models import CreateTposInvoice, Tpos
+from .services import get_tpos_owner_user_id, validate_tpos_sale_amount
+
+
+class InventoryCartItem(BaseModel):
+    id: str
+    quantity: int = Field(..., ge=1)
+    price: float = Field(..., ge=0)
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+
+async def validate_inventory_sale(tpos: Tpos, data: CreateTposInvoice) -> None:
+    inventory = data.inventory
+    assert inventory
+    user_id = await get_tpos_owner_user_id(tpos)
+    catalog = {
+        item["id"]: item
+        for item in await get_inventory_items_for_tpos(
+            user_id,
+            inventory.inventory_id,
+            tpos.inventory_tags,
+            tpos.inventory_omit_tags,
+        )
+    }
+    try:
+        cart_data = (data.details or {}).get("items")
+        if not cart_data:
+            cart_data = [
+                {
+                    "id": item.id,
+                    "quantity": item.quantity,
+                    "price": catalog[item.id].get("price") or 0,
+                }
+                for item in inventory.items
+                if item.id in catalog
+            ]
+        cart = [InventoryCartItem(**item) for item in cart_data]
+    except (ValidationError, TypeError):
+        raise HTTPException(HTTPStatus.BAD_REQUEST, "Invalid inventory cart.") from None
+    quantities = {item.id: item.quantity for item in inventory.items}
+    if (
+        not cart
+        or len(quantities) != len(inventory.items)
+        or len({item.id for item in cart}) != len(cart)
+        or quantities != {item.id: item.quantity for item in cart}
+    ):
+        raise HTTPException(
+            HTTPStatus.BAD_REQUEST, "Inventory quantities do not match the cart."
+        )
+    total = 0.0
+    for line in cart:
+        item = catalog.get(line.id)
+        if not item:
+            raise HTTPException(
+                HTTPStatus.BAD_REQUEST, "Item is not available on this TPoS."
+            )
+        stock = item.get("quantity_in_stock")
+        if stock is not None and line.quantity > stock:
+            raise HTTPException(HTTPStatus.BAD_REQUEST, "Not enough stock available.")
+        if not tpos.allow_price_adjustment and line.price != float(
+            item.get("price") or 0
+        ):
+            raise HTTPException(HTTPStatus.BAD_REQUEST, "Item price cannot be changed.")
+        tax = item.get("tax_rate") or tpos.tax_default or 0
+        total += (
+            line.price * line.quantity * (1 if tpos.tax_inclusive else 1 + tax / 100)
+        )
+    currency = tpos.currency.upper()
+    if currency == "SATS":
+        total = ceil(total)
+    else:
+        # Match the currency precision used by Intl.NumberFormat in the POS.
+        digits = 2
+        if (
+            currency
+            in (
+                "AFN ALL BIF BYR CLP COP DJF GNF HUF IDR IQD ISK JPY KMF KRW LAK LBP "
+                "MGA MMK MRO PKR PYG RWF SLL SOS STD UGX VND VUV XAF XOF XPF YER"
+            ).split()
+        ):
+            digits = 0
+        elif currency in {"BHD", "JOD", "KWD", "LYD", "OMR", "TND"}:
+            digits = 3
+        elif currency == "CLF":
+            digits = 4
+        total = float(
+            Decimal(str(total)).quantize(Decimal(10) ** -digits, rounding=ROUND_HALF_UP)
+        )
+    # The browser can round up after each cart addition; retain that overpayment.
+    await validate_tpos_sale_amount(tpos, data, total, minimum=True)
 
 
 async def deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:

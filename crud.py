@@ -60,7 +60,7 @@ async def set_wrapper_assetlinks_cache(
 
 async def create_tpos(data: CreateTposData) -> Tpos:
     tpos_id = urlsafe_short_hash()
-    data_dict = data.dict()
+    data_dict = data.model_dump()
     data_dict["inventory_tags"] = serialize_inventory_tags(data.inventory_tags)
     data_dict["inventory_omit_tags"] = serialize_inventory_tags(
         data.inventory_omit_tags
@@ -174,6 +174,17 @@ async def get_latest_tpos_payments(tpos_id: str, limit: int = 5) -> list[TposPay
         {"tpos_id": tpos_id},
         TposPayment,
     )
+
+
+async def claim_paid_fiat_checkout(payment_id: str, payment_method: str) -> bool:
+    result = await db.execute(
+        """
+        UPDATE tpos.payments SET paid = true, status = 'paid', payment_method = :method
+        WHERE id = :id AND paid = false
+        """,
+        {"id": payment_id, "method": payment_method},
+    )
+    return result.rowcount == 1
 
 
 async def update_tpos_payment(payment: TposPayment) -> TposPayment:

@@ -1,5 +1,6 @@
 import asyncio
 import json
+from math import ceil
 
 from lnbits.core.crud import get_user_active_extensions_ids, get_wallet
 from lnbits.core.crud.payments import get_standalone_payment, update_payment
@@ -14,26 +15,31 @@ from lnbits.tasks import internal_invoice_queue_put, register_invoice_listener
 from loguru import logger
 
 from .crud import (
+    claim_paid_fiat_checkout,
     get_pending_tpos_payments,
     get_tpos,
     get_tpos_payment_by_hash,
     update_tpos_payment,
 )
-from .models import TposPaymentStatus
-from .services import ensure_tpos_tabs_access
+from .models import Tpos, TposPayment, TposPaymentStatus
+from .services import ensure_tpos_tabs_access, is_tpos_payment
 from .services_inventory import deduct_inventory_stock
 from .services_onchain import fetch_onchain_balance
 from .services_orders import push_order_to_orders
 from .services_tabs import create_tab_settlement_for_tpos
 
+tpos_invoice_queue: asyncio.Queue[Payment] = asyncio.Queue()
+
 
 async def wait_for_paid_invoices():
-    invoice_queue = asyncio.Queue()
-    register_invoice_listener(invoice_queue, "ext_tpos")
+    register_invoice_listener(tpos_invoice_queue, "ext_tpos")
 
     while True:
-        payment = await invoice_queue.get()
-        await on_invoice_paid(payment)
+        payment = await tpos_invoice_queue.get()
+        try:
+            await on_invoice_paid(payment)
+        except Exception:
+            logger.exception("tpos: failed to process payment {}", payment.payment_hash)
 
 
 async def poll_onchain_payments():
@@ -126,28 +132,42 @@ async def on_invoice_paid(payment: Payment) -> None:
         not payment.extra
         or payment.extra.get("tag") != "tpos"
         or payment.extra.get("tipSplitted")
+        or not payment.success
+        or not payment.is_in
     ):
         return
 
-    try:
-        payment_method = payment.extra.get("payment_method") or _payment_method(payment)
-        tpos_payment = await get_tpos_payment_by_hash(payment.payment_hash)
-        if tpos_payment and not tpos_payment.paid:
-            tpos_payment.paid = True
-            tpos_payment.status = TposPaymentStatus.PAID
-            tpos_payment.payment_method = payment_method
-            await update_tpos_payment(tpos_payment)
+    checkout = await get_tpos_payment_by_hash(payment.payment_hash)
+    if not checkout:
+        return
+    tpos = await get_tpos(checkout.tpos_id)
+    if not tpos or not is_tpos_payment(payment, tpos, checkout):
+        return
 
-        if payment.extra.get("tpos_processed"):
+    stored_payment = await get_standalone_payment(payment.payment_hash, incoming=True)
+    if (
+        not stored_payment
+        or not stored_payment.success
+        or not is_tpos_payment(stored_payment, tpos, checkout)
+        or stored_payment.extra.get("tpos_processed")
+    ):
+        return
+
+    payment_method = (
+        "fiat"
+        if checkout.fiat_wallet_id and stored_payment.fiat_provider
+        else _payment_method(stored_payment)
+    )
+    if checkout.fiat_wallet_id:
+        if not await claim_paid_fiat_checkout(checkout.id, payment_method):
             return
+    elif not checkout.paid:
+        checkout.paid = True
+        checkout.status = TposPaymentStatus.PAID
+        checkout.payment_method = payment_method
+        await update_tpos_payment(checkout)
 
-        await process_paid_tpos_payment(payment, payment_method=payment_method)
-    except Exception as exc:
-        # one bad payment must never stop the invoice listener
-        logger.error(
-            f"tpos: failed to process payment {payment.payment_hash}: "
-            f"{type(exc).__name__}: {exc}"
-        )
+    await process_paid_tpos_payment(stored_payment, tpos, checkout, payment_method)
 
 
 async def settle_onchain_tpos_payment(tpos_payment) -> None:
@@ -164,7 +184,7 @@ async def settle_onchain_tpos_payment(tpos_payment) -> None:
 
 
 async def process_paid_tpos_payment(
-    payment: Payment, *, payment_method: str = "lightning"
+    payment: Payment, tpos: Tpos, checkout: TposPayment, payment_method: str
 ) -> None:
     if (
         not payment.extra
@@ -186,21 +206,12 @@ async def process_paid_tpos_payment(
         "fee": payment.fee,
         "checking_id": payment.checking_id,
         "payment_hash": payment.payment_hash,
-        "bolt11": payment.bolt11,
+        "bolt11": "" if checkout.fiat_wallet_id else payment.bolt11,
         "pending": False,
         "payment_method": payment_method,
     }
 
-    tpos = await get_tpos(tpos_id)
-    assert tpos
-    settlement_wallet = await get_wallet(payment.wallet_id)
-    can_split = bool(settlement_wallet and settlement_wallet.can_send_payments)
-
-    if (
-        can_split
-        and payment.extra.get("lnaddress")
-        and payment.extra["lnaddress"] != ""
-    ):
+    if not checkout.fiat_wallet_id and payment.extra.get("lnaddress"):
         calc_amount = payment.amount - ((payment.amount / 100) * tpos.lnaddress_cut)
         address = payment.extra.get("lnaddress")
         if address:
@@ -212,22 +223,17 @@ async def process_paid_tpos_payment(
 
             if pr:
                 payment.extra["lnaddress"] = ""
-                try:
-                    paid_payment = await pay_invoice(
-                        payment_request=pr,
-                        wallet_id=payment.wallet_id,
-                        extra={**payment.extra},
-                    )
-                    logger.debug(
-                        f"tpos: LNaddress paid cut: {paid_payment.checking_id}"
-                    )
-                except Exception as exc:
-                    logger.error(f"tpos: LNaddress cut failed: {exc}")
+                paid_payment = await pay_invoice(
+                    payment_request=pr,
+                    wallet_id=payment.wallet_id,
+                    extra={**payment.extra},
+                )
+                logger.debug(f"tpos: LNaddress paid cut: {paid_payment.checking_id}")
 
     await websocket_updater(tpos_id, json.dumps(stripped_payment))
     await websocket_updater(payment.payment_hash, json.dumps(stripped_payment))
 
-    await maybe_settle_tab(payment, tpos, payment_method)
+    await maybe_settle_tab(payment, tpos, payment_method, checkout)
     await maybe_push_order(payment, tpos)
 
     inventory_payload = payment.extra.get("inventory")
@@ -237,11 +243,7 @@ async def process_paid_tpos_payment(
         except Exception as exc:
             logger.warning(f"tpos: inventory deduction failed: {exc}")
 
-    if not tip_amount:
-        return
-
-    if not can_split:
-        logger.debug(f"tpos: tip kept in fiat wallet {payment.wallet_id}")
+    if not tip_amount or checkout.fiat_wallet_id:
         return
 
     wallet_id = tpos.tip_wallet
@@ -264,9 +266,39 @@ async def process_paid_tpos_payment(
     logger.debug(f"tpos: tip invoice paid: {paid_payment.checking_id}")
 
 
-async def maybe_settle_tab(payment: Payment, tpos, payment_method: str) -> None:
+async def maybe_settle_tab(
+    payment: Payment,
+    tpos: Tpos,
+    payment_method: str,
+    checkout: TposPayment | None = None,
+) -> None:
     settlement = (payment.extra or {}).get("tab_settlement")
     if not settlement:
+        return
+    amount_msat = settlement.get("amount_msat")
+    if amount_msat is None and tpos.currency.lower() == "sats":
+        amount_msat = (
+            ceil(settlement["amount"]) + (payment.extra.get("tip_amount") or 0)
+        ) * 1000
+    # Pre-update fiat invoices retain their original settlement behavior.
+    if (
+        not payment.success
+        or not is_tpos_payment(payment, tpos, checkout)
+        or (
+            amount_msat is not None
+            and (
+                amount_msat <= 0
+                or (
+                    payment.amount != amount_msat
+                    if "amount_msat" in settlement
+                    else payment.amount < amount_msat
+                )
+            )
+        )
+    ):
+        logger.warning(
+            "tpos: refusing unverified tab settlement for {}", payment.payment_hash
+        )
         return
 
     try:
@@ -288,7 +320,11 @@ async def maybe_settle_tab(payment: Payment, tpos, payment_method: str) -> None:
                         "payment_method": payment_method,
                     }
                 ),
-                "idempotency_key": settlement["idempotency_key"],
+                "idempotency_key": (
+                    f"tpos:{payment.payment_hash}"
+                    if "amount_msat" in settlement
+                    else settlement["idempotency_key"]
+                ),
             },
         )
     except Exception as exc:

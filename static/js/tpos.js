@@ -1391,6 +1391,9 @@ window.app = Vue.createApp({
           null,
           params
         )
+        if (data.extra?.amount_fiat !== undefined) {
+          this.paymentAmount = data.extra.amount_fiat
+        }
         this.openInvoiceDialog(data)
         this.subscribeToPaymentWS(data.payment_hash)
       } catch (error) {
@@ -1414,6 +1417,18 @@ window.app = Vue.createApp({
       }
     },
     finalizeSuccessfulPayment(paymentHash) {
+      if (
+        !this.invoiceDialog.show ||
+        this.invoiceDialog.data?.payment_hash !== paymentHash
+      ) {
+        return
+      }
+      if (this.invoiceDialog.paymentChecker) {
+        clearInterval(this.invoiceDialog.paymentChecker)
+        this.invoiceDialog.paymentChecker = null
+      }
+      const ws = this.paymentWsByHash[paymentHash]
+      if (ws) ws.close()
       Quasar.Notify.create({
         type: 'positive',
         message: 'Invoice Paid!'
@@ -1448,25 +1463,28 @@ window.app = Vue.createApp({
       if (this.invoiceDialog.paymentChecker) {
         clearInterval(this.invoiceDialog.paymentChecker)
       }
-      this.invoiceDialog.paymentChecker = setInterval(async () => {
-        try {
-          const {data} = await LNbits.api.request(
-            'GET',
-            `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}`
-          )
-          if (data.paid) {
-            clearInterval(this.invoiceDialog.paymentChecker)
-            this.invoiceDialog.paymentChecker = null
-            this.finalizeSuccessfulPayment(paymentHash)
-          } else if (
-            ['expired', 'underpaid', 'abandoned'].includes(data.status)
-          ) {
-            this.stopTerminalPayment(paymentHash, data.status)
-          }
-        } catch (error) {
-          console.warn('TPoS payment status check failed:', error)
+      this.invoiceDialog.paymentChecker = setInterval(
+        () => this.checkPaymentStatus(paymentHash),
+        3000
+      )
+    },
+    async checkPaymentStatus(paymentHash) {
+      try {
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/tpos/api/v1/tposs/${this.tposId}/invoices/${paymentHash}`
+        )
+        if (this.invoiceDialog.data?.payment_hash !== paymentHash) return
+        if (data.paid === true) {
+          this.finalizeSuccessfulPayment(paymentHash)
+        } else if (
+          ['expired', 'underpaid', 'abandoned'].includes(data.status)
+        ) {
+          this.stopTerminalPayment(paymentHash, data.status)
         }
-      }, 3000)
+      } catch (error) {
+        console.warn('TPoS payment status check failed:', error)
+      }
     },
     subscribeToPaymentWS(paymentHash) {
       if (this.paymentWsByHash[paymentHash]) return
@@ -1478,21 +1496,7 @@ window.app = Vue.createApp({
         url.protocol = wsProtocol
         const ws = new WebSocket(url)
         this.paymentWsByHash[paymentHash] = ws
-        ws.onmessage = async ({data}) => {
-          const payment = JSON.parse(data)
-          if (payment.pending === false) {
-            if (this.invoiceDialog.paymentChecker) {
-              clearInterval(this.invoiceDialog.paymentChecker)
-              this.invoiceDialog.paymentChecker = null
-            }
-            this.finalizeSuccessfulPayment(paymentHash)
-            ws.close()
-          } else if (
-            ['expired', 'underpaid', 'abandoned'].includes(payment.status)
-          ) {
-            this.stopTerminalPayment(paymentHash, payment.status)
-          }
-        }
+        ws.onmessage = () => this.checkPaymentStatus(paymentHash)
         ws.onerror = err => {
           console.warn('TPoS payment websocket error:', err)
         }
@@ -1601,12 +1605,18 @@ window.app = Vue.createApp({
       this._withdrawing = true
       LNbits.api
         .request(
-          'POST',
-          `/tpos/api/v1/atm/withdraw/${this.atmToken}/${this.sat}/pay`,
-          null,
-          {
-            pay_link: payLink
-          }
+          'GET',
+          `/tpos/api/v1/atm/withdraw/${this.atmToken}/${this.sat}`
+        )
+        .then(() =>
+          LNbits.api.request(
+            'POST',
+            `/tpos/api/v1/atm/withdraw/${this.atmToken}/${this.sat}/pay`,
+            null,
+            {
+              pay_link: payLink
+            }
+          )
         )
         .then(res => {
           if (!res.data.success) {

@@ -38,6 +38,7 @@ test: teststatic
 teststatic:
 	node tests/check_static_load.js
 	node tests/test_tax.js
+	node tests/test_payment_status.js
 
 test-e2e:
 	"$(abspath ../../../node_modules/.bin/playwright)" test --config "$(CURDIR)/tests/e2e/playwright.config.ts"
