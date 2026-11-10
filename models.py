@@ -181,6 +181,13 @@ TERMINAL_PAYMENT_STATUSES = frozenset(
 )
 
 
+class OnchainSale(BaseModel):
+    wallet_id: str
+    expires_at: int
+    memo: str
+    extra: dict[str, Any]
+
+
 class TposPayment(BaseModel):
     id: str
     tpos_id: str
@@ -194,6 +201,9 @@ class TposPayment(BaseModel):
     onchain_wallet_id: str | None = None
     onchain_zero_conf: bool = True
     mempool_endpoint: str | None = None
+    onchain_network: str | None = None
+    onchain_sale: OnchainSale | None = None
+    onchain_fulfilment: str | None = None
     balance: int = 0
     pending: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)

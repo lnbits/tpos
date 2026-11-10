@@ -233,7 +233,9 @@ window.app = Vue.createApp({
         ) ||
         (this.formDialog.advanced.otc && !data.withdraw_limit) ||
         (data.onchain_enabled &&
-          (!this.onchainStatus.available || !data.onchain_wallet_id)) ||
+          !this.onchainWalletOptions.some(
+            wallet => wallet.value === data.onchain_wallet_id
+          )) ||
         (this.requiresFiatWallet &&
           !this.fiatWalletOptions.some(
             wallet => wallet.id === data.fiat_wallet_id
@@ -273,10 +275,18 @@ window.app = Vue.createApp({
       return this.isFiatCurrency && !!(allow_cash_settlement || fiat_provider)
     },
     onchainWalletOptions() {
-      return (this.onchainStatus.wallets || []).map(wallet => ({
-        label: wallet.title,
-        value: wallet.id
-      }))
+      return [
+        ...LNbits.map
+          .walletOptions(LNbits.map.wallets(this.g.user.wallets, 'onchain'))
+          .map(wallet => ({
+            label: wallet.label + ' (LNbits)',
+            value: 'core:' + wallet.value
+          })),
+        ...(this.onchainStatus.wallets || []).map(wallet => ({
+          label: wallet.title + ' (Watchonly)',
+          value: wallet.id
+        }))
+      ]
     },
     lightningWalletOptions() {
       return LNbits.map.walletOptions(

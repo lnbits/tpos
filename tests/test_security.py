@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from embit.script import Script  # type: ignore[import-untyped]
 from lnbits.core.crud import get_wallet
 from lnbits.core.crud.payments import get_standalone_payment
 from lnbits.core.crud.wallets import create_wallet
@@ -23,6 +24,7 @@ from lnbits.core.services import payments as core_payments
 from lnbits.helpers import create_access_token
 from lnbits.settings import settings
 from lnbits.utils import safe_http
+from lnbits.utils.electrum import network_from_name
 from tabs.crud import get_tab_settlements  # type: ignore[import]
 
 from .. import (
@@ -41,7 +43,6 @@ from ..crud import (
     get_tpos_payment_by_hash,
     update_lnurlcharge,
     update_tpos,
-    update_tpos_payment,
 )
 from ..models import CreateTposInvoice, TposClean
 from .test_api import _tpos_payload, _user_with_tabs
@@ -114,6 +115,11 @@ async def test_paid_tab_invoice_during_creation_is_preserved_and_processed_once(
 def mempool_transport(client, monkeypatch):
     monkeypatch.setattr(settings, "lnbits_baseurl", "https://instance.example")
     monkeypatch.setattr(settings, "lnbits_outbound_host_ips", ["9.9.9.9"])
+    monkeypatch.setattr(
+        settings,
+        "lnbits_onchain_explorer_urls",
+        ["https://mempool.example", "https://mempool.space"],
+    )
     destinations = {"127.0.0.1.nip.io": "127.0.0.1"}
     requests = []
     original_send = type(client).send
@@ -129,7 +135,7 @@ def mempool_transport(client, monkeypatch):
         return [(family, socket.SOCK_STREAM, 6, "", (address, port))]
 
     async def send(self, request, **kwargs):
-        if request.url.host == "testserver":
+        if request.url.host in {"testserver", "mempool.example", "mempool.space"}:
             return await original_send(self, request, **kwargs)
         requests.append(request)
         address = request.url.path.split("/")[-2]
@@ -137,7 +143,7 @@ def mempool_transport(client, monkeypatch):
             200,
             json=[
                 {
-                    "txid": "confirmed",
+                    "txid": "a" * 64,
                     "status": {"confirmed": True},
                     "vout": [
                         {"scriptpubkey_address": address, "value": 20},
@@ -145,7 +151,7 @@ def mempool_transport(client, monkeypatch):
                     ],
                 },
                 {
-                    "txid": "unconfirmed",
+                    "txid": "b" * 64,
                     "status": {"confirmed": False},
                     "vout": [{"scriptpubkey_address": address, "value": 10}],
                 },
@@ -179,70 +185,39 @@ def mempool_transport(client, monkeypatch):
 )
 async def test_onchain_balance_blocks_unsafe_destinations(mempool_transport, target):
     requests, _ = mempool_transport
+    address = Script(b"\x00\x14" + bytes(20)).address(network_from_name("main"))
+    assert address
     balance = await services_onchain.fetch_onchain_balance(
-        "https://mempool.example", "bc1qtposaddress"
+        "https://mempool.example", address, "Mainnet"
     )
     assert balance == {
         "confirmed": 20,
         "unconfirmed": 10,
-        "txids": ["confirmed", "unconfirmed"],
     }
     assert len(requests) == 1
     requests.clear()
     with pytest.raises(ValueError):
-        await services_onchain.fetch_onchain_balance(target, "bc1qtposaddress")
+        await services_onchain.fetch_onchain_balance(target, address, "Mainnet")
     assert requests == []
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "target",
-    [
-        "http://127.0.0.1:5099",
-        "http://192.168.1.200:5099",
-        "http://127.0.0.1.nip.io:5099",
-        "http://169.254.169.254",
-        "http://[fc00::1]",
-        "https://instance.example",
-        "https://9.9.9.9",
-        "file:///etc/passwd",
-        "https://user:secret@mempool.example",
-    ],
-)
-@pytest.mark.parametrize(
-    "endpoint,address,expected_endpoint",
-    [
-        ("https://mempool.example/", "bc1qtposaddress", "https://mempool.example"),
-        (None, "bc1qtposaddress", "https://mempool.space"),
-        (
-            "https://mempool.example/",
-            "tb1qtposaddress",
-            "https://mempool.example/testnet",
-        ),
-        (
-            "https://mempool.example/signet/",
-            "tb1qtposaddress",
-            "https://mempool.example/signet",
-        ),
-    ],
-)
-async def test_onchain_endpoint_entry_and_polling_are_protected(
-    client, monkeypatch, mempool_transport, target, endpoint, address, expected_endpoint
+async def test_onchain_checkout_rechecks_explorer_and_distinguishes_testnet4(
+    client, monkeypatch, mempool_transport
 ):
     requests, destinations = mempool_transport
-    monkeypatch.setattr(
-        core_payments, "satoshis_amount_as_fiat", AsyncMock(return_value=1)
-    )
-    user, _, pos = await terminal(client)
-    monkeypatch.setattr(settings, "super_user", user.id)
-    stored_pos = await get_tpos(pos["id"])
-    assert stored_pos is not None
-    stored_pos.onchain_enabled = True
-    stored_pos.onchain_wallet_id = "watch-wallet"
-    stored_pos.onchain_zero_conf = False
-    await update_tpos(stored_pos)
-    network = "Mainnet" if address.startswith("bc1") else "Testnet"
-    config = {"network": network, "mempool_endpoint": endpoint}
+    _, _, pos = await terminal(client)
+    stored = await get_tpos(pos["id"])
+    assert stored
+    stored.onchain_enabled = True
+    stored.onchain_wallet_id = "watch-wallet"
+    stored.onchain_zero_conf = False
+    await update_tpos(stored)
+    address = Script(b"\x00\x14" + bytes([99]) * 20).address(network_from_name("test"))
+    config = {
+        "network": "Testnet4",
+        "mempool_endpoint": "https://mempool.example/testnet",
+    }
     monkeypatch.setattr(
         views_onchain, "watchonly_available_for_user", AsyncMock(return_value=True)
     )
@@ -250,98 +225,49 @@ async def test_onchain_endpoint_entry_and_polling_are_protected(
         views_onchain, "fetch_watchonly_config", AsyncMock(return_value=config)
     )
     monkeypatch.setattr(
-        views_onchain, "fetch_watchonly_wallets", AsyncMock(return_value=[])
-    )
-    monkeypatch.setattr(
         views_onchain,
         "fetch_watchonly_wallet",
-        AsyncMock(return_value={"network": network}),
+        AsyncMock(return_value={"network": "Testnet4"}),
     )
     fetch_address = AsyncMock(return_value={"address": address})
     monkeypatch.setattr(views_payments, "fetch_onchain_address", fetch_address)
     url = f"/tpos/api/v1/tposs/{pos['id']}/invoices"
     payload = {"amount": 42, "payment_method": "btc_onchain"}
-    create_invoice = AsyncMock(wraps=views_payments.create_payment_request)
-    create_tracking = AsyncMock(wraps=views_payments.create_tpos_payment)
-    update_account = AsyncMock(wraps=views_payments.update_account)
-
-    async def address_after_invoice(*args):
-        create_invoice.assert_awaited_once()
-        return {"address": address}
-
-    fetch_address.side_effect = address_after_invoice
-    monkeypatch.setattr(views_payments, "create_payment_request", create_invoice)
-    monkeypatch.setattr(views_payments, "create_tpos_payment", create_tracking)
-    monkeypatch.setattr(views_payments, "update_account", update_account)
-    config["mempool_endpoint"] = target
+    monkeypatch.setattr(
+        settings,
+        "lnbits_onchain_explorer_urls",
+        [
+            "https://mempool.example/testnet",
+            "https://mempool.space",
+            "http://127.0.0.1:5099",
+        ],
+    )
     rejected = await client.post(url, json=payload)
-    assert rejected.status_code == 500
-    assert "Invalid mempool endpoint." in rejected.json()["detail"]
-    assert target not in rejected.json()["detail"]
+    assert rejected.status_code == 400
+    config["mempool_endpoint"] = "http://127.0.0.1:5099"
+    rejected = await client.post(url, json=payload)
+    assert rejected.status_code == 400
+    assert rejected.json()["detail"] == "Invalid on-chain explorer."
+    fetch_address.assert_not_awaited()
     assert requests == []
-    create_invoice.assert_not_awaited()
-    create_tracking.assert_not_awaited()
-    update_account.assert_not_awaited()
-    fetch_address.assert_not_awaited()
 
-    config["mempool_endpoint"] = endpoint
-    create_invoice.side_effect = ValueError("Invoice creation failed.")
-    failed = await client.post(url, json=payload)
-    assert failed.status_code == 500
-    assert failed.json()["detail"] == "Invoice creation failed."
-    fetch_address.assert_not_awaited()
-    create_tracking.assert_not_awaited()
-    create_invoice.reset_mock(side_effect=True)
-
+    config["mempool_endpoint"] = "https://mempool.space"
     response = await client.post(url, json=payload)
     assert response.status_code == 201, response.text
-    tracked = await get_tpos_payment_by_hash(response.json()["payment_hash"])
-    assert tracked is not None
-    assert tracked.mempool_endpoint == expected_endpoint
-    create_invoice.assert_awaited_once()
-    create_tracking.assert_awaited_once()
-    fetch_address.assert_awaited_once()
-
-    class PollingStoppedError(Exception):
-        pass
-
-    async def stop_polling(_seconds):
-        raise PollingStoppedError
-
-    monkeypatch.setattr(tasks.asyncio, "sleep", stop_polling)
-    monkeypatch.setattr(
-        tasks, "get_pending_tpos_payments", AsyncMock(return_value=[tracked])
-    )
-    settle = AsyncMock()
-    monkeypatch.setattr(tasks, "settle_onchain_tpos_payment", settle)
-    with pytest.raises(PollingStoppedError):
-        await tasks.poll_onchain_payments()
-    assert len(requests) == 1
-    expected_url = httpx.URL(f"{expected_endpoint}/api/address/{address}/txs")
-    assert requests[0].url.path == expected_url.path
-    assert requests[0].headers["host"] == expected_url.host
+    checkout = await get_tpos_payment_by_hash(response.json()["payment_hash"])
+    assert checkout and checkout.onchain_network == "Testnet4"
+    await tasks.check_onchain_payment(checkout)
+    assert requests[0].url.path == f"/testnet4/api/address/{address}/txs"
+    assert requests[0].headers["host"] == "mempool.space"
     assert requests[0].url.host == "8.8.8.8"
-    updated = await get_tpos_payment_by_hash(tracked.payment_hash)
-    assert updated is not None
-    assert updated.balance == 20
-    assert updated.pending == 10
+    assert checkout.balance == 20
+    assert checkout.pending == 10
+
     requests.clear()
-
-    # Previously stored unsafe URLs must also be blocked at request time.
-    tracked.mempool_endpoint = target
-    await update_tpos_payment(tracked)
-    with pytest.raises(PollingStoppedError):
-        await tasks.poll_onchain_payments()
+    destinations["mempool.space"] = "127.0.0.1"
+    with pytest.raises(ValueError):
+        await tasks.check_onchain_payment(checkout)
     assert requests == []
-    settle.assert_not_awaited()
-
-    # A public endpoint can resolve privately after entry validation.
-    tracked.mempool_endpoint = expected_endpoint
-    destinations[expected_url.host] = "127.0.0.1"
-    with pytest.raises(PollingStoppedError):
-        await tasks.poll_onchain_payments()
-    assert requests == []
-    settle.assert_not_awaited()
 
 
 async def terminal(client, **settings):

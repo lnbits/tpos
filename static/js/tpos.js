@@ -1455,8 +1455,8 @@ window.app = Vue.createApp({
         type: 'warning',
         message:
           status === 'underpaid'
-            ? 'Onchain payment expired with insufficient funds. Reconcile the received amount manually in Watchonly.'
-            : 'Onchain payment expired. Check received funds manually in Watchonly.'
+            ? 'Onchain payment expired with insufficient funds. Reconcile the received amount manually in the receiving wallet.'
+            : 'Onchain payment expired. Check received funds manually in the receiving wallet.'
       })
     },
     startPaymentChecker(paymentHash) {

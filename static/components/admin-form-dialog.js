@@ -141,16 +141,16 @@ window.app.component('tpos-admin-form-dialog', {
             </q-checkbox>
           </div>
         </div>
-        <div v-if="g.user.super_user" class="row q-mt-sm">
+        <div class="row q-mt-sm">
           <div class="col">
             <q-checkbox
               v-model="dialog.data.onchain_enabled"
-              :disable="!onchainStatus.available"
+              :disable="!onchainWalletOptions.length && !dialog.data.onchain_enabled"
               label="Enable onchain payments"
             >
-              <q-tooltip v-if="!onchainStatus.available">
+              <q-tooltip v-if="!onchainWalletOptions.length">
                 <span
-                  v-text="onchainStatus.message || 'Watchonly extension must be enabled and working.'"
+                  v-text="onchainStatus.message || 'Set up an on-chain wallet.'"
                 ></span>
               </q-tooltip>
             </q-checkbox>
@@ -159,13 +159,13 @@ window.app.component('tpos-admin-form-dialog', {
         <div v-if="dialog.data.onchain_enabled" class="row q-col-gutter-md">
           <div class="col-12">
             <q-banner
-              v-if="!onchainStatus.available"
+              v-if="!onchainWalletOptions.length"
               dense
               rounded
               class="bg-orange-2 text-dark"
             >
               <span
-                v-text="onchainStatus.message || 'Watchonly extension must be enabled and working.'"
+                v-text="onchainStatus.message || 'Set up an on-chain wallet.'"
               ></span>
             </q-banner>
           </div>
@@ -177,9 +177,8 @@ window.app.component('tpos-admin-form-dialog', {
               map-options
               v-model="dialog.data.onchain_wallet_id"
               :options="onchainWalletOptions"
-              :disable="!onchainStatus.available"
-              label="Watchonly wallet *"
-              hint="Select the watchonly wallet used to derive fresh onchain addresses."
+              label="On-chain wallet *"
+              hint="TPoS derives a fresh receive address for each checkout."
             ></q-select>
           </div>
           <div class="col-12">

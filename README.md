@@ -86,6 +86,27 @@ Select a fiat wallet for each cash or card terminal after upgrading. New cash
 and card sales pause until a valid wallet is selected. The upgrade preserves
 terminal settings and historical payments.
 
+## On-chain payments
+
+Enable on-chain payments and select an LNbits on-chain wallet or a Watchonly
+wallet you own. Finish wallet setup and confirm any required backup first. TPoS
+reserves a new receive address per checkout. With zero-conf disabled, it waits
+for the first confirmation. The sale and any tip go to the receiving Bitcoin
+wallet, and the terminal's Lightning balance stays unchanged.
+
+Before upgrading, finish or reconcile pending Watchonly checkouts on the old
+version. Historical receipts remain available. The new version records sales in
+TPoS and stops crediting the Lightning wallet for Watchonly sales. Back up the
+database before upgrading. For custom mempool endpoints, the LNbits administrator
+must approve the exact base URL for the selected network.
+
+After checkout expires, a sale observed fully funded before expiry can finish
+confirming. Reconcile partial or late funds in the receiving wallet. TPoS resumes
+paid sales with fulfilment still pending after a restart. If fulfilment stopped
+in `processing`, `order`, or `inventory`, check the tab, order, and stock before
+completing the outstanding steps manually. An interrupted request may already
+have changed the order or inventory.
+
 ## Receiving Tips
 
 1. Create or edit a TPoS and activate **Enable tips**.

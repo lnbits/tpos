@@ -157,10 +157,64 @@ async def get_pending_tpos_payments() -> list[TposPayment]:
     return await db.fetchall(
         """
         SELECT * FROM tpos.payments
-        WHERE paid = false AND status = 'pending' AND onchain_address IS NOT NULL
+        WHERE onchain_sale IS NOT NULL AND (
+            (paid = false AND status = 'pending') OR onchain_fulfilment = 'pending'
+        )
         ORDER BY created_at ASC
         """,
         model=TposPayment,
+    )
+
+
+async def reserve_onchain_address(network: str, address: str) -> bool:
+    result = await db.execute(
+        """
+        INSERT INTO tpos.onchain_addresses (network, address)
+        SELECT :network, :address WHERE NOT EXISTS (
+            SELECT 1 FROM tpos.onchain_addresses
+            WHERE network = '' AND address = :address
+        ) ON CONFLICT DO NOTHING
+        """,
+        {"network": network, "address": address},
+    )
+    return result.rowcount == 1
+
+
+async def record_onchain_balance(payment: TposPayment) -> bool:
+    result = await db.execute(
+        f"""
+        UPDATE tpos.payments SET balance = :balance, pending = :pending,
+            paid = :paid, status = :status, onchain_fulfilment = :fulfilment,
+            updated_at = {db.timestamp_now}
+        WHERE id = :id AND status = 'pending' AND paid = false
+        """,
+        {
+            "id": payment.id,
+            "balance": payment.balance,
+            "pending": payment.pending,
+            "paid": payment.paid,
+            "status": payment.status.value,
+            "fulfilment": "pending" if payment.paid else None,
+        },
+    )
+    return result.rowcount == 1
+
+
+async def claim_onchain_fulfilment(payment_id: str) -> bool:
+    result = await db.execute(
+        """
+        UPDATE tpos.payments SET onchain_fulfilment = 'processing'
+        WHERE id = :id AND paid = true AND onchain_fulfilment = 'pending'
+        """,
+        {"id": payment_id},
+    )
+    return result.rowcount == 1
+
+
+async def set_onchain_fulfilment(payment_id: str, state: str) -> None:
+    await db.execute(
+        "UPDATE tpos.payments SET onchain_fulfilment = :state WHERE id = :id",
+        {"id": payment_id, "state": state},
     )
 
 

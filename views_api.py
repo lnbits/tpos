@@ -34,7 +34,7 @@ from .services_inventory import (
     inventory_available_for_user,
 )
 from .views_inventory import tpos_inventory_router
-from .views_onchain import _validate_watchonly_settings, tpos_onchain_router
+from .views_onchain import tpos_onchain_router, validate_onchain_settings
 from .views_payments import tpos_payments_router
 from .views_tabs import (
     tpos_tabs_router,
@@ -67,7 +67,7 @@ async def api_tpos_create(
 ):
     _require_receiving_lightning_wallet(wallet.wallet)
     data.wallet = wallet.wallet.id
-    await _validate_watchonly_settings(
+    await validate_onchain_settings(
         wallet=wallet.wallet,
         onchain_enabled=data.onchain_enabled,
         onchain_wallet_id=data.onchain_wallet_id,
@@ -124,7 +124,7 @@ async def api_tpos_update(
     desired_onchain_wallet_id = update_payload.get(
         "onchain_wallet_id", tpos.onchain_wallet_id
     )
-    await _validate_watchonly_settings(
+    await validate_onchain_settings(
         wallet=wallet.wallet,
         onchain_enabled=desired_onchain_enabled,
         onchain_wallet_id=desired_onchain_wallet_id,

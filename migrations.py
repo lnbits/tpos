@@ -1,4 +1,4 @@
-from lnbits.db import Database
+from lnbits.db import SQLITE, Database
 
 
 async def m001_initial(db: Database):
@@ -344,4 +344,33 @@ async def m027_add_fiat_wallet(db: Database):
     """)
     await db.execute("""
         ALTER TABLE tpos.payments ADD fiat_wallet_id TEXT NULL;
+    """)
+
+
+async def m028_onchain_sales(db: Database):
+    sqlite = db.type == SQLITE
+    columns = (
+        (await db.execute("SELECT * FROM tpos.payments LIMIT 0")).keys()
+        if sqlite
+        else ()
+    )
+    add_column = "ADD COLUMN" if sqlite else "ADD COLUMN IF NOT EXISTS"
+    for column in ("onchain_network", "onchain_sale", "onchain_fulfilment"):
+        if column not in columns:
+            await db.execute(
+                f"ALTER TABLE tpos.payments {add_column} {column} TEXT NULL"
+            )
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS tpos.onchain_addresses (
+            network TEXT NOT NULL,
+            address TEXT NOT NULL,
+            PRIMARY KEY (network, address)
+        )
+    """)
+    await db.execute("""
+        INSERT INTO tpos.onchain_addresses (network, address)
+        SELECT DISTINCT '', onchain_address FROM tpos.payments
+        WHERE onchain_address IS NOT NULL
+        AND onchain_sale IS NULL
+        ON CONFLICT DO NOTHING
     """)
