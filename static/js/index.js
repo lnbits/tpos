@@ -236,7 +236,7 @@ window.app = Vue.createApp({
           (!this.onchainStatus.available || !data.onchain_wallet_id)) ||
         (this.requiresFiatWallet &&
           !this.fiatWalletOptions.some(
-            wallet => wallet.value === data.fiat_wallet_id
+            wallet => wallet.id === data.fiat_wallet_id
           ))
       )
     },
@@ -290,7 +290,6 @@ window.app = Vue.createApp({
       return LNbits.map
         .wallets(this.g.user.wallets, 'fiat')
         .filter(wallet => (wallet.currency || '').toUpperCase() === currency)
-        .map(wallet => ({label: wallet.name, value: wallet.id}))
     }
   },
   methods: {

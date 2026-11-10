@@ -52,6 +52,8 @@ window.app.component('tpos-admin-form-dialog', {
             map-options
             v-model="dialog.data.fiat_wallet_id"
             :options="fiatWalletOptions"
+            option-label="name"
+            option-value="id"
             label="Fiat wallet *"
             hint="Cash and card sales are credited to this wallet."
           ></q-select>
