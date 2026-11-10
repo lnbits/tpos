@@ -176,16 +176,6 @@ async def get_latest_tpos_payments(tpos_id: str, limit: int = 5) -> list[TposPay
     )
 
 
-async def bind_fiat_checkout_wallet(payment_id: str, wallet_id: str) -> None:
-    await db.execute(
-        """
-        UPDATE tpos.payments SET fiat_wallet_id = :wallet
-        WHERE id = :id AND fiat_wallet_id IS NULL
-        """,
-        {"id": payment_id, "wallet": wallet_id},
-    )
-
-
 async def claim_fiat_checkout(payment_id: str) -> bool:
     # shortcut: reconcile killed workers manually until dispatches are idempotent.
     result = await db.execute(

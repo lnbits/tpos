@@ -4,8 +4,6 @@ window.app.component('tpos-admin-form-dialog', {
     'dialog',
     'g',
     'currencyOptions',
-    'hasFiatProvider',
-    'fiatProviders',
     'isFiatCurrency',
     'requiresFiatWallet',
     'lightningWalletOptions',
@@ -68,12 +66,12 @@ window.app.component('tpos-admin-form-dialog', {
           </p>
         </template>
         <q-select
-          v-if="dialog.data.currency != g.settings.denomination && hasFiatProvider"
+          v-if="dialog.data.fiat_provider || (dialog.data.currency != g.settings.denomination && g.user.fiat_providers?.length)"
           filled
           dense
           emit-value
           v-model="dialog.data.fiat_provider"
-          :options="fiatProviders"
+          :options="g.user.fiat_providers || []"
           label="Fiat payments"
           hint="Choose what fiat platform to use for fiat payments."
         >
@@ -311,7 +309,7 @@ window.app.component('tpos-admin-form-dialog', {
             dense
             emit-value
             v-model="dialog.data.tip_wallet"
-            :options="lightningWalletOptions"
+            :options="g.user.walletOptions"
             label="Tip Wallet"
           ></q-select>
           <q-select

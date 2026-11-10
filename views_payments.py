@@ -19,7 +19,6 @@ from lnbits.tasks import internal_invoice_queue_put
 from lnbits.utils.safe_http import validate_url
 
 from .crud import (
-    bind_fiat_checkout_wallet,
     create_tpos_payment,
     get_latest_tpos_payments,
     get_tpos,
@@ -125,7 +124,9 @@ async def api_tpos_create_invoice(
         )
     settlement_wallet = None
     if cash_method or (data.pay_in_fiat and tpos.fiat_provider):
-        settlement_wallet = await get_valid_tpos_fiat_wallet(tpos)
+        settlement_wallet = await get_valid_tpos_fiat_wallet(
+            tpos, tpos.fiat_wallet_id, tpos.currency
+        )
         if not settlement_wallet:
             raise HTTPException(
                 status_code=HTTPStatus.CONFLICT,
@@ -491,12 +492,7 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
         )
     checkout = await get_tpos_payment_by_hash(payment_hash)
-    bound_checkout = (
-        checkout.model_copy(update={"fiat_wallet_id": payment.wallet_id})
-        if checkout and not checkout.fiat_wallet_id
-        else checkout
-    )
-    if not checkout or not is_tpos_payment(payment, tpos, bound_checkout):
+    if not checkout or not is_tpos_payment(payment, tpos, checkout):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
         )
@@ -510,8 +506,8 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
         )
     wallet = await get_valid_tpos_fiat_wallet(
         tpos,
-        wallet_id=payment.wallet_id,
-        currency=payment.extra.get("wallet_fiat_currency"),
+        checkout.fiat_wallet_id,
+        payment.extra.get("wallet_fiat_currency") or tpos.currency,
     )
     if not wallet:
         raise HTTPException(
@@ -528,9 +524,6 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
                 status_code=HTTPStatus.CONFLICT,
                 detail="Cash checkout cannot be settled.",
             )
-    if not checkout.fiat_wallet_id:
-        await bind_fiat_checkout_wallet(checkout.id, wallet.id)
-    if not payment.success:
         payment.status = PaymentState.SUCCESS
         await update_payment(
             payment.copy(include={"wallet_id", "checking_id", "status"})

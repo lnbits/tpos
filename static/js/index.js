@@ -50,8 +50,6 @@ window.app = Vue.createApp({
     return {
       tposs: [],
       currencyOptions: [],
-      hasFiatProvider: false,
-      fiatProviders: null,
       inventoryStatus: {
         enabled: false,
         inventory_id: null,
@@ -860,9 +858,5 @@ window.app = Vue.createApp({
         }
       })
       .catch(LNbits.utils.notifyApiError)
-    if (this.g.user.fiat_providers && this.g.user.fiat_providers.length > 0) {
-      this.hasFiatProvider = true
-      this.fiatProviders = [...this.g.user.fiat_providers]
-    }
   }
 })

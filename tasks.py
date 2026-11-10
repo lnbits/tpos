@@ -154,42 +154,42 @@ async def on_invoice_paid(payment: Payment) -> None:
     if not tpos or not is_tpos_payment(payment, tpos, checkout):
         return
 
-    stored_payment = await get_standalone_payment(payment.payment_hash, incoming=True)
-    if (
-        not stored_payment
-        or not stored_payment.success
-        or not is_tpos_payment(stored_payment, tpos, checkout)
-    ):
+    is_fiat = bool(checkout.fiat_wallet_id)
+    if is_fiat and not await claim_fiat_checkout(checkout.id):
         return
 
-    payment_method = (
-        "fiat"
-        if checkout.fiat_wallet_id and stored_payment.fiat_provider
-        else _payment_method(stored_payment)
-    )
-    if checkout.fiat_wallet_id:
-        if not await claim_fiat_checkout(checkout.id):
+    finished = False
+    try:
+        stored_payment = await get_standalone_payment(
+            payment.payment_hash, incoming=True
+        )
+        if (
+            not stored_payment
+            or not stored_payment.success
+            or not is_tpos_payment(stored_payment, tpos, checkout)
+        ):
             return
-        try:
-            if not stored_payment.extra.get("tpos_processed"):
-                await process_paid_tpos_payment(
-                    stored_payment, tpos, checkout, payment_method
-                )
+
+        payment_method = (
+            "fiat"
+            if is_fiat and stored_payment.fiat_provider
+            else _payment_method(stored_payment)
+        )
+        if not stored_payment.extra.get("tpos_processed"):
+            if not is_fiat and not checkout.paid:
+                checkout.paid = True
+                checkout.status = TposPaymentStatus.PAID
+                checkout.payment_method = payment_method
+                await update_tpos_payment(checkout)
+            await process_paid_tpos_payment(
+                stored_payment, tpos, checkout, payment_method
+            )
+        if is_fiat:
             await finish_fiat_checkout(checkout.id, payment_method)
-        except BaseException:
+            finished = True
+    finally:
+        if is_fiat and not finished:
             await finish_fiat_checkout(checkout.id)
-            raise
-        return
-
-    if stored_payment.extra.get("tpos_processed"):
-        return
-    if not checkout.paid:
-        checkout.paid = True
-        checkout.status = TposPaymentStatus.PAID
-        checkout.payment_method = payment_method
-        await update_tpos_payment(checkout)
-
-    await process_paid_tpos_payment(stored_payment, tpos, checkout, payment_method)
 
 
 async def settle_onchain_tpos_payment(tpos_payment) -> None:
@@ -256,11 +256,13 @@ async def process_paid_tpos_payment(
     await websocket_updater(tpos_id, json.dumps(stripped_payment))
     await websocket_updater(payment.payment_hash, json.dumps(stripped_payment))
 
-    await maybe_settle_tab(payment, tpos, payment_method, checkout)
     if checkout.fiat_wallet_id:
         await _fulfil_fiat_checkout(payment, tpos)
+        await maybe_settle_tab(payment, tpos, payment_method, checkout)
+        await _record_fiat_progress(payment, "tpos_processed")
         return
 
+    await maybe_settle_tab(payment, tpos, payment_method, checkout)
     await maybe_push_order(payment, tpos)
 
     inventory_payload = payment.extra.get("inventory")
@@ -307,7 +309,6 @@ async def _fulfil_fiat_checkout(payment: Payment, tpos: Tpos) -> None:
             inventory,
             partial(_record_fiat_progress, payment, "tpos_inventory_dispatched"),
         )
-    await _record_fiat_progress(payment, "tpos_processed")
 
 
 async def _record_fiat_progress(payment: Payment, step: str) -> None:

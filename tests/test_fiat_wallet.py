@@ -45,6 +45,22 @@ async def _terminal(client, wallet, **settings):
     return response.json()
 
 
+async def _cash_checkout(client, username):
+    user, wallet = await _user_with_tabs(username)
+    fiat = await create_wallet(
+        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
+    )
+    tpos = await _terminal(
+        client, wallet, allow_cash_settlement=True, fiat_wallet_id=fiat.id
+    )
+    base = f"/tpos/api/v1/tposs/{tpos['id']}"
+    sale = await client.post(
+        f"{base}/invoices", json={**FIAT_SALE, "fiat_method": "cash"}
+    )
+    assert sale.is_success, sale.text
+    return user, wallet, fiat, base, sale.json()["payment_hash"]
+
+
 @pytest.mark.asyncio
 async def test_cash_requires_explicit_owned_fiat_wallet(client):
     user, wallet = await _user_with_tabs("fiat_cash_setup")
@@ -86,17 +102,13 @@ async def test_cash_requires_explicit_owned_fiat_wallet(client):
 async def test_cash_confirmation_rejects_foreign_terminal_and_deleted_wallet(
     client, fixed_fiat_rate
 ):
-    user, wallet = await _user_with_tabs("fiat_cash_binding")
-    fiat = await create_wallet(
-        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
+    user, wallet, fiat, base, payment_hash = await _cash_checkout(
+        client, "fiat_cash_binding"
     )
-    config = {"allow_cash_settlement": True, "fiat_wallet_id": fiat.id}
-    tpos = await _terminal(client, wallet, **config)
-    other = await _terminal(client, wallet, **config)
-    base = f"/tpos/api/v1/tposs/{tpos['id']}/invoices"
-    response = await client.post(base, json={**FIAT_SALE, "fiat_method": "cash"})
-    assert response.status_code == 201, response.text
-    payment_hash = response.json()["payment_hash"]
+    other = await _terminal(
+        client, wallet, allow_cash_settlement=True, fiat_wallet_id=fiat.id
+    )
+    base += "/invoices"
     suffix = f"invoices/{payment_hash}"
     other_base = f"/tpos/api/v1/tposs/{other['id']}/{suffix}"
     assert (await client.get(other_base)).status_code == 404
@@ -282,32 +294,21 @@ async def test_verified_card_event_uses_checkout_wallet_and_fulfils_once(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("binding", ["bound", "draft", "lightning"])
+@pytest.mark.parametrize("binding", ["bound", "lightning"])
 async def test_cash_confirmation_keeps_original_destination(
     client, fixed_fiat_rate, monkeypatch, binding
 ):
-    user, wallet = await _user_with_tabs(f"switch_{binding}")
-    original = await create_wallet(
-        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
+    user, wallet, original, base, payment_hash = await _cash_checkout(
+        client, f"switch_{binding}"
     )
     replacement = await create_wallet(
         user_id=user.id, wallet_type=WalletType.FIAT, currency="USD"
     )
-    tpos = await _terminal(
-        client, wallet, allow_cash_settlement=True, fiat_wallet_id=original.id
-    )
-    base = f"/tpos/api/v1/tposs/{tpos['id']}"
-    sale = await client.post(
-        f"{base}/invoices", json={**FIAT_SALE, "fiat_method": "cash"}
-    )
-    assert sale.is_success, sale.text
-    payment_hash = sale.json()["payment_hash"]
-    if binding != "bound":
+    if binding == "lightning":
         await db.execute(
             "UPDATE tpos.payments SET fiat_wallet_id = NULL WHERE payment_hash = :hash",
             {"hash": payment_hash},
         )
-    if binding == "lightning":
         await core_db.execute(
             "UPDATE apipayments SET wallet_id = :wallet WHERE payment_hash = :hash",
             {"hash": payment_hash, "wallet": wallet.id},
@@ -342,20 +343,10 @@ async def test_cash_confirmation_keeps_original_destination(
 async def test_cash_confirmation_distinguishes_failed_from_expired(
     client, fixed_fiat_rate, monkeypatch
 ):
-    user, wallet = await _user_with_tabs("cash_failed_state")
-    fiat = await create_wallet(
-        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
-    )
-    tpos = await _terminal(
-        client, wallet, allow_cash_settlement=True, fiat_wallet_id=fiat.id
-    )
-    base = f"/tpos/api/v1/tposs/{tpos['id']}/invoices"
-    sale = await client.post(base, json={**FIAT_SALE, "fiat_method": "cash"})
-    assert sale.is_success, sale.text
-    payment_hash = sale.json()["payment_hash"]
+    _, _, _, base, payment_hash = await _cash_checkout(client, "cash_failed_state")
     payment = await get_standalone_payment(payment_hash, incoming=True)
     assert payment
-    url = f"{base}/{payment_hash}/cash/validate"
+    url = f"{base}/invoices/{payment_hash}/cash/validate"
     monkeypatch.setattr(Payment, "is_expired", property(lambda _: True))
     expired = await client.post(url)
     assert expired.status_code == 409 and "has expired" in expired.json()["detail"]
@@ -391,59 +382,73 @@ async def test_update_rejects_ineligible_primary_wallet(client):
 
 
 @pytest.mark.asyncio
-async def test_cash_retry_after_partial_fulfilment_does_not_resend_order(
+async def test_cash_retry_after_tabs_failure_does_not_repeat_dispatches(
     client, fixed_fiat_rate, monkeypatch, checkout_db_locks
 ):
-    user, wallet = await _user_with_tabs("cash_fulfil_retry")
-    fiat = await create_wallet(
-        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
-    )
-    tpos = await _terminal(
-        client, wallet, allow_cash_settlement=True, fiat_wallet_id=fiat.id
-    )
-    base = f"/tpos/api/v1/tposs/{tpos['id']}/invoices"
-    sale = await client.post(base, json={**FIAT_SALE, "fiat_method": "cash"})
-    assert sale.is_success, sale.text
-    payment_hash = sale.json()["payment_hash"]
+    _, _, fiat, base, payment_hash = await _cash_checkout(client, "cash_fulfil_retry")
     pending = await get_standalone_payment(payment_hash, incoming=True)
     assert pending
     pending.extra["inventory"] = {"inventory_id": "inventory", "items": []}
     await update_payment(pending)
+
     queued, order_sent, inventory_sent = AsyncMock(), AsyncMock(), AsyncMock()
-    prepare_inventory = AsyncMock(side_effect=[RuntimeError("Before dispatch"), None])
+    settle_tab = AsyncMock(side_effect=[RuntimeError("Tabs unavailable"), None])
+    first_worker_ready, competing, released = (asyncio.Event() for _ in range(3))
+    original_claim = tasks.claim_fiat_checkout
+
+    async def claim(checkout_id):
+        worker = asyncio.current_task()
+        if worker and worker.get_name() == "competing-fiat-checkout":
+            competing.set()
+            await released.wait()
+        return await original_claim(checkout_id)
+
+    async def notify(*args):
+        if not first_worker_ready.is_set():
+            first_worker_ready.set()
+            await competing.wait()
 
     async def push_order(_payment, _tpos, before_dispatch):
         await before_dispatch()
         await order_sent()
 
     async def deduct_stock(_wallet_id, _payload, before_dispatch):
-        await prepare_inventory()
         await before_dispatch()
         await inventory_sent()
 
     monkeypatch.setattr(views_payments, "internal_invoice_queue_put", queued)
+    monkeypatch.setattr(tasks, "claim_fiat_checkout", claim)
+    monkeypatch.setattr(tasks, "websocket_updater", notify)
+    monkeypatch.setattr(tasks, "maybe_settle_tab", settle_tab)
     monkeypatch.setattr(tasks, "maybe_push_order", push_order)
     monkeypatch.setattr(tasks, "deduct_inventory_stock", deduct_stock)
-    confirm_url = f"{base}/{payment_hash}/cash/validate"
+    confirm_url = f"{base}/invoices/{payment_hash}/cash/validate"
     assert (await client.post(confirm_url)).is_success
     paid = await get_standalone_payment(payment_hash, incoming=True)
     assert paid and paid.success
-    with pytest.raises(RuntimeError, match="Before dispatch"):
-        await tasks.on_invoice_paid(paid)
-    checkout = await get_tpos_payment_by_hash(payment_hash)
-    assert checkout and not checkout.paid and checkout.status == "pending"
-    checkpoint = await get_standalone_payment(payment_hash, incoming=True)
-    assert checkpoint and checkpoint.extra["tpos_order_dispatched"]
-    assert not checkpoint.extra.get("tpos_processed")
 
-    assert (await client.post(confirm_url)).is_success
-    assert queued.await_count == 2
-    await asyncio.gather(tasks.on_invoice_paid(paid), tasks.on_invoice_paid(paid))
+    first = asyncio.create_task(tasks.on_invoice_paid(paid))
+    await asyncio.wait_for(first_worker_ready.wait(), timeout=5)
+    second = asyncio.create_task(
+        tasks.on_invoice_paid(paid), name="competing-fiat-checkout"
+    )
+    try:
+        with pytest.raises(RuntimeError, match="Tabs unavailable"):
+            await first
+        order_sent.assert_awaited_once()
+        inventory_sent.assert_awaited_once()
+        checkout = await get_tpos_payment_by_hash(payment_hash)
+        assert checkout and not checkout.paid and checkout.status == "pending"
+        assert (await client.post(confirm_url)).is_success
+        assert queued.await_count == 2
+    finally:
+        released.set()
+        await second
+
     order_sent.assert_awaited_once()
     inventory_sent.assert_awaited_once()
+    assert settle_tab.await_count == 2
     checkout = await get_tpos_payment_by_hash(payment_hash)
     assert checkout and checkout.paid
-    stored = await get_standalone_payment(payment_hash, incoming=True)
-    assert stored and stored.extra["tpos_processed"]
     credited = await get_wallet(fiat.id)
     assert credited and credited.balance_msat == 1_000_000
