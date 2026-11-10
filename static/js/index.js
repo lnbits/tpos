@@ -57,11 +57,8 @@ window.app = Vue.createApp({
         omit_tags: []
       },
       onchainStatus: {
-        available: false,
         message: null,
-        network: null,
-        wallets: [],
-        mempool_endpoint: null
+        wallets: []
       },
       tpossTable: {
         columns: [
@@ -232,8 +229,7 @@ window.app = Vue.createApp({
           wallet => wallet.value === data.wallet
         ) ||
         (this.formDialog.advanced.otc && !data.withdraw_limit) ||
-        (data.onchain_enabled &&
-          (!this.onchainStatus.available || !data.onchain_wallet_id)) ||
+        (data.onchain_enabled && !this.hasSelectedOnchainWallet) ||
         (this.requiresFiatWallet &&
           !this.fiatWalletOptions.some(
             wallet => wallet.id === data.fiat_wallet_id
@@ -273,10 +269,23 @@ window.app = Vue.createApp({
       return this.isFiatCurrency && !!(allow_cash_settlement || fiat_provider)
     },
     onchainWalletOptions() {
-      return (this.onchainStatus.wallets || []).map(wallet => ({
-        label: wallet.title,
-        value: wallet.id
-      }))
+      return [
+        ...LNbits.map
+          .walletOptions(LNbits.map.wallets(this.g.user.wallets, 'onchain'))
+          .map(wallet => ({
+            label: wallet.label + ' (LNbits)',
+            value: 'core:' + wallet.value
+          })),
+        ...this.onchainStatus.wallets.map(wallet => ({
+          label: wallet.title + ' (Watchonly)',
+          value: wallet.id
+        }))
+      ]
+    },
+    hasSelectedOnchainWallet() {
+      return this.onchainWalletOptions.some(
+        wallet => wallet.value === this.formDialog.data.onchain_wallet_id
+      )
     },
     lightningWalletOptions() {
       return LNbits.map.walletOptions(
@@ -363,14 +372,14 @@ window.app = Vue.createApp({
           '/tpos/api/v1/onchain/status',
           this.g.user.wallets[0].adminkey
         )
-        this.onchainStatus = data
+        this.onchainStatus = {
+          message: data.message,
+          wallets: data.wallets || []
+        }
       } catch (error) {
         this.onchainStatus = {
-          available: false,
           message: error.response?.data?.detail || 'Watchonly unavailable.',
-          network: null,
-          wallets: [],
-          mempool_endpoint: null
+          wallets: []
         }
       }
     },
@@ -378,6 +387,7 @@ window.app = Vue.createApp({
       try {
         const {data} = await LNbits.api.getAuthenticatedUser()
         this.g.user.wallets = LNbits.map.user(data).wallets
+        await this.loadOnchainStatus()
       } catch (error) {
         LNbits.utils.notifyApiError(error)
       }

@@ -10,6 +10,7 @@ window.app.component('tpos-admin-form-dialog', {
     'fiatWalletOptions',
     'onchainStatus',
     'onchainWalletOptions',
+    'hasSelectedOnchainWallet',
     'withdrawOptions',
     'createOrUpdateDisabled'
   ],
@@ -141,45 +142,39 @@ window.app.component('tpos-admin-form-dialog', {
             </q-checkbox>
           </div>
         </div>
-        <div v-if="g.user.super_user" class="row q-mt-sm">
+        <div class="row q-mt-sm">
           <div class="col">
             <q-checkbox
               v-model="dialog.data.onchain_enabled"
-              :disable="!onchainStatus.available"
+              :disable="!onchainWalletOptions.length && !dialog.data.onchain_enabled"
               label="Enable onchain payments"
-            >
-              <q-tooltip v-if="!onchainStatus.available">
-                <span
-                  v-text="onchainStatus.message || 'Watchonly extension must be enabled and working.'"
-                ></span>
-              </q-tooltip>
-            </q-checkbox>
+            ></q-checkbox>
+            <p v-if="!onchainWalletOptions.length || (dialog.data.onchain_enabled && dialog.data.onchain_wallet_id && !hasSelectedOnchainWallet)"
+               class="text-caption q-mb-none">
+              <template v-if="onchainWalletOptions.length">
+                The selected on-chain wallet is unavailable. Choose another wallet or
+              </template>
+              <template v-else>
+                {{ onchainStatus.message || 'No on-chain wallet is available.' }}
+                <a href="/wallets" target="_blank" rel="noopener">Open Wallets</a>, then
+              </template>
+              <q-btn flat dense no-caps label="refresh wallets"
+                @click="$emit('refresh-wallets')"></q-btn>.
+            </p>
           </div>
         </div>
         <div v-if="dialog.data.onchain_enabled" class="row q-col-gutter-md">
-          <div class="col-12">
-            <q-banner
-              v-if="!onchainStatus.available"
-              dense
-              rounded
-              class="bg-orange-2 text-dark"
-            >
-              <span
-                v-text="onchainStatus.message || 'Watchonly extension must be enabled and working.'"
-              ></span>
-            </q-banner>
-          </div>
           <div class="col-12">
             <q-select
               filled
               dense
               emit-value
               map-options
+              clearable
               v-model="dialog.data.onchain_wallet_id"
               :options="onchainWalletOptions"
-              :disable="!onchainStatus.available"
-              label="Watchonly wallet *"
-              hint="Select the watchonly wallet used to derive fresh onchain addresses."
+              label="On-chain wallet *"
+              hint="TPoS derives a fresh receive address for each checkout."
             ></q-select>
           </div>
           <div class="col-12">
