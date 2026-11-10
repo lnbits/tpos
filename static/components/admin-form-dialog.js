@@ -17,425 +17,519 @@ window.app.component('tpos-admin-form-dialog', {
   emits: ['close', 'submit', 'refresh-wallets'],
   template: `
   <q-dialog v-model="dialog.show" position="top" @hide="$emit('close')">
-    <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
-      <q-form @submit="!createOrUpdateDisabled && $emit('submit')" class="q-gutter-md">
-        <q-input
-          filled
-          dense
-          v-model.trim="dialog.data.name"
-          label="Name *"
-          placeholder="Tiago's PoS"
-        ></q-input>
-        <q-select
-          filled
-          dense
-          emit-value
-          map-options
-          v-model="dialog.data.wallet"
-          :options="lightningWalletOptions"
-          label="Wallet *"
-        ></q-select>
-        <q-select
-          v-if="g.settings.denomination == 'sats'"
-          filled
-          dense
-          emit-value
-          v-model="dialog.data.currency"
-          :options="currencyOptions"
-          label="Currency *"
-        ></q-select>
-        <template v-if="requiresFiatWallet">
-          <q-select
-            v-if="fiatWalletOptions.length"
-            filled
-            dense
-            emit-value
-            map-options
-            v-model="dialog.data.fiat_wallet_id"
-            :options="fiatWalletOptions"
-            option-label="name"
-            option-value="id"
-            label="Fiat wallet *"
-            hint="Cash and card sales are credited to this wallet."
-          ></q-select>
-          <p v-else class="text-caption q-mb-none">
-            A {{ dialog.data.currency }} fiat wallet is required.
-            <template v-if="g.user.canCreateFiatWallet">
-              <a href="/wallets" target="_blank" rel="noopener">Create it in Wallets</a>,
-              then <q-btn flat dense no-caps label="refresh wallets"
-                @click="$emit('refresh-wallets')"></q-btn>.
-            </template>
-            <span v-else>Ask your LNbits admin to enable fiat wallets.</span>
-          </p>
-        </template>
-        <q-select
-          v-if="dialog.data.fiat_provider || (dialog.data.currency != g.settings.denomination && g.user.fiat_providers?.length)"
-          filled
-          dense
-          emit-value
-          v-model="dialog.data.fiat_provider"
-          :options="g.user.fiat_providers || []"
-          label="Fiat payments"
-          hint="Choose what fiat platform to use for fiat payments."
-        >
-          <template v-if="dialog.data.fiat_provider" v-slot:append>
-            <q-icon
-              name="cancel"
-              @click.stop.prevent="dialog.data.fiat_provider = null"
-              class="cursor-pointer"
-            />
-          </template>
-        </q-select>
-        <div
-          v-if="(dialog.data.fiat_provider || []).includes('stripe')"
-          class="row"
-        >
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.data.stripe_card_payments"
-              label="Allow Stripe card payments"
-            >
-              <q-tooltip>
-                <span
-                  v-text="'If enabled, invoices can be paid by tapping a card.'"
-                ></span
-              ></q-tooltip>
-            </q-checkbox>
-          </div>
-          <div class="col">
-            <small>
-              After saving use the QR code button to create the pairing code.
-            </small>
-          </div>
+    <q-card
+      class="column no-wrap"
+      style="width: 560px; max-width: calc(100vw - 32px); max-height: 90vh"
+    >
+      <q-card-section class="row items-center q-pb-sm">
+        <div class="text-h6">
+          {{ dialog.data.id ? 'Edit TPoS' : 'Create TPoS' }}
         </div>
-        <div
-          v-if="
-            (dialog.data.fiat_provider || []).includes('stripe') &&
-              dialog.data.stripe_card_payments
-          "
-          class="row q-mt-sm"
-        >
-          <div class="col">
+        <q-space></q-space>
+        <q-btn
+          v-close-popup
+          flat
+          round
+          dense
+          icon="close"
+          aria-label="Close dialog"
+        ></q-btn>
+      </q-card-section>
+      <q-form
+        @submit="!createOrUpdateDisabled && $emit('submit')"
+        class="column no-wrap"
+        style="min-height: 0"
+      >
+        <q-card-section class="scroll q-pt-sm" style="min-height: 0">
+          <div class="q-gutter-y-md">
             <q-input
               filled
               dense
-              v-model.trim="dialog.data.stripe_reader_id"
-              label="Stripe reader ID"
-              hint="If you are using a Stripe reader (rather than a generic device) add it here"
+              v-model.trim="dialog.data.name"
+              label="Name *"
+              placeholder="Tiago's PoS"
             ></q-input>
-          </div>
-        </div>
-        <div class="row q-mt-sm">
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.data.allow_cash_settlement"
-              :disable="!isFiatCurrency"
-              label="Allow cash settlement"
-            >
-              <q-tooltip v-if="!isFiatCurrency"
-                >currency must be set to fiat</q-tooltip
-              >
-              <q-tooltip v-else
-                >Anyone with the terminal link can confirm cash sales.
-                The selected fiat wallet receives the credit.</q-tooltip
-              >
-            </q-checkbox>
-          </div>
-        </div>
-        <div class="row q-mt-sm">
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.data.onchain_enabled"
-              :disable="!onchainWalletOptions.length && !dialog.data.onchain_enabled"
-              label="Enable onchain payments"
-            ></q-checkbox>
-            <p v-if="!onchainWalletOptions.length || (dialog.data.onchain_enabled && dialog.data.onchain_wallet_id && !hasSelectedOnchainWallet)"
-               class="text-caption q-mb-none">
-              <template v-if="onchainWalletOptions.length">
-                The selected on-chain wallet is unavailable. Choose another wallet or
-              </template>
-              <template v-else>
-                {{ onchainStatus.message || 'No on-chain wallet is available.' }}
-                <a href="/wallets" target="_blank" rel="noopener">Open Wallets</a>, then
-              </template>
-              <q-btn flat dense no-caps label="refresh wallets"
-                @click="$emit('refresh-wallets')"></q-btn>.
-            </p>
-          </div>
-        </div>
-        <div v-if="dialog.data.onchain_enabled" class="row q-col-gutter-md">
-          <div class="col-12">
             <q-select
               filled
               dense
               emit-value
               map-options
-              clearable
-              v-model="dialog.data.onchain_wallet_id"
-              :options="onchainWalletOptions"
-              label="On-chain wallet *"
-              hint="TPoS derives a fresh receive address for each checkout."
+              v-model="dialog.data.wallet"
+              :options="lightningWalletOptions"
+              label="Wallet *"
             ></q-select>
-          </div>
-          <div class="col-12">
-            <q-toggle
-              v-model="dialog.data.onchain_zero_conf"
-              label="Accept onchain payment at 0-conf"
-            >
-              <q-tooltip>
-                If disabled, TPoS waits for the first confirmation before
-                completing the sale.
-              </q-tooltip>
-            </q-toggle>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.data.lnaddress"
-              label="LNaddress funding"
-            >
-              <q-tooltip>
-                <span
-                  v-text="'If enabled, the tpos can be funded with a LNaddress in the public page.'"
-                ></span
-              ></q-tooltip>
-            </q-checkbox>
-          </div>
-          <div class="col">
-            <q-input
+            <q-select
+              v-if="g.settings.denomination == 'sats'"
               filled
               dense
-              :disable="!dialog.data.lnaddress"
-              v-model="dialog.data.lnaddress_cut"
-              type="number"
-              label="LNaddress cut 0-100 percent"
-              ><q-tooltip>
-                <span
-                  v-text="'Percent charge for using the LNaddress funding option. To go to the TPoS wallet.'"
-                ></span
-              ></q-tooltip>
-            </q-input>
+              emit-value
+              v-model="dialog.data.currency"
+              :options="currencyOptions"
+              label="Currency *"
+            ></q-select>
           </div>
-        </div>
-        <div class="row">
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.advanced.tips"
-              label="Enable tips"
-            ></q-checkbox>
-          </div>
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.advanced.otc"
-              label="Enable selling BTC (ATM)"
-            ></q-checkbox>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.data.enable_receipt_print"
-              label="Enable printing (experimental)"
-            ></q-checkbox>
-          </div>
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.data.enable_remote"
-              label="Enable remote (to trigger payments on external device)"
-            ></q-checkbox>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.data.allow_price_adjustment"
-              label="Allow cart item price adjustment"
-            ></q-checkbox>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.data.tabs_enabled"
-              label="Enable Tabs integration"
-            ></q-checkbox>
-          </div>
-          <div class="col">
-            <q-checkbox
-              v-model="dialog.data.tabs_allow_create"
-              :disable="!dialog.data.tabs_enabled"
-              label="Allow creating tabs from TPoS"
-            ></q-checkbox>
-          </div>
-        </div>
-        <template v-if="dialog.data.enable_receipt_print">
-          <p class="text-caption">
-            Receipt printing is an experimental feature. Not all devices work
-            correctly, or work at all.
-          </p>
-          <q-input
-            filled
-            dense
-            v-model="dialog.data.business_name"
-            label="Business name"
-            placeholder="My Shop"
-          ></q-input>
-          <q-input
-            v-model="dialog.data.business_address"
-            filled
-            label="Business address"
-            placeholder="123 Main St, City, Country"
-            type="textarea"
-          ></q-input>
-          <q-input
-            filled
-            dense
-            v-model="dialog.data.business_vat_id"
-            label="VAT ID"
-            placeholder="123456789"
-          ></q-input>
-          <q-checkbox
-            v-model="dialog.data.only_show_sats_on_bitcoin"
-            label="Only show sats & sats conversion rate on bitcoin transactions"
-          ></q-checkbox>
-        </template>
-        <template v-if="dialog.advanced.tips">
-          <q-select
-            filled
-            dense
-            emit-value
-            v-model="dialog.data.tip_wallet"
-            :options="g.user.walletOptions"
-            label="Tip Wallet"
-          ></q-select>
-          <q-select
-            filled
-            multiple
-            dense
-            emit-value
-            v-model="dialog.data.tip_options"
-            v-if="dialog.data.tip_wallet"
-            use-input
-            use-chips
-            hide-dropdown-icon
-            input-debounce="0"
-            inputmode="numeric"
-            new-value-mode="add-unique"
-            label="Tip % Options (hit enter to add values)"
-            ><q-tooltip>Hit enter to add values</q-tooltip>
-            <template v-slot:hint>
-              You can leave this blank. A default rounding option is available
-              (round amount to a value)
-            </template>
-          </q-select>
-        </template>
-        <template v-if="dialog.advanced.otc">
-          <q-input
-            filled
-            dense
-            v-model.number="dialog.data.withdraw_limit"
-            type="number"
-            :label="'Max amount to be sold daily (' + g.settings.denomination + ') *'"
-          ></q-input>
-
-          <div class="row">
-            <div class="col-8">
-              <q-input
-                filled
-                dense
-                v-model.number="dialog.data.withdraw_between"
-                type="number"
-                min="0"
-                :label="'Time between withdraws (' + g.settings.denomination + ')'"
-              ></q-input>
-            </div>
-            <div class="col-4">
-              <q-option-group
-                v-model="dialog.data.withdraw_time_option"
-                :options="withdrawOptions"
-                color="primary"
-                inline
-              ></q-option-group>
-            </div>
-          </div>
-
-          <q-input
-            filled
-            dense
-            v-model.number="dialog.data.withdraw_premium"
-            type="number"
-            label="Withdraw premium %"
-            step="0.01"
-            min="0"
-          ></q-input>
-        </template>
-        <q-list>
-          <q-expansion-item
-            expand-separator
-            icon="inventory"
-            label="Tax settings"
-            caption="Only applicable when using items/products"
-          >
-            <q-card>
-              <q-card-section>
-                Tax Inclusive means the unit price includes tax. (default)
-                <br />
-                Tax Exclusive means tax is applied on top of the unit price.
-              </q-card-section>
-              <q-card-section>
-                <div class="row q-mt-lg">
-                  <div class="col-12 col-md-6">
-                    <q-toggle
-                      v-model="dialog.data.tax_inclusive"
-                      :label="dialog.data.tax_inclusive ?
-                                  'Tax Inclusive' :
-                                  'Tax Exclusive'"
-                      ><q-tooltip>
+          <q-list bordered separator class="rounded-borders q-mt-lg">
+            <q-expansion-item
+              expand-separator
+              icon="payments"
+              label="Payment methods"
+              caption="Cash, cards and Lightning address funding"
+              :default-opened="requiresFiatWallet"
+            >
+              <div class="q-pa-md q-gutter-y-md">
+                <template v-if="requiresFiatWallet">
+                  <q-select
+                    v-if="fiatWalletOptions.length"
+                    filled
+                    dense
+                    emit-value
+                    map-options
+                    v-model="dialog.data.fiat_wallet_id"
+                    :options="fiatWalletOptions"
+                    option-label="name"
+                    option-value="id"
+                    label="Fiat wallet *"
+                    hint="Cash and card sales are credited to this wallet."
+                  ></q-select>
+                  <p v-else class="text-caption q-mb-none">
+                    A {{ dialog.data.currency }} fiat wallet is required.
+                    <template v-if="g.user.canCreateFiatWallet">
+                      <a href="/wallets" target="_blank" rel="noopener">
+                        Create it in Wallets
+                      </a>
+                      , then
+                      <q-btn
+                        flat
+                        dense
+                        no-caps
+                        label="refresh wallets"
+                        @click="$emit('refresh-wallets')"
+                      ></q-btn>
+                      .
+                    </template>
+                    <span v-else>
+                      Ask your LNbits admin to enable fiat wallets.
+                    </span>
+                  </p>
+                </template>
+                <q-select
+                  v-if="dialog.data.fiat_provider || (dialog.data.currency != g.settings.denomination && g.user.fiat_providers?.length)"
+                  filled
+                  dense
+                  emit-value
+                  v-model="dialog.data.fiat_provider"
+                  :options="g.user.fiat_providers || []"
+                  label="Fiat payments"
+                  hint="Choose what fiat platform to use for fiat payments."
+                >
+                  <template v-if="dialog.data.fiat_provider" v-slot:append>
+                    <q-icon
+                      name="cancel"
+                      @click.stop.prevent="dialog.data.fiat_provider = null"
+                      class="cursor-pointer"
+                    />
+                  </template>
+                </q-select>
+                <div
+                  v-if="(dialog.data.fiat_provider || []).includes('stripe')"
+                  class="row"
+                >
+                  <div class="col">
+                    <q-checkbox
+                      v-model="dialog.data.stripe_card_payments"
+                      label="Allow Stripe card payments"
+                    >
+                      <q-tooltip>
                         <span
-                          v-text="'Applies to all products'"
-                        ></span> </q-tooltip
-                    ></q-toggle>
+                          v-text="'If enabled, invoices can be paid by tapping a card.'"
+                        ></span>
+                      </q-tooltip>
+                    </q-checkbox>
                   </div>
-                  <div class="col-12 col-md-6">
+                  <div class="col">
+                    <small>
+                      After saving use the QR code button to create the pairing
+                      code.
+                    </small>
+                  </div>
+                </div>
+                <div
+                  v-if="
+                      (dialog.data.fiat_provider || []).includes('stripe') &&
+                        dialog.data.stripe_card_payments
+                    "
+                  class="row q-mt-sm"
+                >
+                  <div class="col">
                     <q-input
                       filled
                       dense
-                      v-model.number="dialog.data.tax_default"
-                      type="number"
-                      label="Default tax rate %"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      hint="Fallback tax rate if not set on product"
+                      v-model.trim="dialog.data.stripe_reader_id"
+                      label="Stripe reader ID"
+                      hint="If you are using a Stripe reader (rather than a generic device) add it here"
                     ></q-input>
                   </div>
                 </div>
-              </q-card-section>
-            </q-card>
-          </q-expansion-item>
-        </q-list>
-        <div class="row q-mt-lg">
+                <div class="row q-mt-sm">
+                  <div class="col">
+                    <q-checkbox
+                      v-model="dialog.data.allow_cash_settlement"
+                      :disable="!isFiatCurrency"
+                      label="Allow cash settlement"
+                    >
+                      <q-tooltip v-if="!isFiatCurrency">
+                        currency must be set to fiat
+                      </q-tooltip>
+                      <q-tooltip v-else>
+                        Anyone with the terminal link can confirm cash sales. The
+                        selected fiat wallet receives the credit.
+                      </q-tooltip>
+                    </q-checkbox>
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="col">
+                    <q-checkbox
+                      v-model="dialog.data.lnaddress"
+                      label="LNaddress funding"
+                    >
+                      <q-tooltip>
+                        <span
+                          v-text="'If enabled, the tpos can be funded with a LNaddress in the public page.'"
+                        ></span>
+                      </q-tooltip>
+                    </q-checkbox>
+                  </div>
+                  <div class="col">
+                    <q-input
+                      filled
+                      dense
+                      :disable="!dialog.data.lnaddress"
+                      v-model="dialog.data.lnaddress_cut"
+                      type="number"
+                      label="LNaddress cut 0-100 percent"
+                    >
+                      <q-tooltip>
+                        <span
+                          v-text="'Percent charge for using the LNaddress funding option. To go to the TPoS wallet.'"
+                        ></span>
+                      </q-tooltip>
+                    </q-input>
+                  </div>
+                </div>
+              </div>
+            </q-expansion-item>
+            <q-expansion-item
+              expand-separator
+              icon="currency_bitcoin"
+              label="On-chain payments"
+              :caption="dialog.data.onchain_enabled ? 'Enabled' : 'Disabled'"
+              :default-opened="dialog.data.onchain_enabled"
+            >
+              <div class="q-pa-md q-gutter-y-md">
+                <div class="row q-mt-sm">
+                  <div class="col">
+                    <q-checkbox
+                      v-model="dialog.data.onchain_enabled"
+                      :disable="!onchainWalletOptions.length && !dialog.data.onchain_enabled"
+                      label="Enable onchain payments"
+                    ></q-checkbox>
+                    <p
+                      v-if="!onchainWalletOptions.length || (dialog.data.onchain_enabled && dialog.data.onchain_wallet_id && !hasSelectedOnchainWallet)"
+                      class="text-caption q-mb-none"
+                    >
+                      <template v-if="onchainWalletOptions.length">
+                        The selected on-chain wallet is unavailable. Choose
+                        another wallet or
+                      </template>
+                      <template v-else>
+                        {{ onchainStatus.message || 'No on-chain wallet is available.' }}
+                        <a href="/wallets" target="_blank" rel="noopener">
+                          Open Wallets
+                        </a>
+                        , then
+                      </template>
+                      <q-btn
+                        flat
+                        dense
+                        no-caps
+                        label="refresh wallets"
+                        @click="$emit('refresh-wallets')"
+                      ></q-btn>
+                      .
+                    </p>
+                  </div>
+                </div>
+                <div v-if="dialog.data.onchain_enabled" class="q-gutter-y-md">
+                  <div class="col-12">
+                    <q-select
+                      filled
+                      dense
+                      emit-value
+                      map-options
+                      clearable
+                      v-model="dialog.data.onchain_wallet_id"
+                      :options="onchainWalletOptions"
+                      label="On-chain wallet *"
+                      hint="TPoS derives a fresh receive address for each checkout."
+                    ></q-select>
+                  </div>
+                  <div class="col-12">
+                    <q-toggle
+                      v-model="dialog.data.onchain_zero_conf"
+                      label="Accept onchain payment at 0-conf"
+                    >
+                      <q-tooltip>
+                        If disabled, TPoS waits for the first confirmation before
+                        completing the sale.
+                      </q-tooltip>
+                    </q-toggle>
+                  </div>
+                </div>
+              </div>
+            </q-expansion-item>
+            <q-expansion-item
+              expand-separator
+              icon="volunteer_activism"
+              label="Tips"
+              :caption="dialog.advanced.tips ? 'Enabled' : 'Disabled'"
+            >
+              <div class="q-pa-md q-gutter-y-md">
+                <q-checkbox
+                  v-model="dialog.advanced.tips"
+                  label="Enable tips"
+                ></q-checkbox>
+                <template v-if="dialog.advanced.tips">
+                  <q-select
+                    filled
+                    dense
+                    emit-value
+                    v-model="dialog.data.tip_wallet"
+                    :options="g.user.walletOptions"
+                    label="Tip Wallet"
+                  ></q-select>
+                  <q-select
+                    filled
+                    multiple
+                    dense
+                    emit-value
+                    v-model="dialog.data.tip_options"
+                    v-if="dialog.data.tip_wallet"
+                    use-input
+                    use-chips
+                    hide-dropdown-icon
+                    input-debounce="0"
+                    inputmode="numeric"
+                    new-value-mode="add-unique"
+                    label="Tip % Options (hit enter to add values)"
+                  >
+                    <q-tooltip>Hit enter to add values</q-tooltip>
+                    <template v-slot:hint>
+                      You can leave this blank. A default rounding option is
+                      available (round amount to a value)
+                    </template>
+                  </q-select>
+                </template>
+              </div>
+            </q-expansion-item>
+            <q-expansion-item
+              expand-separator
+              icon="local_atm"
+              label="ATM"
+              :caption="dialog.advanced.otc ? 'Enabled' : 'Disabled'"
+            >
+              <div class="q-pa-md q-gutter-y-md">
+                <q-checkbox
+                  v-model="dialog.advanced.otc"
+                  label="Enable selling BTC (ATM)"
+                ></q-checkbox>
+                <template v-if="dialog.advanced.otc">
+                  <q-input
+                    filled
+                    dense
+                    v-model.number="dialog.data.withdraw_limit"
+                    type="number"
+                    :label="'Max amount to be sold daily (' + g.settings.denomination + ') *'"
+                  ></q-input>
+
+                  <div class="row">
+                    <div class="col-8">
+                      <q-input
+                        filled
+                        dense
+                        v-model.number="dialog.data.withdraw_between"
+                        type="number"
+                        min="0"
+                        :label="'Time between withdraws (' + g.settings.denomination + ')'"
+                      ></q-input>
+                    </div>
+                    <div class="col-4">
+                      <q-option-group
+                        v-model="dialog.data.withdraw_time_option"
+                        :options="withdrawOptions"
+                        color="primary"
+                        inline
+                      ></q-option-group>
+                    </div>
+                  </div>
+
+                  <q-input
+                    filled
+                    dense
+                    v-model.number="dialog.data.withdraw_premium"
+                    type="number"
+                    label="Withdraw premium %"
+                    step="0.01"
+                    min="0"
+                  ></q-input>
+                </template>
+              </div>
+            </q-expansion-item>
+            <q-expansion-item
+              expand-separator
+              icon="point_of_sale"
+              label="Checkout"
+              caption="Price adjustments, tabs and remote payments"
+            >
+              <div class="q-pa-md q-gutter-y-md">
+                <div>
+                  <q-checkbox
+                    v-model="dialog.data.allow_price_adjustment"
+                    label="Allow cart item price adjustment"
+                  ></q-checkbox>
+                </div>
+                <div>
+                  <q-checkbox
+                    v-model="dialog.data.tabs_enabled"
+                    label="Enable Tabs integration"
+                  ></q-checkbox>
+                </div>
+                <div>
+                  <q-checkbox
+                    v-model="dialog.data.tabs_allow_create"
+                    :disable="!dialog.data.tabs_enabled"
+                    label="Allow creating tabs from TPoS"
+                  ></q-checkbox>
+                </div>
+                <div>
+                  <q-checkbox
+                    v-model="dialog.data.enable_remote"
+                    label="Enable remote (to trigger payments on external device)"
+                  ></q-checkbox>
+                </div>
+              </div>
+            </q-expansion-item>
+            <q-expansion-item
+              expand-separator
+              icon="receipt_long"
+              label="Receipts"
+              :caption="dialog.data.enable_receipt_print ? 'Printing enabled' : 'Printing disabled'"
+            >
+              <div class="q-pa-md q-gutter-y-md">
+                <q-checkbox
+                  v-model="dialog.data.enable_receipt_print"
+                  label="Enable printing (experimental)"
+                ></q-checkbox>
+                <template v-if="dialog.data.enable_receipt_print">
+                  <p class="text-caption">
+                    Receipt printing is an experimental feature. Not all devices
+                    work correctly, or work at all.
+                  </p>
+                  <q-input
+                    filled
+                    dense
+                    v-model="dialog.data.business_name"
+                    label="Business name"
+                    placeholder="My Shop"
+                  ></q-input>
+                  <q-input
+                    v-model="dialog.data.business_address"
+                    filled
+                    label="Business address"
+                    placeholder="123 Main St, City, Country"
+                    type="textarea"
+                  ></q-input>
+                  <q-input
+                    filled
+                    dense
+                    v-model="dialog.data.business_vat_id"
+                    label="VAT ID"
+                    placeholder="123456789"
+                  ></q-input>
+                  <q-checkbox
+                    v-model="dialog.data.only_show_sats_on_bitcoin"
+                    label="Only show sats & sats conversion rate on bitcoin transactions"
+                  ></q-checkbox>
+                </template>
+              </div>
+            </q-expansion-item>
+            <q-expansion-item
+              expand-separator
+              icon="inventory"
+              label="Tax settings"
+              caption="Only applicable when using items/products"
+            >
+              <q-card>
+                <q-card-section>
+                  Tax Inclusive means the unit price includes tax. (default)
+                  <br />
+                  Tax Exclusive means tax is applied on top of the unit price.
+                </q-card-section>
+                <q-card-section>
+                  <div class="row q-mt-lg">
+                    <div class="col-12 col-md-6">
+                      <q-toggle
+                        v-model="dialog.data.tax_inclusive"
+                        :label="dialog.data.tax_inclusive ?
+                                      'Tax Inclusive' :
+                                      'Tax Exclusive'"
+                      >
+                        <q-tooltip>
+                          <span v-text="'Applies to all products'"></span>
+                        </q-tooltip>
+                      </q-toggle>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <q-input
+                        filled
+                        dense
+                        v-model.number="dialog.data.tax_default"
+                        type="number"
+                        label="Default tax rate %"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        hint="Fallback tax rate if not set on product"
+                      ></q-input>
+                    </div>
+                  </div>
+                </q-card-section>
+              </q-card>
+            </q-expansion-item>
+          </q-list>
+        </q-card-section>
+        <q-separator></q-separator>
+        <q-card-actions class="q-pa-md" align="between">
           <q-btn
             v-if="dialog.data.id"
             unelevated
             color="primary"
             type="submit"
             :disable="createOrUpdateDisabled"
-            >Update TPoS</q-btn
           >
+            Update TPoS
+          </q-btn>
           <q-btn
             v-else
             unelevated
             color="primary"
             :disable="createOrUpdateDisabled"
             type="submit"
-            >Create TPoS</q-btn
           >
-          <q-btn v-close-popup flat color="grey" class="q-ml-auto"
-            >Cancel</q-btn
-          >
-        </div>
+            Create TPoS
+          </q-btn>
+          <q-btn v-close-popup flat color="grey" class="q-ml-auto">Cancel</q-btn>
+        </q-card-actions>
       </q-form>
     </q-card>
   </q-dialog>
