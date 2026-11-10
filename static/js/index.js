@@ -50,8 +50,6 @@ window.app = Vue.createApp({
     return {
       tposs: [],
       currencyOptions: [],
-      hasFiatProvider: false,
-      fiatProviders: null,
       inventoryStatus: {
         enabled: false,
         inventory_id: null,
@@ -134,6 +132,7 @@ window.app = Vue.createApp({
           stripe_card_payments: false,
           stripe_reader_id: '',
           allow_cash_settlement: false,
+          fiat_wallet_id: null,
           onchain_enabled: false,
           onchain_wallet_id: null,
           onchain_zero_conf: true,
@@ -229,10 +228,16 @@ window.app = Vue.createApp({
       return (
         !data.name ||
         !data.currency ||
-        !data.wallet ||
+        !this.lightningWalletOptions.some(
+          wallet => wallet.value === data.wallet
+        ) ||
         (this.formDialog.advanced.otc && !data.withdraw_limit) ||
         (data.onchain_enabled &&
-          (!this.onchainStatus.available || !data.onchain_wallet_id))
+          (!this.onchainStatus.available || !data.onchain_wallet_id)) ||
+        (this.requiresFiatWallet &&
+          !this.fiatWalletOptions.some(
+            wallet => wallet.id === data.fiat_wallet_id
+          ))
       )
     },
     inventoryModeOptions() {
@@ -263,11 +268,28 @@ window.app = Vue.createApp({
         this.formDialog.data.currency !== 'sats'
       )
     },
+    requiresFiatWallet() {
+      const {allow_cash_settlement, fiat_provider} = this.formDialog.data
+      return this.isFiatCurrency && !!(allow_cash_settlement || fiat_provider)
+    },
     onchainWalletOptions() {
       return (this.onchainStatus.wallets || []).map(wallet => ({
         label: wallet.title,
         value: wallet.id
       }))
+    },
+    lightningWalletOptions() {
+      return LNbits.map.walletOptions(
+        LNbits.map
+          .wallets(this.g.user.wallets)
+          .filter(wallet => wallet.canReceivePayments)
+      )
+    },
+    fiatWalletOptions() {
+      const currency = (this.formDialog.data.currency || '').toUpperCase()
+      return LNbits.map
+        .wallets(this.g.user.wallets, 'fiat')
+        .filter(wallet => (wallet.currency || '').toUpperCase() === currency)
     }
   },
   methods: {
@@ -292,6 +314,7 @@ window.app = Vue.createApp({
         stripe_card_payments: false,
         stripe_reader_id: '',
         allow_cash_settlement: false,
+        fiat_wallet_id: null,
         onchain_enabled: false,
         onchain_wallet_id: null,
         onchain_zero_conf: true,
@@ -351,6 +374,14 @@ window.app = Vue.createApp({
         }
       }
     },
+    async refreshWallets() {
+      try {
+        const {data} = await LNbits.api.getAuthenticatedUser()
+        this.g.user.wallets = LNbits.map.user(data).wallets
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
+      }
+    },
     sendTposData() {
       const data = {
         ...this.formDialog.data,
@@ -384,6 +415,8 @@ window.app = Vue.createApp({
       }
       if (data.currency === 'sats') {
         data.allow_cash_settlement = false
+        data.fiat_provider = null
+        data.fiat_wallet_id = null
       }
       if (!data.onchain_enabled) {
         data.onchain_wallet_id = null
@@ -824,9 +857,5 @@ window.app = Vue.createApp({
         }
       })
       .catch(LNbits.utils.notifyApiError)
-    if (this.g.user.fiat_providers && this.g.user.fiat_providers.length > 0) {
-      this.hasFiatProvider = true
-      this.fiatProviders = [...this.g.user.fiat_providers]
-    }
   }
 })

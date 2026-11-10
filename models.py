@@ -90,6 +90,7 @@ class CreateTposData(BaseModel):
     stripe_card_payments: bool = False
     stripe_reader_id: str | None = None
     allow_cash_settlement: bool = Field(False)
+    fiat_wallet_id: str | None = Field(None)
     onchain_enabled: bool = Field(False)
     onchain_wallet_id: str | None = None
     onchain_zero_conf: bool = Field(True)
@@ -159,10 +160,12 @@ class TposClean(BaseModel):
 class Tpos(TposClean, BaseModel):
     wallet: str
     tip_wallet: str | None = None
+    fiat_wallet_id: str | None = None
 
 
 class TposPaymentStatus(str, Enum):
     PENDING = "pending"
+    PROCESSING = "processing"
     PAID = "paid"
     EXPIRED = "expired"
     UNDERPAID = "underpaid"
@@ -181,6 +184,7 @@ TERMINAL_PAYMENT_STATUSES = frozenset(
 class TposPayment(BaseModel):
     id: str
     tpos_id: str
+    fiat_wallet_id: str | None = None
     payment_hash: str
     amount: int = 0
     paid: bool = False

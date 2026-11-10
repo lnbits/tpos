@@ -1,7 +1,9 @@
 import os
 from typing import Any, cast
+from unittest.mock import AsyncMock
 
 import httpx
+import pytest
 import pytest_asyncio
 import tabs.migrations as tabs_migrations  # type: ignore[import]
 from fastapi import FastAPI
@@ -63,3 +65,24 @@ async def client(monkeypatch):
     monkeypatch.setattr(httpx, "AsyncClient", app_client)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
+
+
+@pytest.fixture
+def enable_stripe(monkeypatch):
+    """Enable the fiat provider as an admin would (`allowed_users=[]` = everyone)."""
+
+    def _enable(user_id: str | None = None):
+        monkeypatch.setattr(settings, "stripe_enabled", True)
+        monkeypatch.setattr(
+            settings.stripe_limits, "allowed_users", [user_id] if user_id else []
+        )
+
+    return _enable
+
+
+@pytest.fixture
+def fixed_fiat_rate(monkeypatch):
+    monkeypatch.setattr(
+        "lnbits.utils.exchange_rates.get_fiat_rate_satoshis",
+        AsyncMock(return_value=1000),
+    )

@@ -43,8 +43,10 @@ from .models import (
 )
 from .services import (
     ensure_tpos_tabs_access,
+    is_tpos_payment,
     validate_tpos_sale_amount,
 )
+from .services_fiat import get_valid_tpos_fiat_wallet
 from .services_inventory import validate_inventory_sale
 from .services_onchain import fetch_onchain_address, normalize_mempool_endpoint
 from .services_tabs import get_tab_for_tpos, tab_settlement_tolerance
@@ -105,6 +107,11 @@ async def api_tpos_create_invoice(
 
     cash_method = data.pay_in_fiat and data.fiat_method == "cash"
     onchain_method = data.payment_method == "btc_onchain"
+    if onchain_method and data.pay_in_fiat:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail="Choose either an onchain or a fiat payment.",
+        )
     if cash_method and not tpos.allow_cash_settlement:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN,
@@ -115,6 +122,16 @@ async def api_tpos_create_invoice(
             status_code=HTTPStatus.FORBIDDEN,
             detail="Onchain payments are not enabled for this TPoS.",
         )
+    settlement_wallet = None
+    if cash_method or (data.pay_in_fiat and tpos.fiat_provider):
+        settlement_wallet = await get_valid_tpos_fiat_wallet(
+            tpos, tpos.fiat_wallet_id, tpos.currency
+        )
+        if not settlement_wallet:
+            raise HTTPException(
+                status_code=HTTPStatus.CONFLICT,
+                detail=f"Select an active fiat wallet in {tpos.currency}.",
+            )
     tab_settlement = data.tab_settlement
     if tab_settlement:
         user_id = await ensure_tpos_tabs_access(tpos)
@@ -170,10 +187,10 @@ async def api_tpos_create_invoice(
         if cash_method or onchain_method:
             wallet = await get_wallet(tpos.wallet)
             account = await get_account(wallet.user) if wallet else None
-            if account and not account.is_super_user:
+            if onchain_method and account and not account.is_super_user:
                 raise HTTPException(
                     status_code=HTTPStatus.BAD_REQUEST,
-                    detail="This tpos cannot create cash or onchain invoices.",
+                    detail="This tpos cannot create onchain invoices.",
                 )
             if onchain_method:
                 if not wallet:
@@ -228,7 +245,9 @@ async def api_tpos_create_invoice(
             internal=bool(cash_method or onchain_method),
             labels=["cash"] if cash_method else (["onchain"] if onchain_method else []),
         )
-        payment = await create_payment_request(tpos.wallet, invoice_data)
+        payment = await create_payment_request(
+            settlement_wallet.id if settlement_wallet else tpos.wallet, invoice_data
+        )
         if tab_settlement:
             payment.extra["tab_settlement"]["amount_msat"] = payment.amount
             # A provider may already have completed the payment; save only metadata.
@@ -262,6 +281,7 @@ async def api_tpos_create_invoice(
             TposPayment(
                 id=uuid4().hex,
                 tpos_id=tpos_id,
+                fiat_wallet_id=settlement_wallet.id if settlement_wallet else None,
                 payment_hash=payment.payment_hash,
                 amount=int(data.amount + (data.tip_amount or 0)),
                 onchain_address=onchain_address,
@@ -394,11 +414,7 @@ async def api_tpos_check_invoice(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
         )
-    if (
-        payment.extra.get("tag") != "tpos"
-        or payment.extra.get("tpos_id") != tpos_id
-        or payment.wallet_id != tpos.wallet
-    ):
+    if not is_tpos_payment(payment, tpos, tpos_payment):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
         )
@@ -434,11 +450,8 @@ async def api_tpos_print_invoice(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
         )
-    if (
-        payment.extra.get("tag") != "tpos"
-        or payment.extra.get("tpos_id") != tpos_id
-        or payment.wallet_id != tpos.wallet
-    ):
+    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
+    if not is_tpos_payment(payment, tpos, tpos_payment):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
         )
@@ -446,7 +459,6 @@ async def api_tpos_print_invoice(
     receipt_type: Literal["receipt", "order_receipt"] = (
         "order_receipt" if data.receipt_type == "order_receipt" else "receipt"
     )
-    tpos_payment = await get_tpos_payment_by_hash(payment_hash)
     receipt = _build_receipt_data(tpos, payment, tpos_payment)
     payload = ReceiptPrint(
         tpos_id=tpos_id,
@@ -479,23 +491,45 @@ async def api_tpos_validate_cash_invoice(tpos_id: str, payment_hash: str):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Payment does not exist."
         )
-    if payment.extra.get("tag") != "tpos" or payment.extra.get("tpos_id") != tpos_id:
+    checkout = await get_tpos_payment_by_hash(payment_hash)
+    if not checkout or not is_tpos_payment(payment, tpos, checkout):
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="TPoS payment does not exist."
         )
-    if payment.extra.get("fiat_method") != "cash":
+    if (
+        payment.extra.get("fiat_method") != "cash"
+        or payment.fiat_provider
+        or payment.checking_id != f"internal_cash_{payment_hash}"
+    ):
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST, detail="Payment is not cash."
         )
-    if not payment.is_internal:
+    wallet = await get_valid_tpos_fiat_wallet(
+        tpos,
+        checkout.fiat_wallet_id,
+        payment.extra.get("wallet_fiat_currency") or tpos.currency,
+    )
+    if not wallet:
         raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="Payment is not an internal cash invoice.",
+            status_code=HTTPStatus.CONFLICT,
+            detail="Cash checkout is no longer assigned to an active fiat wallet.",
         )
     if not payment.success:
+        if payment.is_expired:
+            raise HTTPException(
+                status_code=HTTPStatus.CONFLICT, detail="Cash checkout has expired."
+            )
+        if not payment.pending:
+            raise HTTPException(
+                status_code=HTTPStatus.CONFLICT,
+                detail="Cash checkout cannot be settled.",
+            )
         payment.status = PaymentState.SUCCESS
-        await update_payment(payment)
-    await internal_invoice_queue_put(payment.checking_id)
+        await update_payment(
+            payment.copy(include={"wallet_id", "checking_id", "status"})
+        )
+    if not checkout.paid:
+        await internal_invoice_queue_put(payment.checking_id)
     return {"success": True}
 
 
@@ -531,7 +565,7 @@ def _serialize_tpos_invoice_response(
 
     return TposInvoiceResponse(
         payment_hash=payment.payment_hash,
-        bolt11=payment.bolt11,
+        bolt11="" if tpos_payment.fiat_wallet_id else payment.bolt11,
         payment_request=payment_request,
         tpos_payment_id=tpos_payment.id,
         payment_options=options,

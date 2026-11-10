@@ -1,18 +1,18 @@
 import asyncio
 import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 from lnbits.core.crud import get_standalone_payment
-from lnbits.core.crud.payments import create_payment, update_payment_checking_id
-from lnbits.core.crud.wallets import create_wallet
-from lnbits.core.models import CreateInvoice, CreatePayment, PaymentState
+from lnbits.core.crud.payments import create_payment
+from lnbits.core.crud.wallets import create_wallet, get_total_balance, get_wallet
+from lnbits.core.models import CreatePayment, PaymentState
 from lnbits.core.models.users import Account
+from lnbits.core.models.wallets import WalletType
 from lnbits.core.services import (
-    create_payment_request,
     pay_invoice,
     update_wallet_balance,
 )
@@ -86,7 +86,9 @@ async def _drain_internal_invoice_queue() -> None:
 @pytest.mark.asyncio
 async def test_tpos_crud_settings_and_wrapper_token(client: AsyncClient):
     user, wallet = await _user_with_tabs()
-    settings.super_user = user.id
+    fiat_wallet = await create_wallet(
+        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
+    )
     headers = {"X-API-KEY": wallet.adminkey}
 
     listed_empty = await client.get("/tpos/api/v1/tposs", headers=headers)
@@ -95,7 +97,9 @@ async def test_tpos_crud_settings_and_wrapper_token(client: AsyncClient):
 
     create = await client.post(
         "/tpos/api/v1/tposs",
-        json=_tpos_payload(currency="EUR", allow_cash_settlement=True),
+        json=_tpos_payload(
+            currency="EUR", allow_cash_settlement=True, fiat_wallet_id=fiat_wallet.id
+        ),
         headers=headers,
     )
     assert create.status_code == 201
@@ -498,15 +502,20 @@ async def test_remote_invoice_payload_keeps_fiat_tip_amount(
 
 @pytest.mark.asyncio
 async def test_terminal_invoice_keeps_reader_and_tap_to_pay_payload(
-    client: AsyncClient, monkeypatch
+    client: AsyncClient, monkeypatch, enable_stripe
 ):
-    _user, wallet = await _user_with_tabs("terminaluser")
+    user, wallet = await _user_with_tabs("terminaluser")
+    enable_stripe(user.id)
+    fiat_wallet = await create_wallet(
+        user_id=user.id, wallet_type=WalletType.FIAT, currency="USD"
+    )
     headers = {"X-API-KEY": wallet.adminkey}
     create = await client.post(
         "/tpos/api/v1/tposs",
         json=_tpos_payload(
             currency="USD",
             fiat_provider="stripe",
+            fiat_wallet_id=fiat_wallet.id,
             stripe_card_payments=True,
             stripe_reader_id="reader_test",
         ),
@@ -519,7 +528,7 @@ async def test_terminal_invoice_keeps_reader_and_tap_to_pay_payload(
     payment = await create_payment(
         "pi_test",
         CreatePayment(
-            wallet_id=wallet.id,
+            wallet_id=fiat_wallet.id,
             payment_hash=payment_hash,
             bolt11="bolt11",
             amount_msat=6_000,
@@ -534,7 +543,7 @@ async def test_terminal_invoice_keeps_reader_and_tap_to_pay_payload(
     captured_invoice_data = []
 
     async def fake_create_payment_request(wallet_id, invoice_data):
-        assert wallet_id == wallet.id
+        assert wallet_id == fiat_wallet.id
         captured_invoice_data.append(invoice_data)
         return payment
 
@@ -1035,56 +1044,44 @@ async def test_inventory_items_and_lnaddress_check(client: AsyncClient, monkeypa
 
 @pytest.mark.asyncio
 async def test_cash_validate_and_print_invoice_endpoints(
-    client: AsyncClient, monkeypatch
+    client: AsyncClient, monkeypatch, fixed_fiat_rate
 ):
     await _drain_internal_invoice_queue()
     user, wallet = await _user_with_tabs("cashuser")
-    settings.super_user = user.id
+    fiat_wallet = await create_wallet(
+        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
+    )
     headers = {"X-API-KEY": wallet.adminkey}
     create = await client.post(
         "/tpos/api/v1/tposs",
-        json=_tpos_payload(currency="EUR", allow_cash_settlement=True),
+        json=_tpos_payload(
+            currency="EUR", allow_cash_settlement=True, fiat_wallet_id=fiat_wallet.id
+        ),
         headers=headers,
     )
     assert create.status_code == 201
     tpos = create.json()
 
-    payment = await create_payment_request(
-        wallet.id,
-        CreateInvoice(
-            unit="sat",
-            out=False,
-            amount=10,
-            memo="Cash sale",
-            internal=True,
-            extra={
-                "tag": "tpos",
-                "tpos_id": tpos["id"],
-                "amount": 10,
-                "fiat_method": "cash",
-                "details": {
-                    "currency": "EUR",
-                    "exchangeRate": 1,
-                    "taxValue": 0,
-                    "taxIncluded": True,
-                    "items": [],
-                },
-            },
-        ),
+    lightning_total = await get_total_balance()
+    funding_source = Mock(side_effect=AssertionError("Cash must not use Lightning"))
+    monkeypatch.setattr(
+        "lnbits.core.services.payments.get_funding_source", funding_source
     )
-    await update_payment_checking_id(
-        payment.checking_id, f"internal_cash_{payment.payment_hash}"
+    sale = await client.post(
+        f"/tpos/api/v1/tposs/{tpos['id']}/invoices",
+        json={
+            "amount": 1000,
+            "amount_fiat": 1,
+            "pay_in_fiat": True,
+            "fiat_method": "cash",
+        },
     )
-    await create_tpos_payment(
-        TposPayment(
-            id=uuid4().hex,
-            tpos_id=tpos["id"],
-            payment_hash=payment.payment_hash,
-            amount=10,
-            payment_method="cash",
-        )
-    )
-    invoice = {"payment_hash": payment.payment_hash}
+    assert sale.status_code == 201, sale.text
+    invoice = sale.json()
+    assert invoice["payment_request"] == "cash"
+    assert not invoice["bolt11"]
+    payment = await get_standalone_payment(invoice["payment_hash"], incoming=True)
+    assert payment and payment.wallet_id == fiat_wallet.id and payment.pending
 
     sent_messages = []
 
@@ -1136,14 +1133,21 @@ async def test_cash_validate_and_print_invoice_endpoints(
     assert settled_payment is not None
     assert settled_payment.success is True
 
+    await on_invoice_paid(settled_payment)
+
     retried = await client.post(
         f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}/cash/validate"
     )
     assert retried.status_code == 200
     expected_checking_id = f"internal_cash_{payment.payment_hash}"
-    assert queued_checking_ids == [expected_checking_id, expected_checking_id]
-
-    await on_invoice_paid(settled_payment)
+    assert queued_checking_ids == [expected_checking_id]
+    credited = await get_wallet(fiat_wallet.id)
+    lightning = await get_wallet(wallet.id)
+    assert credited and credited.balance_msat == 1_000_000
+    assert credited.withdrawable_balance == 0
+    assert lightning and lightning.balance_msat == wallet.balance_msat
+    assert await get_total_balance() == lightning_total
+    funding_source.assert_not_called()
 
     paid_response = await client.get(
         f"/tpos/api/v1/tposs/{tpos['id']}/invoices/{invoice['payment_hash']}"

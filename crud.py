@@ -176,6 +176,36 @@ async def get_latest_tpos_payments(tpos_id: str, limit: int = 5) -> list[TposPay
     )
 
 
+async def claim_fiat_checkout(payment_id: str) -> bool:
+    # shortcut: reconcile killed workers manually until dispatches are idempotent.
+    result = await db.execute(
+        """
+        UPDATE tpos.payments SET status = 'processing'
+        WHERE id = :id AND status = 'pending' AND paid = false
+        """,
+        {"id": payment_id},
+    )
+    return result.rowcount == 1
+
+
+async def finish_fiat_checkout(
+    payment_id: str, payment_method: str | None = None
+) -> None:
+    await db.execute(
+        """
+        UPDATE tpos.payments
+        SET paid = :paid, status = :status, payment_method = :method
+        WHERE id = :id AND status = 'processing'
+        """,
+        {
+            "id": payment_id,
+            "paid": payment_method is not None,
+            "status": "paid" if payment_method else "pending",
+            "method": payment_method,
+        },
+    )
+
+
 async def update_tpos_payment(payment: TposPayment) -> TposPayment:
     await db.update("tpos.payments", payment)
     return payment

@@ -3,12 +3,24 @@ from math import ceil, isfinite
 
 from fastapi import HTTPException
 from lnbits.core.crud import get_wallet
+from lnbits.core.models import Payment
 from lnbits.utils.exchange_rates import fiat_amount_as_satoshis
 
-from .models import CreateTposInvoice, Tpos
+from .models import CreateTposInvoice, Tpos, TposPayment
 from .services_tabs import (
     tabs_available_for_user,
 )
+
+
+def is_tpos_payment(payment: Payment, tpos: Tpos, checkout: TposPayment | None) -> bool:
+    fiat_wallet_id = checkout.fiat_wallet_id if checkout else None
+    return (
+        payment.is_in
+        and payment.extra.get("tag") == "tpos"
+        and payment.extra.get("tpos_id") == tpos.id
+        and (checkout is None or checkout.tpos_id == tpos.id)
+        and payment.wallet_id == (fiat_wallet_id or tpos.wallet)
+    )
 
 
 async def get_tpos_owner_user_id(tpos: Tpos) -> str:

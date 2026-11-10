@@ -4,19 +4,20 @@ window.app.component('tpos-admin-form-dialog', {
     'dialog',
     'g',
     'currencyOptions',
-    'hasFiatProvider',
-    'fiatProviders',
     'isFiatCurrency',
+    'requiresFiatWallet',
+    'lightningWalletOptions',
+    'fiatWalletOptions',
     'onchainStatus',
     'onchainWalletOptions',
     'withdrawOptions',
     'createOrUpdateDisabled'
   ],
-  emits: ['close', 'submit'],
+  emits: ['close', 'submit', 'refresh-wallets'],
   template: `
   <q-dialog v-model="dialog.show" position="top" @hide="$emit('close')">
     <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
-      <q-form @submit="$emit('submit')" class="q-gutter-md">
+      <q-form @submit="!createOrUpdateDisabled && $emit('submit')" class="q-gutter-md">
         <q-input
           filled
           dense
@@ -28,8 +29,9 @@ window.app.component('tpos-admin-form-dialog', {
           filled
           dense
           emit-value
+          map-options
           v-model="dialog.data.wallet"
-          :options="g.user.walletOptions"
+          :options="lightningWalletOptions"
           label="Wallet *"
         ></q-select>
         <q-select
@@ -41,13 +43,37 @@ window.app.component('tpos-admin-form-dialog', {
           :options="currencyOptions"
           label="Currency *"
         ></q-select>
+        <template v-if="requiresFiatWallet">
+          <q-select
+            v-if="fiatWalletOptions.length"
+            filled
+            dense
+            emit-value
+            map-options
+            v-model="dialog.data.fiat_wallet_id"
+            :options="fiatWalletOptions"
+            option-label="name"
+            option-value="id"
+            label="Fiat wallet *"
+            hint="Cash and card sales are credited to this wallet."
+          ></q-select>
+          <p v-else class="text-caption q-mb-none">
+            A {{ dialog.data.currency }} fiat wallet is required.
+            <template v-if="g.user.canCreateFiatWallet">
+              <a href="/wallets" target="_blank" rel="noopener">Create it in Wallets</a>,
+              then <q-btn flat dense no-caps label="refresh wallets"
+                @click="$emit('refresh-wallets')"></q-btn>.
+            </template>
+            <span v-else>Ask your LNbits admin to enable fiat wallets.</span>
+          </p>
+        </template>
         <q-select
-          v-if="dialog.data.currency != g.settings.denomination && hasFiatProvider"
+          v-if="dialog.data.fiat_provider || (dialog.data.currency != g.settings.denomination && g.user.fiat_providers?.length)"
           filled
           dense
           emit-value
           v-model="dialog.data.fiat_provider"
-          :options="fiatProviders"
+          :options="g.user.fiat_providers || []"
           label="Fiat payments"
           hint="Choose what fiat platform to use for fiat payments."
         >
@@ -98,16 +124,20 @@ window.app.component('tpos-admin-form-dialog', {
             ></q-input>
           </div>
         </div>
-        <div v-if="g.user.super_user" class="row q-mt-sm">
+        <div class="row q-mt-sm">
           <div class="col">
             <q-checkbox
               v-model="dialog.data.allow_cash_settlement"
               :disable="!isFiatCurrency"
               label="Allow cash settlement"
             >
-              <q-tooltip v-if="!isFiatCurrency">
-                currency must be set to fiat
-              </q-tooltip>
+              <q-tooltip v-if="!isFiatCurrency"
+                >currency must be set to fiat</q-tooltip
+              >
+              <q-tooltip v-else
+                >Anyone with the terminal link can confirm cash sales.
+                The selected fiat wallet receives the credit.</q-tooltip
+              >
             </q-checkbox>
           </div>
         </div>

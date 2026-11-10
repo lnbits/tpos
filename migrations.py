@@ -333,3 +333,15 @@ async def m026_add_onchain_payment_status(db: Database):
     await db.execute("""
         UPDATE tpos.payments SET status = 'paid' WHERE paid = true;
     """)
+
+
+async def m027_add_fiat_wallet(db: Database):
+    """
+    Store fiat wallet selections on terminals and bind them to checkouts.
+    """
+    await db.execute("""
+        ALTER TABLE tpos.pos ADD fiat_wallet_id TEXT NULL;
+    """)
+    await db.execute("""
+        ALTER TABLE tpos.payments ADD fiat_wallet_id TEXT NULL;
+    """)

@@ -28,6 +28,7 @@ _For video content about the TPoS extension, watch the [official demo](https://w
 
 - [Overview](#overview)
 - [Usage](#usage)
+- [Cash Settlement & Fiat Wallet](#cash-settlement--fiat-wallet)
 - [Receiving Tips](#receiving-tips)
 - [LN Address Funding](#ln-address-funding)
 - [Adding Items to PoS](#adding-items-to-pos)
@@ -42,6 +43,7 @@ _For video content about the TPoS extension, watch the [official demo](https://w
 - **Item management** — products, cart, JSON import/export
 - **OTC ATM** — LNURL withdraw limits and cooldown
 - **Stripe fiat payment integration** — accept tap-to-pay via Stripe
+- **Cash settlement & fiat wallet** — cash and card sales booked to a LNbits fiat wallet
 - **Tax settings** — global/per-item, inclusive or exclusive
 
 ## Overview
@@ -63,6 +65,26 @@ TPoS lets you take Lightning payments right from the browser. Every TPoS runs is
 4. **Present** the invoice QR to the customer.
 
    <img src="https://github.com/user-attachments/assets/1d5341e2-cfba-45d5-b2c5-99f61a3d07a4" alt="Invoice QR" width="720">
+
+## Cash Settlement & Fiat Wallet
+
+Set the terminal to a fiat currency, enable cash settlement or select an enabled
+card provider, and choose an active fiat wallet you own in that currency. Create
+a wallet from LNbits Wallets if you need one. Your LNbits admin controls fiat
+wallet creation and which accounts can use each card provider.
+
+Anyone with the public terminal link can confirm a cash checkout when cash
+settlement is enabled. Share the link with the people you trust to record cash
+sales. Card sales settle when the configured provider verifies the payment.
+
+Both types of sale credit the selected fiat wallet. Cash uses an internal
+accounting record. Tips from fiat sales stay in that wallet. Lightning sales
+continue to use the terminal’s Lightning wallet.
+
+Before upgrading, finish any outstanding cash checkouts on the old version.
+Select a fiat wallet for each cash or card terminal after upgrading. New cash
+and card sales pause until a valid wallet is selected. The upgrade preserves
+terminal settings and historical payments.
 
 ## Receiving Tips
 
