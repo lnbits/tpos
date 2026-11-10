@@ -369,7 +369,7 @@
     :has-fiat-provider="hasFiatProvider"
     :fiat-providers="fiatProviders"
     :is-fiat-currency="isFiatCurrency"
-    :can-create-fiat-wallet="g.user.canCreateFiatWallet"
+    :requires-fiat-wallet="requiresFiatWallet"
     :lightning-wallet-options="lightningWalletOptions"
     :fiat-wallet-options="fiatWalletOptions"
     :onchain-status="onchainStatus"
@@ -378,6 +378,7 @@
     :create-or-update-disabled="createOrUpdateDisabled"
     @close="closeFormDialog"
     @submit="sendTposData"
+    @refresh-wallets="refreshWallets"
   ></tpos-admin-form-dialog>
   <tpos-admin-item-dialog
     :dialog="itemDialog"

@@ -230,12 +230,13 @@ window.app = Vue.createApp({
       return (
         !data.name ||
         !data.currency ||
-        !data.wallet ||
+        !this.lightningWalletOptions.some(
+          wallet => wallet.value === data.wallet
+        ) ||
         (this.formDialog.advanced.otc && !data.withdraw_limit) ||
         (data.onchain_enabled &&
           (!this.onchainStatus.available || !data.onchain_wallet_id)) ||
-        (this.isFiatCurrency &&
-          (data.allow_cash_settlement || data.fiat_provider) &&
+        (this.requiresFiatWallet &&
           !this.fiatWalletOptions.some(
             wallet => wallet.value === data.fiat_wallet_id
           ))
@@ -268,6 +269,10 @@ window.app = Vue.createApp({
         !!this.formDialog.data.currency &&
         this.formDialog.data.currency !== 'sats'
       )
+    },
+    requiresFiatWallet() {
+      const {allow_cash_settlement, fiat_provider} = this.formDialog.data
+      return this.isFiatCurrency && !!(allow_cash_settlement || fiat_provider)
     },
     onchainWalletOptions() {
       return (this.onchainStatus.wallets || []).map(wallet => ({
@@ -370,6 +375,14 @@ window.app = Vue.createApp({
           wallets: [],
           mempool_endpoint: null
         }
+      }
+    },
+    async refreshWallets() {
+      try {
+        const {data} = await LNbits.api.getAuthenticatedUser()
+        this.g.user.wallets = LNbits.map.user(data).wallets
+      } catch (error) {
+        LNbits.utils.notifyApiError(error)
       }
     },
     sendTposData() {

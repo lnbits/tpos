@@ -7,7 +7,7 @@ window.app.component('tpos-admin-form-dialog', {
     'hasFiatProvider',
     'fiatProviders',
     'isFiatCurrency',
-    'canCreateFiatWallet',
+    'requiresFiatWallet',
     'lightningWalletOptions',
     'fiatWalletOptions',
     'onchainStatus',
@@ -15,20 +15,11 @@ window.app.component('tpos-admin-form-dialog', {
     'withdrawOptions',
     'createOrUpdateDisabled'
   ],
-  emits: ['close', 'submit'],
-  computed: {
-    needsFiatWallet() {
-      const data = this.dialog.data
-      return (
-        this.isFiatCurrency &&
-        !!(data.allow_cash_settlement || data.fiat_provider)
-      )
-    }
-  },
+  emits: ['close', 'submit', 'refresh-wallets'],
   template: `
   <q-dialog v-model="dialog.show" position="top" @hide="$emit('close')">
     <q-card class="q-pa-lg q-pt-xl" style="width: 500px">
-      <q-form @submit="$emit('submit')" class="q-gutter-md">
+      <q-form @submit="!createOrUpdateDisabled && $emit('submit')" class="q-gutter-md">
         <q-input
           filled
           dense
@@ -40,6 +31,7 @@ window.app.component('tpos-admin-form-dialog', {
           filled
           dense
           emit-value
+          map-options
           v-model="dialog.data.wallet"
           :options="lightningWalletOptions"
           label="Wallet *"
@@ -53,7 +45,7 @@ window.app.component('tpos-admin-form-dialog', {
           :options="currencyOptions"
           label="Currency *"
         ></q-select>
-        <template v-if="needsFiatWallet">
+        <template v-if="requiresFiatWallet">
           <q-select
             v-if="fiatWalletOptions.length"
             filled
@@ -67,7 +59,11 @@ window.app.component('tpos-admin-form-dialog', {
           ></q-select>
           <p v-else class="text-caption q-mb-none">
             A {{ dialog.data.currency }} fiat wallet is required.
-            <a v-if="canCreateFiatWallet" href="/wallets">Create it in Wallets.</a>
+            <template v-if="g.user.canCreateFiatWallet">
+              <a href="/wallets" target="_blank" rel="noopener">Create it in Wallets</a>,
+              then <q-btn flat dense no-caps label="refresh wallets"
+                @click="$emit('refresh-wallets')"></q-btn>.
+            </template>
             <span v-else>Ask your LNbits admin to enable fiat wallets.</span>
           </p>
         </template>
