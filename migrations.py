@@ -344,6 +344,11 @@ async def m027_add_fiat_wallet(db: Database):
     """)
 
 
+async def m028_reserve_draft_fiat_backfill(db: Database):
+    # The original draft used this version to backfill terminal wallet assignments.
+    pass
+
+
 async def m029_bind_fiat_checkout_wallet(db: Database):
     await db.execute("""
         ALTER TABLE tpos.payments ADD fiat_wallet_id TEXT NULL;

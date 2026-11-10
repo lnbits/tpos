@@ -4,7 +4,10 @@ from uuid import uuid4
 
 import pytest
 from lnbits.core.crud import get_standalone_payment
+from lnbits.core.crud.payments import update_payment
 from lnbits.core.crud.wallets import create_wallet, delete_wallet, get_wallet
+from lnbits.core.db import db as core_db
+from lnbits.core.models import Payment, PaymentState
 from lnbits.core.models.wallets import WalletType
 from lnbits.core.services import fiat_providers, payments
 from lnbits.fiat.base import FiatInvoiceResponse, FiatPaymentStatus
@@ -23,6 +26,13 @@ from tpos.models import TposClean  # type: ignore[import]
 from .test_api import _tpos_payload, _user_with_tabs
 
 FIAT_SALE = {"amount": 1000, "amount_fiat": 1, "pay_in_fiat": True}
+
+
+@pytest.fixture
+def checkout_db_locks(monkeypatch):
+    # LNbits database locks are global, but pytest uses one event loop per test.
+    for database in (db, core_db):
+        monkeypatch.setattr(database, "lock", asyncio.Lock())
 
 
 async def _terminal(client, wallet, **settings):
@@ -149,7 +159,7 @@ async def test_provider_checkout_cannot_fall_back_to_lightning(
 
 @pytest.mark.asyncio
 async def test_verified_card_event_uses_checkout_wallet_and_fulfils_once(
-    client, enable_stripe, fixed_fiat_rate, monkeypatch
+    client, enable_stripe, fixed_fiat_rate, monkeypatch, checkout_db_locks
 ):
     user, wallet = await _user_with_tabs("fiat_card_event")
     fiat = await create_wallet(
@@ -269,3 +279,171 @@ async def test_verified_card_event_uses_checkout_wallet_and_fulfils_once(
     assert lightning and lightning.balance_msat == wallet.balance_msat
     assert credited and credited.balance_msat == event.amount + event.fee
     assert untouched and untouched.balance_msat == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("binding", ["bound", "draft", "lightning"])
+async def test_cash_confirmation_keeps_original_destination(
+    client, fixed_fiat_rate, monkeypatch, binding
+):
+    user, wallet = await _user_with_tabs(f"switch_{binding}")
+    original = await create_wallet(
+        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
+    )
+    replacement = await create_wallet(
+        user_id=user.id, wallet_type=WalletType.FIAT, currency="USD"
+    )
+    tpos = await _terminal(
+        client, wallet, allow_cash_settlement=True, fiat_wallet_id=original.id
+    )
+    base = f"/tpos/api/v1/tposs/{tpos['id']}"
+    sale = await client.post(
+        f"{base}/invoices", json={**FIAT_SALE, "fiat_method": "cash"}
+    )
+    assert sale.is_success, sale.text
+    payment_hash = sale.json()["payment_hash"]
+    if binding != "bound":
+        await db.execute(
+            "UPDATE tpos.payments SET fiat_wallet_id = NULL WHERE payment_hash = :hash",
+            {"hash": payment_hash},
+        )
+    if binding == "lightning":
+        await core_db.execute(
+            "UPDATE apipayments SET wallet_id = :wallet WHERE payment_hash = :hash",
+            {"hash": payment_hash, "wallet": wallet.id},
+        )
+    switched = await client.put(
+        base,
+        json={"currency": "USD", "fiat_wallet_id": replacement.id},
+        headers={"X-API-KEY": wallet.adminkey},
+    )
+    assert switched.is_success, switched.text
+    queued = AsyncMock()
+    monkeypatch.setattr(views_payments, "internal_invoice_queue_put", queued)
+    confirmed = await client.post(f"{base}/invoices/{payment_hash}/cash/validate")
+    payment = await get_standalone_payment(payment_hash, incoming=True)
+    assert payment
+    if binding == "lightning":
+        assert confirmed.status_code == 409 and payment.pending
+        queued.assert_not_awaited()
+        return
+    assert confirmed.is_success, confirmed.text
+    assert payment.success and payment.wallet_id == original.id
+    await tasks.on_invoice_paid(payment)
+    checkout = await get_tpos_payment_by_hash(payment_hash)
+    assert checkout and checkout.paid and checkout.fiat_wallet_id == original.id
+    credited = await get_wallet(original.id)
+    untouched = await get_wallet(replacement.id)
+    assert credited and credited.balance_msat == 1_000_000
+    assert untouched and untouched.balance_msat == 0
+
+
+@pytest.mark.asyncio
+async def test_cash_confirmation_distinguishes_failed_from_expired(
+    client, fixed_fiat_rate, monkeypatch
+):
+    user, wallet = await _user_with_tabs("cash_failed_state")
+    fiat = await create_wallet(
+        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
+    )
+    tpos = await _terminal(
+        client, wallet, allow_cash_settlement=True, fiat_wallet_id=fiat.id
+    )
+    base = f"/tpos/api/v1/tposs/{tpos['id']}/invoices"
+    sale = await client.post(base, json={**FIAT_SALE, "fiat_method": "cash"})
+    assert sale.is_success, sale.text
+    payment_hash = sale.json()["payment_hash"]
+    payment = await get_standalone_payment(payment_hash, incoming=True)
+    assert payment
+    url = f"{base}/{payment_hash}/cash/validate"
+    monkeypatch.setattr(Payment, "is_expired", property(lambda _: True))
+    expired = await client.post(url)
+    assert expired.status_code == 409 and "has expired" in expired.json()["detail"]
+
+    payment.status = PaymentState.FAILED
+    await update_payment(payment)
+    monkeypatch.setattr(Payment, "is_expired", property(lambda _: False))
+    failed = await client.post(url)
+    assert failed.status_code == 409 and "cannot be settled" in failed.json()["detail"]
+    stored = await get_standalone_payment(payment_hash, incoming=True)
+    assert stored and stored.failed
+
+
+@pytest.mark.asyncio
+async def test_update_rejects_ineligible_primary_wallet(client):
+    user, wallet = await _user_with_tabs("fiat_primary_update")
+    fiat = await create_wallet(
+        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
+    )
+    tpos = await _terminal(client, wallet)
+    await db.execute(
+        "UPDATE tpos.pos SET wallet = :wallet WHERE id = :id",
+        {"wallet": fiat.id, "id": tpos["id"]},
+    )
+    update = await client.put(
+        f"/tpos/api/v1/tposs/{tpos['id']}",
+        json={"name": "Invalid terminal update"},
+        headers={"X-API-KEY": fiat.adminkey},
+    )
+    assert update.status_code == 400
+    stored = await get_tpos(tpos["id"])
+    assert stored and stored.name == tpos["name"]
+
+
+@pytest.mark.asyncio
+async def test_cash_retry_after_partial_fulfilment_does_not_resend_order(
+    client, fixed_fiat_rate, monkeypatch, checkout_db_locks
+):
+    user, wallet = await _user_with_tabs("cash_fulfil_retry")
+    fiat = await create_wallet(
+        user_id=user.id, wallet_type=WalletType.FIAT, currency="EUR"
+    )
+    tpos = await _terminal(
+        client, wallet, allow_cash_settlement=True, fiat_wallet_id=fiat.id
+    )
+    base = f"/tpos/api/v1/tposs/{tpos['id']}/invoices"
+    sale = await client.post(base, json={**FIAT_SALE, "fiat_method": "cash"})
+    assert sale.is_success, sale.text
+    payment_hash = sale.json()["payment_hash"]
+    pending = await get_standalone_payment(payment_hash, incoming=True)
+    assert pending
+    pending.extra["inventory"] = {"inventory_id": "inventory", "items": []}
+    await update_payment(pending)
+    queued, order_sent, inventory_sent = AsyncMock(), AsyncMock(), AsyncMock()
+    prepare_inventory = AsyncMock(side_effect=[RuntimeError("Before dispatch"), None])
+
+    async def push_order(_payment, _tpos, before_dispatch):
+        await before_dispatch()
+        await order_sent()
+
+    async def deduct_stock(_wallet_id, _payload, before_dispatch):
+        await prepare_inventory()
+        await before_dispatch()
+        await inventory_sent()
+
+    monkeypatch.setattr(views_payments, "internal_invoice_queue_put", queued)
+    monkeypatch.setattr(tasks, "maybe_push_order", push_order)
+    monkeypatch.setattr(tasks, "deduct_inventory_stock", deduct_stock)
+    confirm_url = f"{base}/{payment_hash}/cash/validate"
+    assert (await client.post(confirm_url)).is_success
+    paid = await get_standalone_payment(payment_hash, incoming=True)
+    assert paid and paid.success
+    with pytest.raises(RuntimeError, match="Before dispatch"):
+        await tasks.on_invoice_paid(paid)
+    checkout = await get_tpos_payment_by_hash(payment_hash)
+    assert checkout and not checkout.paid and checkout.status == "pending"
+    checkpoint = await get_standalone_payment(payment_hash, incoming=True)
+    assert checkpoint and checkpoint.extra["tpos_order_dispatched"]
+    assert not checkpoint.extra.get("tpos_processed")
+
+    assert (await client.post(confirm_url)).is_success
+    assert queued.await_count == 2
+    await asyncio.gather(tasks.on_invoice_paid(paid), tasks.on_invoice_paid(paid))
+    order_sent.assert_awaited_once()
+    inventory_sent.assert_awaited_once()
+    checkout = await get_tpos_payment_by_hash(payment_hash)
+    assert checkout and checkout.paid
+    stored = await get_standalone_payment(payment_hash, incoming=True)
+    assert stored and stored.extra["tpos_processed"]
+    credited = await get_wallet(fiat.id)
+    assert credited and credited.balance_msat == 1_000_000

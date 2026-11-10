@@ -165,6 +165,7 @@ class Tpos(TposClean, BaseModel):
 
 class TposPaymentStatus(str, Enum):
     PENDING = "pending"
+    PROCESSING = "processing"
     PAID = "paid"
     EXPIRED = "expired"
     UNDERPAID = "underpaid"

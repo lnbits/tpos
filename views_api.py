@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from lnbits.core.crud import (
     get_user,
 )
-from lnbits.core.models import WalletTypeInfo
+from lnbits.core.models import Wallet, WalletTypeInfo
 from lnbits.core.services import lnurl as core_lnurl
 from lnbits.decorators import (
     require_admin_key,
@@ -65,13 +65,7 @@ async def api_tposs(
 async def api_tpos_create(
     data: CreateTposData, wallet: WalletTypeInfo = Depends(require_admin_key)
 ):
-    if not (
-        wallet.wallet.is_lightning_wallet or wallet.wallet.is_lightning_shared_wallet
-    ):
-        raise HTTPException(
-            status_code=HTTPStatus.BAD_REQUEST,
-            detail="A TPoS requires a Lightning wallet.",
-        )
+    _require_receiving_lightning_wallet(wallet.wallet)
     data.wallet = wallet.wallet.id
     await _validate_watchonly_settings(
         wallet=wallet.wallet,
@@ -120,6 +114,7 @@ async def api_tpos_update(
         )
     if wallet.wallet.id != tpos.wallet:
         raise HTTPException(status_code=HTTPStatus.FORBIDDEN, detail="Not your TPoS.")
+    _require_receiving_lightning_wallet(wallet.wallet)
     user = await get_user(wallet.wallet.user)
     update_payload = data.model_dump(exclude_unset=True)
     update_payload.pop("wallet", None)
@@ -180,6 +175,15 @@ async def api_tpos_update(
         setattr(tpos, field, value)
     tpos = await update_tpos(tpos)
     return tpos
+
+
+def _require_receiving_lightning_wallet(wallet: Wallet) -> None:
+    if not wallet.can_receive_payments or not (
+        wallet.is_lightning_wallet or wallet.is_lightning_shared_wallet
+    ):
+        raise HTTPException(
+            HTTPStatus.BAD_REQUEST, "A TPoS requires a receiving Lightning wallet."
+        )
 
 
 @tpos_api_router.delete("/api/v1/tposs/{tpos_id}")

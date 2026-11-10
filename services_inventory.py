@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from decimal import ROUND_HALF_UP, Decimal
 from http import HTTPStatus
 from math import ceil
@@ -104,7 +105,11 @@ async def validate_inventory_sale(tpos: Tpos, data: CreateTposInvoice) -> None:
     await validate_tpos_sale_amount(tpos, data, total, minimum=True)
 
 
-async def deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> None:
+async def deduct_inventory_stock(
+    wallet_id: str,
+    inventory_payload: dict,
+    before_dispatch: Callable[[], Awaitable[None]] | None = None,
+) -> None:
     wallet = await get_wallet(wallet_id)
     if not wallet:
         return
@@ -128,11 +133,15 @@ async def deduct_inventory_stock(wallet_id: str, inventory_payload: dict) -> Non
     # Needed to accomodate admin users, as using user ID is not possible
     access = create_internal_user_access_token(wallet.user)
     async with httpx.AsyncClient() as client:
-        await client.patch(
+        if before_dispatch:
+            await before_dispatch()
+        response = await client.patch(
             url=f"http://{settings.host}:{settings.port}/inventory/api/v1/items/{inventory_id}/quantities",
             headers={"Authorization": f"Bearer {access}"},
             params={"source": "tpos", "ids": ids, "quantities": quantities},
         )
+        if before_dispatch:
+            response.raise_for_status()
     return
 
 

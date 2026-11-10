@@ -41,11 +41,14 @@ async def resolve_tpos_fiat_wallet(
     return requested_id
 
 
-async def get_valid_tpos_fiat_wallet(tpos: Tpos) -> Wallet | None:
-    if not tpos.fiat_wallet_id:
+async def get_valid_tpos_fiat_wallet(
+    tpos: Tpos, *, wallet_id: str | None = None, currency: str | None = None
+) -> Wallet | None:
+    wallet_id = wallet_id or tpos.fiat_wallet_id
+    if not wallet_id:
         return None
-    wallet = await get_wallet(tpos.fiat_wallet_id)
-    if not wallet or not _matches_currency(wallet, tpos.currency):
+    wallet = await get_wallet(wallet_id)
+    if not wallet or not _matches_currency(wallet, currency or tpos.currency):
         return None
     owner_wallet = await get_standalone_wallet(tpos.wallet)
     if not owner_wallet or owner_wallet.user != wallet.user:

@@ -1,3 +1,5 @@
+from collections.abc import Awaitable, Callable
+
 import httpx
 from lnbits.settings import settings
 from loguru import logger
@@ -10,6 +12,7 @@ async def push_order_to_orders(
     payment,
     tpos,
     base_url: str | None = None,
+    before_dispatch: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     details = payment.extra.get("details") or {}
     payload = {
@@ -39,12 +42,16 @@ async def push_order_to_orders(
     if base_url:
         params["base_url"] = base_url
     async with httpx.AsyncClient() as client:
+        if before_dispatch:
+            await before_dispatch()
         try:
-            await client.post(
+            response = await client.post(
                 url=f"http://{settings.host}:{settings.port}/orders/api/v1/orders",
                 headers={"Authorization": f"Bearer {access}"},
                 params=params,
                 json=payload,
             )
+            if before_dispatch:
+                response.raise_for_status()
         except Exception as exc:
             logger.warning(f"tpos: failed to push order to orders: {exc}")

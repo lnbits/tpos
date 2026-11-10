@@ -1,5 +1,7 @@
 import asyncio
 import json
+from collections.abc import Awaitable, Callable
+from functools import partial
 from math import ceil
 
 from lnbits.core.crud import get_user_active_extensions_ids, get_wallet
@@ -15,7 +17,8 @@ from lnbits.tasks import internal_invoice_queue_put, register_invoice_listener
 from loguru import logger
 
 from .crud import (
-    claim_paid_fiat_checkout,
+    claim_fiat_checkout,
+    finish_fiat_checkout,
     get_pending_tpos_payments,
     get_tpos,
     get_tpos_payment_by_hash,
@@ -36,10 +39,17 @@ async def wait_for_paid_invoices():
 
     while True:
         payment = await tpos_invoice_queue.get()
-        try:
-            await on_invoice_paid(payment)
-        except Exception:
-            logger.exception("tpos: failed to process payment {}", payment.payment_hash)
+        retryable = payment.fiat_provider or payment.checking_id.startswith(
+            "internal_cash_"
+        )
+        for _ in range(2 if retryable else 1):
+            try:
+                await on_invoice_paid(payment)
+                break
+            except Exception:
+                logger.exception(
+                    "tpos: failed to process payment {}", payment.payment_hash
+                )
 
 
 async def poll_onchain_payments():
@@ -149,7 +159,6 @@ async def on_invoice_paid(payment: Payment) -> None:
         not stored_payment
         or not stored_payment.success
         or not is_tpos_payment(stored_payment, tpos, checkout)
-        or stored_payment.extra.get("tpos_processed")
     ):
         return
 
@@ -159,9 +168,22 @@ async def on_invoice_paid(payment: Payment) -> None:
         else _payment_method(stored_payment)
     )
     if checkout.fiat_wallet_id:
-        if not await claim_paid_fiat_checkout(checkout.id, payment_method):
+        if not await claim_fiat_checkout(checkout.id):
             return
-    elif not checkout.paid:
+        try:
+            if not stored_payment.extra.get("tpos_processed"):
+                await process_paid_tpos_payment(
+                    stored_payment, tpos, checkout, payment_method
+                )
+            await finish_fiat_checkout(checkout.id, payment_method)
+        except BaseException:
+            await finish_fiat_checkout(checkout.id)
+            raise
+        return
+
+    if stored_payment.extra.get("tpos_processed"):
+        return
+    if not checkout.paid:
         checkout.paid = True
         checkout.status = TposPaymentStatus.PAID
         checkout.payment_method = payment_method
@@ -193,9 +215,10 @@ async def process_paid_tpos_payment(
     ):
         return
 
-    payment.extra["tpos_processed"] = True
     payment.extra["payment_method"] = payment_method
-    await update_payment(payment)
+    if not checkout.fiat_wallet_id:
+        payment.extra["tpos_processed"] = True
+        await update_payment(payment)
 
     tip_amount = payment.extra.get("tip_amount")
     tpos_id = payment.extra.get("tpos_id")
@@ -234,6 +257,10 @@ async def process_paid_tpos_payment(
     await websocket_updater(payment.payment_hash, json.dumps(stripped_payment))
 
     await maybe_settle_tab(payment, tpos, payment_method, checkout)
+    if checkout.fiat_wallet_id:
+        await _fulfil_fiat_checkout(payment, tpos)
+        return
+
     await maybe_push_order(payment, tpos)
 
     inventory_payload = payment.extra.get("inventory")
@@ -243,7 +270,7 @@ async def process_paid_tpos_payment(
         except Exception as exc:
             logger.warning(f"tpos: inventory deduction failed: {exc}")
 
-    if not tip_amount or checkout.fiat_wallet_id:
+    if not tip_amount:
         return
 
     wallet_id = tpos.tip_wallet
@@ -264,6 +291,29 @@ async def process_paid_tpos_payment(
         extra={**payment.extra, "tipSplitted": True},
     )
     logger.debug(f"tpos: tip invoice paid: {paid_payment.checking_id}")
+
+
+async def _fulfil_fiat_checkout(payment: Payment, tpos: Tpos) -> None:
+    if not payment.extra.get("tpos_order_dispatched"):
+        await maybe_push_order(
+            payment,
+            tpos,
+            partial(_record_fiat_progress, payment, "tpos_order_dispatched"),
+        )
+    inventory = payment.extra.get("inventory")
+    if inventory and not payment.extra.get("tpos_inventory_dispatched"):
+        await deduct_inventory_stock(
+            payment.wallet_id,
+            inventory,
+            partial(_record_fiat_progress, payment, "tpos_inventory_dispatched"),
+        )
+    await _record_fiat_progress(payment, "tpos_processed")
+
+
+async def _record_fiat_progress(payment: Payment, step: str) -> None:
+    # Orders and Inventory cannot deduplicate requests with an ambiguous outcome.
+    payment.extra[step] = True
+    await update_payment(payment.copy(include={"wallet_id", "checking_id", "extra"}))
 
 
 async def maybe_settle_tab(
@@ -328,6 +378,8 @@ async def maybe_settle_tab(
             },
         )
     except Exception as exc:
+        if checkout and checkout.fiat_wallet_id:
+            raise
         logger.warning(f"tpos: tab settlement failed: {exc}")
 
 
@@ -349,7 +401,11 @@ def _payment_method(payment: Payment) -> str:
     return "lightning"
 
 
-async def maybe_push_order(payment: Payment, tpos) -> None:
+async def maybe_push_order(
+    payment: Payment,
+    tpos: Tpos,
+    before_dispatch: Callable[[], Awaitable[None]] | None = None,
+) -> None:
     wallet = await get_wallet(payment.wallet_id)
     if not wallet:
         return
@@ -363,4 +419,5 @@ async def maybe_push_order(payment: Payment, tpos) -> None:
         payment,
         tpos,
         base_url=payment.extra.get("base_url"),
+        before_dispatch=before_dispatch,
     )
