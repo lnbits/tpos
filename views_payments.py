@@ -21,11 +21,11 @@ from lnbits.tasks import internal_invoice_queue_put
 from loguru import logger
 
 from .crud import (
+    create_onchain_payment,
     create_tpos_payment,
     get_latest_tpos_payments,
     get_tpos,
     get_tpos_payment_by_hash,
-    reserve_onchain_address,
 )
 from .helpers import inventory_tags_to_list
 from .models import (
@@ -190,7 +190,12 @@ async def api_tpos_create_invoice(
         if onchain_method:
             response = await _create_onchain_checkout(tpos, data, extra)
             if tpos.enable_remote:
-                await _notify_checkout_created(tpos_id, data, response)
+                try:
+                    await _notify_checkout_created(tpos_id, data, response)
+                except Exception:
+                    logger.exception(
+                        "tpos: failed to notify on-chain checkout for {}", tpos_id
+                    )
             return response.model_dump()
         if data.pay_in_fiat:
             extra["fiat_method"] = data.fiat_method if data.fiat_method else "checkout"
@@ -586,45 +591,45 @@ async def _create_onchain_checkout(
     if not selection:
         raise HTTPException(HTTPStatus.BAD_REQUEST, "On-chain payments are disabled.")
     key, network, endpoint = selection
-    try:
-        address_data = await fetch_onchain_address(
-            key, wallet_ref.removeprefix("core:"), core=wallet_ref.startswith("core:")
-        )
-        address = address_data["address"]
-        validate_onchain_address(address, network)
-    except (HTTPError, KeyError, TypeError, ValueError) as exc:
-        raise HTTPException(
-            HTTPStatus.BAD_GATEWAY, "Could not get an on-chain receive address."
-        ) from exc
-    if not await reserve_onchain_address(network, address):
-        raise HTTPException(
-            HTTPStatus.CONFLICT, "Receive address already reserved. Retry checkout."
-        )
-
     amount = data.amount + (data.tip_amount or 0)
     if data.tab_settlement:
         extra["tab_settlement"]["amount_msat"] = amount * 1000
     extra.pop("lnaddress", None)
-    checkout = await create_tpos_payment(
-        TposPayment(
-            id=uuid4().hex,
-            tpos_id=tpos.id,
-            payment_hash=uuid4().hex,
-            amount=amount,
-            payment_method="onchain",
-            onchain_address=address,
-            onchain_wallet_id=wallet_ref,
-            onchain_zero_conf=tpos.onchain_zero_conf,
-            mempool_endpoint=endpoint,
-            onchain_network=network,
-            onchain_sale=OnchainSale(
-                wallet_id=tpos.wallet,
-                expires_at=int(time()) + settings.lightning_invoice_expiry,
-                memo=f"{data.memo} to {tpos.name}" if data.memo else tpos.name,
-                extra=extra,
-            ),
-        )
+    checkout = TposPayment(
+        id=uuid4().hex,
+        tpos_id=tpos.id,
+        payment_hash=uuid4().hex,
+        amount=amount,
+        payment_method="onchain",
+        onchain_wallet_id=wallet_ref,
+        onchain_zero_conf=tpos.onchain_zero_conf,
+        mempool_endpoint=endpoint,
+        onchain_network=network,
+        onchain_sale=OnchainSale(
+            wallet_id=tpos.wallet,
+            expires_at=int(time()) + settings.lightning_invoice_expiry,
+            memo=f"{data.memo} to {tpos.name}" if data.memo else tpos.name,
+            extra=extra,
+        ),
     )
+    core = wallet_ref.startswith("core:")
+    wallet_id = wallet_ref.removeprefix("core:")
+    for _ in range(3):
+        try:
+            address_data = await fetch_onchain_address(key, wallet_id, core=core)
+            address = address_data["address"]
+            validate_onchain_address(address, network)
+        except (HTTPError, KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(
+                HTTPStatus.BAD_GATEWAY, "Could not get an on-chain receive address."
+            ) from exc
+        checkout.onchain_address = address
+        if await create_onchain_payment(checkout):
+            break
+    else:
+        raise HTTPException(
+            HTTPStatus.CONFLICT, "Wallet did not supply an unused on-chain address."
+        )
     return TposInvoiceResponse(
         payment_hash=checkout.payment_hash,
         bolt11="",

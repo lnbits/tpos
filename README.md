@@ -93,9 +93,12 @@ wallet you own. Finish wallet setup and confirm any required backup first. TPoS
 reserves a new receive address per checkout. With zero-conf disabled, it waits
 for the first confirmation. The sale and any tip go to the receiving Bitcoin
 wallet, and the terminal's Lightning balance stays unchanged.
+On-chain tips stay in the receiving Bitcoin wallet even when a separate
+Lightning tip wallet is configured.
 
 Before upgrading, finish or reconcile pending Watchonly checkouts on the old
-version. Historical receipts remain available. The new version records sales in
+version. Any legacy checkout still pending at upgrade is closed for manual
+reconciliation. Historical receipts remain available. The new version records sales in
 TPoS and stops crediting the Lightning wallet for Watchonly sales. Back up the
 database before upgrading. For custom mempool endpoints, the LNbits administrator
 must approve the exact base URL for the selected network.

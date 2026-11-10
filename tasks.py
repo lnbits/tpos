@@ -432,30 +432,30 @@ async def _fulfil_onchain_checkout(checkout: TposPayment) -> None:
     sale = checkout.onchain_sale
     if not sale or not await claim_onchain_fulfilment(checkout.id):
         return
-    tpos = await get_tpos(checkout.tpos_id)
-    if not tpos or tpos.wallet != sale.wallet_id:
-        raise ValueError("On-chain sale terminal is unavailable.")
-    settlement = sale.extra.get("tab_settlement")
-    if settlement:
-        if settlement.get("amount_msat") != checkout.amount * 1000:
-            raise ValueError("On-chain tab settlement amount mismatch.")
-        try:
+    try:
+        tpos = await get_tpos(checkout.tpos_id)
+        if not tpos or tpos.wallet != sale.wallet_id:
+            raise ValueError("On-chain sale terminal is unavailable.")
+        settlement = sale.extra.get("tab_settlement")
+        if settlement:
+            if settlement.get("amount_msat") != checkout.amount * 1000:
+                raise ValueError("On-chain tab settlement amount mismatch.")
             await _settle_tab(
                 tpos, settlement, checkout.payment_hash, "onchain", "other"
             )
-        except Exception:
-            await set_onchain_fulfilment(checkout.id, "pending")
-            raise
 
-    # A worker that stops during either dispatch requires operator reconciliation.
-    await maybe_push_order(
-        checkout, tpos, partial(set_onchain_fulfilment, checkout.id, "order")
-    )
-    inventory = sale.extra.get("inventory")
-    if inventory:
-        await deduct_inventory_stock(
-            sale.wallet_id,
-            inventory,
-            partial(set_onchain_fulfilment, checkout.id, "inventory"),
+        # A worker that stops during either dispatch requires operator reconciliation.
+        await maybe_push_order(
+            checkout, tpos, partial(set_onchain_fulfilment, checkout.id, "order")
         )
-    await set_onchain_fulfilment(checkout.id, "complete")
+        inventory = sale.extra.get("inventory")
+        if inventory:
+            await deduct_inventory_stock(
+                sale.wallet_id,
+                inventory,
+                partial(set_onchain_fulfilment, checkout.id, "inventory"),
+            )
+        await set_onchain_fulfilment(checkout.id, "complete")
+    except Exception:
+        await set_onchain_fulfilment(checkout.id, "pending", expected="processing")
+        raise

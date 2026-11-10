@@ -51,7 +51,7 @@ async def push_order_to_orders(
         "tax_value": details.get("taxValue"),
         "items": details.get("items") or [],
         "notes": extra.get("notes"),
-        "created_at": created_at.isoformat(),
+        "created_at": created_at.isoformat() if created_at else None,
         "paid": True,
         "shipped": True,
     }

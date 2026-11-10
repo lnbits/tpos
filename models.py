@@ -188,6 +188,9 @@ class OnchainSale(BaseModel):
     extra: dict[str, Any]
 
 
+OnchainFulfilment = Literal["pending", "processing", "order", "inventory", "complete"]
+
+
 class TposPayment(BaseModel):
     id: str
     tpos_id: str
@@ -203,7 +206,7 @@ class TposPayment(BaseModel):
     mempool_endpoint: str | None = None
     onchain_network: str | None = None
     onchain_sale: OnchainSale | None = None
-    onchain_fulfilment: str | None = None
+    onchain_fulfilment: OnchainFulfilment | None = None
     balance: int = 0
     pending: int = 0
     created_at: datetime = Field(default_factory=datetime.utcnow)

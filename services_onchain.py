@@ -82,7 +82,9 @@ def onchain_mempool_url(config: OnchainConfig, network: str) -> str:
 
 
 def validate_onchain_address(address: str, network: str) -> None:
-    network_id = next(key for key, name in NETWORKS.items() if name == network)
+    network_id = next((key for key, name in NETWORKS.items() if name == network), None)
+    if network_id is None:
+        raise ValueError("Unknown on-chain network.")
     if (
         Script(address_to_scriptpubkey(address)).address(network_from_name(network_id))
         != address

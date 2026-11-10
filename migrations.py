@@ -374,3 +374,12 @@ async def m028_onchain_sales(db: Database):
         AND onchain_sale IS NULL
         ON CONFLICT DO NOTHING
     """)
+
+
+async def m029_close_legacy_onchain_checkouts(db: Database):
+    await db.execute("""
+        UPDATE tpos.payments SET status = 'abandoned'
+        WHERE onchain_address IS NOT NULL
+        AND (onchain_sale IS NULL OR onchain_sale = 'null')
+        AND paid = false AND status = 'pending'
+    """)

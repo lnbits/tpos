@@ -11,18 +11,28 @@ from lnbits.core.crud.wallets import (
     init_onchain_wallet_state,
 )
 from lnbits.core.db import db as core_db
+from lnbits.core.models import Payment
 from lnbits.core.models.wallets import WalletType
 from lnbits.utils.electrum import network_from_name
+from sqlalchemy.exc import IntegrityError  # type: ignore[import-untyped]
 from tabs.crud import get_tab_settlements  # type: ignore[import]
 
-from .. import tasks, views_onchain, views_payments
+from .. import (
+    migrations,
+    services_onchain,
+    services_orders,
+    tasks,
+    views_onchain,
+    views_payments,
+)
 from ..crud import (
+    create_onchain_payment,
     create_tpos_payment,
     db,
     get_pending_tpos_payments,
     get_tpos_payment_by_hash,
 )
-from ..models import OnchainSale, TposPayment, TposPaymentStatus
+from ..models import OnchainSale, Tpos, TposPayment, TposPaymentStatus
 from .test_api import _tpos_payload, _user_with_tabs
 
 
@@ -135,6 +145,22 @@ async def test_ordinary_merchant_onchain_checkout_fulfils_once(
     check_url = f"{base}/invoices/{payment_hash}"
     checkout = await get_tpos_payment_by_hash(payment_hash)
     assert checkout and checkout.onchain_sale and not checkout.paid
+
+    unused_address = _address(6 if core else 7)
+    fetch_address.side_effect = [
+        {"address": invoice["onchain_address"]},
+        {"address": unused_address},
+    ]
+    with monkeypatch.context() as mock:
+        mock.setattr(
+            views_payments, "websocket_updater", AsyncMock(side_effect=TimeoutError)
+        )
+        retry = await client.post(
+            f"{base}/invoices", json={"amount": 42, "payment_method": "btc_onchain"}
+        )
+    assert retry.status_code == 201, retry.text
+    retried_sale = await get_tpos_payment_by_hash(retry.json()["payment_hash"])
+    assert retried_sale and retried_sale.onchain_address == unused_address
 
     balance = AsyncMock(return_value={"confirmed": 0, "unconfirmed": 44})
     monkeypatch.setattr(tasks, "fetch_onchain_balance", balance)
@@ -285,8 +311,15 @@ async def test_ambiguous_order_dispatch_is_not_replayed(client, monkeypatch):
         await before_dispatch()
         raise TimeoutError("Order outcome unknown")
 
-    order = AsyncMock(side_effect=dispatch)
+    order = AsyncMock(side_effect=TimeoutError("Order wallet lookup failed"))
     monkeypatch.setattr(tasks, "maybe_push_order", order)
+    with pytest.raises(TimeoutError):
+        await tasks._fulfil_onchain_checkout(sale)
+    retried = await get_tpos_payment_by_hash(sale.payment_hash)
+    assert retried and retried.paid and retried.onchain_fulfilment == "pending"
+
+    order.reset_mock()
+    order.side_effect = dispatch
     with pytest.raises(TimeoutError):
         await tasks._fulfil_onchain_checkout(sale)
     stored = await get_tpos_payment_by_hash(sale.payment_hash)
@@ -294,3 +327,72 @@ async def test_ambiguous_order_dispatch_is_not_replayed(client, monkeypatch):
     await tasks._fulfil_onchain_checkout(stored)
     order.assert_awaited_once()
     assert sale.id not in {row.id for row in await get_pending_tpos_payments()}
+
+
+@pytest.mark.asyncio
+async def test_address_reservation_rolls_back_if_sale_insert_fails():
+    existing = await create_tpos_payment(
+        TposPayment(
+            id="existing-sale", tpos_id="rollback", payment_hash="existing-hash"
+        )
+    )
+    checkout = TposPayment(
+        id="rollback-sale",
+        tpos_id=existing.tpos_id,
+        payment_hash=existing.payment_hash,
+        onchain_address=_address(8),
+        onchain_network="Mainnet",
+        onchain_sale=OnchainSale(wallet_id="wallet", expires_at=50, memo="", extra={}),
+    )
+    with pytest.raises(IntegrityError):
+        await create_onchain_payment(checkout)
+    checkout.payment_hash = "retry-hash"
+    assert await create_onchain_payment(checkout)
+    stored = await get_tpos_payment_by_hash(checkout.payment_hash)
+    assert stored and stored.onchain_address == checkout.onchain_address
+
+
+@pytest.mark.asyncio
+async def test_upgrade_closes_legacy_checkout_without_marking_it_paid():
+    for identifier, address in [("legacy", _address(9)), ("lightning", None)]:
+        await create_tpos_payment(
+            TposPayment(
+                id=identifier,
+                tpos_id="upgrade",
+                payment_hash=identifier,
+                onchain_address=address,
+            )
+        )
+    await migrations.m029_close_legacy_onchain_checkouts(db)
+    legacy = await get_tpos_payment_by_hash("legacy")
+    lightning = await get_tpos_payment_by_hash("lightning")
+    assert legacy and legacy.status == TposPaymentStatus.ABANDONED and not legacy.paid
+    assert lightning and lightning.status == TposPaymentStatus.PENDING
+    assert not {"legacy", "lightning"}.intersection(
+        row.id for row in await get_pending_tpos_payments()
+    )
+
+
+@pytest.mark.asyncio
+async def test_unknown_onchain_network_fails_before_request():
+    with pytest.raises(ValueError, match="Unknown on-chain network"):
+        await services_onchain.fetch_onchain_balance(None, _address(10), "unknown")
+
+
+@pytest.mark.asyncio
+async def test_legacy_order_can_have_no_payment_timestamp(monkeypatch):
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    monkeypatch.setattr(services_orders.httpx, "AsyncClient", lambda: client)
+    payment = Payment.model_construct(
+        payment_hash="legacy-order-hash",
+        checking_id="legacy-order",
+        amount=1000,
+        fee=0,
+        time=None,
+    )
+    await services_orders.push_order_to_orders(
+        "owner", payment, Tpos.model_construct(name="Test")
+    )
+    client.post.assert_awaited_once()
+    assert client.post.await_args.kwargs["json"]["created_at"] is None

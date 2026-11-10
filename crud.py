@@ -1,11 +1,18 @@
 import json
 from typing import Any
 
-from lnbits.db import Database
+from lnbits.db import Connection, Database
 from lnbits.helpers import urlsafe_short_hash
 
 from .helpers import serialize_inventory_tags
-from .models import CreateTposData, LnurlCharge, Tpos, TposClean, TposPayment
+from .models import (
+    CreateTposData,
+    LnurlCharge,
+    OnchainFulfilment,
+    Tpos,
+    TposClean,
+    TposPayment,
+)
 
 db = Database("ext_tpos")
 
@@ -124,8 +131,10 @@ async def delete_tpos(tpos_id: str) -> None:
     await db.execute("DELETE FROM tpos.payments WHERE tpos_id = :id", {"id": tpos_id})
 
 
-async def create_tpos_payment(payment: TposPayment) -> TposPayment:
-    await db.insert("tpos.payments", payment)
+async def create_tpos_payment(
+    payment: TposPayment, *, conn: Connection | None = None
+) -> TposPayment:
+    await (conn or db).insert("tpos.payments", payment)
     return payment
 
 
@@ -157,7 +166,7 @@ async def get_pending_tpos_payments() -> list[TposPayment]:
     return await db.fetchall(
         """
         SELECT * FROM tpos.payments
-        WHERE onchain_sale IS NOT NULL AND (
+        WHERE onchain_sale != 'null' AND (
             (paid = false AND status = 'pending') OR onchain_fulfilment = 'pending'
         )
         ORDER BY created_at ASC
@@ -166,18 +175,23 @@ async def get_pending_tpos_payments() -> list[TposPayment]:
     )
 
 
-async def reserve_onchain_address(network: str, address: str) -> bool:
-    result = await db.execute(
-        """
-        INSERT INTO tpos.onchain_addresses (network, address)
-        SELECT :network, :address WHERE NOT EXISTS (
-            SELECT 1 FROM tpos.onchain_addresses
-            WHERE network = '' AND address = :address
-        ) ON CONFLICT DO NOTHING
-        """,
-        {"network": network, "address": address},
-    )
-    return result.rowcount == 1
+async def create_onchain_payment(payment: TposPayment) -> bool:
+    async with db.connect() as conn:
+        # fetchone keeps the reservation uncommitted until the sale insert commits.
+        reserved = await conn.fetchone(
+            """
+            INSERT INTO tpos.onchain_addresses (network, address)
+            SELECT :network, :address WHERE NOT EXISTS (
+                SELECT 1 FROM tpos.onchain_addresses
+                WHERE network = '' AND address = :address
+            ) ON CONFLICT DO NOTHING RETURNING address
+            """,
+            {"network": payment.onchain_network, "address": payment.onchain_address},
+        )
+        if not reserved:
+            return False
+        await create_tpos_payment(payment, conn=conn)
+        return True
 
 
 async def record_onchain_balance(payment: TposPayment) -> bool:
@@ -211,10 +225,18 @@ async def claim_onchain_fulfilment(payment_id: str) -> bool:
     return result.rowcount == 1
 
 
-async def set_onchain_fulfilment(payment_id: str, state: str) -> None:
+async def set_onchain_fulfilment(
+    payment_id: str,
+    state: OnchainFulfilment,
+    *,
+    expected: OnchainFulfilment | None = None,
+) -> None:
     await db.execute(
-        "UPDATE tpos.payments SET onchain_fulfilment = :state WHERE id = :id",
-        {"id": payment_id, "state": state},
+        """
+        UPDATE tpos.payments SET onchain_fulfilment = :state
+        WHERE id = :id AND onchain_fulfilment = COALESCE(:expected, onchain_fulfilment)
+        """,
+        {"id": payment_id, "state": state, "expected": expected},
     )
 
 
