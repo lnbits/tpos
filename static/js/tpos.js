@@ -29,7 +29,7 @@ window.app = Vue.createApp({
       withdrawMaximum: 0,
       tip_options: null,
       exchangeRateLoaded: false,
-      exchangeRate: 1,
+      exchangeRate: 0,
       stack: [],
       tipAmount: 0.0,
       tipRounding: null,
@@ -1687,6 +1687,7 @@ window.app = Vue.createApp({
         }
       } catch (e) {
         console.error(e)
+        rate = 0
       } finally {
         Quasar.Loading.hide()
         this.exchangeRate = rate
@@ -1701,15 +1702,18 @@ window.app = Vue.createApp({
             let last = [...res.data]
             this.lastPaymentsDialog.data = last.map(obj => {
               obj.dateFrom = moment(obj.time).fromNow()
-              if (obj.currency != g.settings.denomination) {
+              const paidRate = obj.exchange_rate || this.exchangeRate
+              if (obj.currency != g.settings.denomination && paidRate) {
                 obj.amountFiat = this.formatAmount(
-                  obj.amount / 1000 / (obj.exchange_rate || this.exchangeRate),
+                  obj.amount / 1000 / paidRate,
                   this.currency
                 )
-                obj.amountFiatNow = this.formatAmount(
-                  Math.abs(obj.amount) / 1000 / this.exchangeRate,
-                  this.currency
-                )
+                obj.amountFiatNow = this.exchangeRate
+                  ? this.formatAmount(
+                      Math.abs(obj.amount) / 1000 / this.exchangeRate,
+                      this.currency
+                    )
+                  : null
               }
               return obj
             })

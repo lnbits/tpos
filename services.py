@@ -48,6 +48,16 @@ async def ensure_tpos_tabs_access(tpos: Tpos) -> str:
     return user_id
 
 
+async def tpos_fiat_as_satoshis(amount: float, currency: str) -> int:
+    try:
+        return await fiat_amount_as_satoshis(amount, currency)
+    except ValueError as exc:
+        raise HTTPException(
+            HTTPStatus.SERVICE_UNAVAILABLE,
+            "Exchange rate not available. Please try again later.",
+        ) from exc
+
+
 async def validate_tpos_sale_amount(
     tpos: Tpos, data: CreateTposInvoice, amount: float, *, minimum: bool = False
 ) -> None:
@@ -68,7 +78,7 @@ async def validate_tpos_sale_amount(
         )
     if minimum:
         amount = max(supplied, amount)
-    data.amount = await fiat_amount_as_satoshis(amount, tpos.currency)
+    data.amount = await tpos_fiat_as_satoshis(amount, tpos.currency)
     if data.amount <= 0:
         raise HTTPException(HTTPStatus.BAD_REQUEST, "Sale amount is below one satoshi.")
     data.amount_fiat = amount
